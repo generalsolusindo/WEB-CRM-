@@ -103,4 +103,32 @@ class SalesOrderDocumentTest extends TestCase
             'po_number' => 'X',
         ])->assertForbidden();
     }
+
+    public function test_finance_sees_approval_docs_on_invoice_create_page(): void
+    {
+        [$sales, $so] = $this->confirmedOrder();
+        $this->actingAs($sales)->post("/sales/sales-orders/{$so->id}/documents", ['po_number' => 'PO/2026/900']);
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+
+        $this->actingAs($finance)->get("/finance/sales-orders/{$so->id}/invoices/create")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('salesOrder.po_number', 'PO/2026/900')
+                ->has('approvalDocs', 1)
+                ->where('approvalDocs.0.category', 'quotation_signed'));
+    }
+
+    public function test_operational_sees_approval_docs_on_project(): void
+    {
+        [$sales, $so] = $this->confirmedOrder();
+        $this->actingAs($sales)->post("/sales/sales-orders/{$so->id}/documents", ['po_number' => 'PO/OPS/1']);
+        $project = \App\Models\Project::create(['sales_order_id' => $so->id, 'status' => 'draft']);
+        $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
+
+        $this->actingAs($ops)->get("/operational/projects/{$project->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('project.sales_order.po_number', 'PO/OPS/1')
+                ->has('approvalDocs', 1));
+    }
 }

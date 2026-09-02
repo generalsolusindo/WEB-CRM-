@@ -23,7 +23,7 @@ class CreateQuotation
     {
         return DB::transaction(function () use ($procurementRequest, $user, $data) {
             $request = ProcurementRequest::query()
-                ->with(['lead', 'lines'])
+                ->with(['lead', 'lines', 'lines.vendorProduct:id,category'])
                 ->whereKey($procurementRequest->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -91,10 +91,18 @@ class CreateQuotation
             isset($input['discount_amount']) ? (float) $input['discount_amount'] : null,
         );
 
+        $category = in_array($input['category'] ?? null, ['material', 'service'], true)
+            ? $input['category']
+            : ($source->category ?? $source->vendorProduct?->category ?? 'material');
+
         return [
             'procurement_request_line_id' => $source->id,
             'item_name' => $source->item_name,
+            'category' => $category,
             'description' => $source->description,
+            'sourcing_note' => array_key_exists('sourcing_note', $input)
+                ? ($input['sourcing_note'] ?: null)
+                : $source->sourcing_note,
             'qty' => $source->qty,
             'unit' => $source->unit,
             'cost_price' => $source->cost_price,

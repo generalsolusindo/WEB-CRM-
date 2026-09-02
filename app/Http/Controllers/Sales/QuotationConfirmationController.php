@@ -19,7 +19,7 @@ class QuotationConfirmationController extends Controller
         Gate::authorize('confirm', $quotation);
         $quotation->load([
             'contact:id,name,company_name,email,phone',
-            'lines:id,quotation_id,item_name,description,qty,unit,cost_price,selling_price,discount_percent,discount_amount,markup_percent,tax_id,tax_rate,subtotal',
+            'lines:id,quotation_id,item_name,category,description,sourcing_note,qty,unit,cost_price,selling_price,discount_percent,discount_amount,markup_percent,tax_id,tax_rate,subtotal',
             'lines.tax:id,name,rate',
         ]);
 

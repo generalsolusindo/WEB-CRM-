@@ -96,7 +96,7 @@ export default function Show({ survey, invoice, payments, taxes = [], canHandle,
                             <div className="flex flex-wrap items-center justify-between gap-2">
                                 <h2 className="font-semibold text-text">Invoice {invoice.number}</h2>
                                 <div className="flex items-center gap-2">
-                                    <a href={`/finance/invoices/${invoice.id}/print`} target="_blank" rel="noreferrer" className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold">Lihat / Cetak PDF</a>
+                                    <a href={`/finance/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer" className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold">Lihat / Cetak PDF</a>
                                     {canVoidInvoice && <button onClick={voidInvoice} className="rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-semibold text-danger">Batalkan Invoice</button>}
                                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${invoice.status === 'paid' ? 'bg-success/10 text-success' : 'bg-info/10 text-info'}`}>{invoice.status}</span>
                                 </div>

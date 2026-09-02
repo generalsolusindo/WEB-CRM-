@@ -88,7 +88,10 @@ Route::middleware('auth')->group(function () {
         Route::post('sales-orders/{salesOrder}/final-invoice', [InvoiceController::class, 'storeFinal'])
             ->name('sales-orders.final-invoice');
         Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
+        Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
         Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('invoices.send');
+        Route::post('invoices/{invoice}/send-whatsapp', [InvoiceController::class, 'sendWhatsapp'])->name('invoices.send-whatsapp');
+        Route::post('invoices/{invoice}/pph23', [InvoiceController::class, 'updatePph23'])->name('invoices.pph23');
         Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
         Route::get('surveys', [FinanceSurveyController::class, 'index'])->name('surveys.index');
         Route::get('surveys/{survey}', [FinanceSurveyController::class, 'show'])->name('surveys.show');
@@ -198,3 +201,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('leads', LeadController::class);
     });
 });
+
+// Unduhan invoice untuk customer via tautan bertanda tangan (tanpa login).
+Route::get('invoice/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])
+    ->name('invoices.pdf.public')
+    ->middleware('signed');

@@ -15,10 +15,27 @@ const statusBadge = {
     cancelled: 'bg-text-muted/10 text-text-muted',
 };
 
-export default function Show({ invoice, payments, totals, totalPaid, permissions }) {
+export default function Show({ invoice, payments, totals, totalPaid, customerHasWhatsapp = false, pph23 = null, permissions }) {
     const grandTotal = totals.grand_total;
+    const payable = pph23 && pph23.amount > 0 ? pph23.payable : grandTotal;
+
+    const pphForm = useForm({ rate: pph23 ? String(pph23.rate || 2) : '2', bukti_potong_no: pph23?.bukti_potong_no ?? '', slip: null });
+    function savePph23(e) {
+        e.preventDefault();
+        pphForm.post(`/finance/invoices/${invoice.id}/pph23`, { forceFormData: true, preserveScroll: true, onSuccess: () => pphForm.setData('slip', null) });
+    }
     const overdue = invoice.due_date && !['paid', 'cancelled'].includes(invoice.status)
         && new Date(invoice.due_date) < new Date(new Date().toDateString());
+
+    function sendWhatsapp() {
+        router.post(`/finance/invoices/${invoice.id}/send-whatsapp`, {}, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const url = page.props.flash?.whatsappUrl;
+                if (url) window.open(url, '_blank', 'noopener');
+            },
+        });
+    }
 
     const nowLocal = (() => {
         const d = new Date();
@@ -56,12 +73,26 @@ export default function Show({ invoice, payments, totals, totalPaid, permissions
                             {invoice.sales_order?.number} · {invoice.sales_order?.contact?.name ?? '—'}
                         </p>
                     </div>
-                    <div className="flex gap-2">
-                        <a href={`/finance/invoices/${invoice.id}/print`} target="_blank" rel="noreferrer" className="rounded-lg border border-border px-4 py-2 text-sm">Cetak / PDF</a>
-                        {permissions.send && <button onClick={() => act(`/finance/invoices/${invoice.id}/send`, 'Tandai invoice sudah dikirim ke customer?')} className="rounded-lg bg-info px-4 py-2 text-sm font-semibold text-white">Kirim</button>}
+                    <div className="flex flex-wrap gap-2">
+                        <a href={`/finance/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer" className="rounded-lg border border-border px-4 py-2 text-sm">Lihat PDF</a>
+                        {permissions.sendWhatsapp && (
+                            <button
+                                onClick={sendWhatsapp}
+                                disabled={!customerHasWhatsapp}
+                                title={customerHasWhatsapp ? '' : 'Nomor WhatsApp customer belum ada di data Contact'}
+                                className="rounded-lg bg-success px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                            >
+                                {invoice.whatsapp_sent_at ? 'Kirim Ulang via WhatsApp' : 'Kirim via WhatsApp'}
+                            </button>
+                        )}
+                        {permissions.send && <button onClick={() => act(`/finance/invoices/${invoice.id}/send`, 'Tandai invoice sudah dikirim (tanpa WA)?')} className="rounded-lg border border-border px-4 py-2 text-sm">Tandai Terkirim</button>}
                         {permissions.cancel && <button onClick={() => act(`/finance/invoices/${invoice.id}/cancel`, 'Batalkan invoice ini?')} className="rounded-lg border border-danger/30 px-4 py-2 text-sm text-danger">Batalkan</button>}
                     </div>
                 </div>
+
+                {invoice.whatsapp_sent_at && (
+                    <p className="text-xs text-text-muted">Invoice terakhir dikirim ke customer via WhatsApp: {new Date(invoice.whatsapp_sent_at).toLocaleString('id-ID')}</p>
+                )}
 
                 {overdue && <div className="rounded-lg border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">Invoice sudah melewati jatuh tempo ({invoice.due_date}).</div>}
 
@@ -70,9 +101,49 @@ export default function Show({ invoice, payments, totals, totalPaid, permissions
                     <Info label="Perusahaan" value={invoice.sales_order?.contact?.company_name} />
                     <Info label="Jatuh Tempo" value={invoice.due_date || '—'} />
                     <Info label="Dibuat oleh" value={invoice.creator?.name} />
-                    <Info label="Total Dibayar" value={money(totalPaid)} />
-                    <Info label="Sisa" value={money(grandTotal - totalPaid)} />
+                    <Info label="Total Dibayar (kas)" value={money(totalPaid)} />
+                    <Info label="Sisa" value={money(payable - totalPaid)} />
                 </section>
+
+                {pph23 && pph23.applies && (
+                    <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+                        <h2 className="font-semibold text-text">PPh 23 (Jasa)</h2>
+                        <div className="mt-3 grid gap-4 sm:grid-cols-4">
+                            <Info label="Rate" value={`${pph23.rate || 0}%`} />
+                            <Info label="Dipotong" value={money(pph23.amount)} />
+                            <Info label="Nilai Faktur" value={money(grandTotal)} />
+                            <Info label="Dibayar Customer" value={money(pph23.payable)} />
+                        </div>
+                        {pph23.bukti_potong_no && (
+                            <p className="mt-2 text-sm text-text-muted">
+                                Bukti potong: <span className="font-medium text-text">{pph23.bukti_potong_no}</span>
+                                {pph23.recorded_by ? ` · dicatat ${pph23.recorded_by}` : ''}
+                                {pph23.slip_url && <> · <a href={pph23.slip_url} target="_blank" rel="noreferrer" className="text-info">lihat file</a></>}
+                            </p>
+                        )}
+                        {permissions.managePph23 && (
+                            <form onSubmit={savePph23} className="mt-4 grid gap-3 rounded-lg border border-border bg-bg/50 p-4 sm:grid-cols-3">
+                                {pph23.rate_editable && (
+                                    <label className="text-sm font-medium text-text">Rate PPh 23 (%)
+                                        <input type="number" min="0" max="10" step="0.01" value={pphForm.data.rate} onChange={(e) => pphForm.setData('rate', e.target.value)} className="input" />
+                                        {pphForm.errors.rate && <span className="text-xs text-danger">{pphForm.errors.rate}</span>}
+                                    </label>
+                                )}
+                                <label className="text-sm font-medium text-text">Nomor Bukti Potong
+                                    <input value={pphForm.data.bukti_potong_no} onChange={(e) => pphForm.setData('bukti_potong_no', e.target.value)} className="input" placeholder="dari customer" />
+                                    {pphForm.errors.bukti_potong_no && <span className="text-xs text-danger">{pphForm.errors.bukti_potong_no}</span>}
+                                </label>
+                                <label className="text-sm font-medium text-text">File Bukti Potong
+                                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pphForm.setData('slip', e.target.files[0] ?? null)} className="mt-1 block w-full text-sm" />
+                                    {pphForm.errors.slip && <span className="text-xs text-danger">{pphForm.errors.slip}</span>}
+                                </label>
+                                <div className="sm:col-span-3 flex justify-end">
+                                    <button disabled={pphForm.processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Simpan PPh 23</button>
+                                </div>
+                            </form>
+                        )}
+                    </section>
+                )}
 
                 <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
                     <div className="overflow-x-auto">

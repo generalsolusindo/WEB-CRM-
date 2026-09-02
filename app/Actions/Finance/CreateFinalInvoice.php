@@ -16,9 +16,9 @@ class CreateFinalInvoice
 {
     public function __construct(private DocumentNumber $documentNumber) {}
 
-    public function handle(SalesOrder $salesOrder, User $user, ?string $dueDate): Invoice
+    public function handle(SalesOrder $salesOrder, User $user, ?string $dueDate, ?float $pph23Rate = null): Invoice
     {
-        return DB::transaction(function () use ($salesOrder, $user, $dueDate) {
+        return DB::transaction(function () use ($salesOrder, $user, $dueDate, $pph23Rate) {
             $order = SalesOrder::query()
                 ->with('lines.tax')
                 ->whereKey($salesOrder->id)
@@ -55,6 +55,28 @@ class CreateFinalInvoice
                 ]);
             }
 
+            // Ambil rincian yang sudah ditagih di invoice DP — pelunasan menagih sisanya,
+            // apa pun persentase DP yang dipakai Finance.
+            $dpInvoice = $order->invoices()
+                ->where('invoice_phase', InvoicePhase::Dp->value)
+                ->where('status', '!=', InvoiceStatus::Cancelled->value)
+                ->with('lines')
+                ->latest()
+                ->first();
+
+            $dpSubtotalByLine = [];
+            $dpDiscountByLine = [];
+            $dpCreditBilled = 0.0;
+            foreach ($dpInvoice?->lines ?? [] as $line) {
+                if ($line->sales_order_line_id === null) {
+                    $dpCreditBilled += abs((float) $line->subtotal); // baris kredit survey (negatif)
+
+                    continue;
+                }
+                $dpSubtotalByLine[$line->sales_order_line_id] = ($dpSubtotalByLine[$line->sales_order_line_id] ?? 0) + (float) $line->subtotal;
+                $dpDiscountByLine[$line->sales_order_line_id] = ($dpDiscountByLine[$line->sales_order_line_id] ?? 0) + (float) $line->discount_amount;
+            }
+
             $invoice = Invoice::create([
                 'number' => $this->documentNumber->nextInvoiceNumber(),
                 'sales_order_id' => $order->id,
@@ -71,10 +93,9 @@ class CreateFinalInvoice
 
             foreach ($order->lines as $soLine) {
                 $full = (float) $soLine->subtotal;
-                $dp = round($full * 0.5, 2);
-                $remaining = round($full - $dp, 2); // sisa tepat, tanpa drift pembulatan
+                $remaining = round($full - round((float) ($dpSubtotalByLine[$soLine->id] ?? 0), 2), 2);
                 $discountFull = (float) $soLine->discount_amount;
-                $discountRemaining = round($discountFull - round($discountFull * 0.5, 2), 2);
+                $discountRemaining = round($discountFull - round((float) ($dpDiscountByLine[$soLine->id] ?? 0), 2), 2);
                 $qty = (float) $soLine->qty;
                 $unitPrice = $qty > 0 ? round(($remaining + $discountRemaining) / $qty, 2) : 0.0;
                 $taxAmount = round($remaining * (float) $soLine->tax_rate / 100, 2);
@@ -82,6 +103,7 @@ class CreateFinalInvoice
                 $invoice->lines()->create([
                     'sales_order_line_id' => $soLine->id,
                     'item_name' => $soLine->item_name.' (Pelunasan)',
+                    'category' => $soLine->category,
                     'qty' => $soLine->qty,
                     'unit_price' => $unitPrice,
                     'discount_amount' => $discountRemaining,
@@ -94,9 +116,9 @@ class CreateFinalInvoice
                 $taxTotal += $taxAmount;
             }
 
-            // Sisa kredit biaya survey (bagian pelunasan) — bayangan split 50/50 seperti DP.
+            // Sisa kredit biaya survey (bagian pelunasan) — apa pun yang belum dipotong di DP.
             $creditFull = (float) $order->survey_credit;
-            $creditRemaining = round($creditFull - round($creditFull * 0.5, 2), 2);
+            $creditRemaining = round($creditFull - round($dpCreditBilled, 2), 2);
             if ($creditRemaining > 0) {
                 $invoice->lines()->create([
                     'sales_order_line_id' => null,
@@ -111,9 +133,16 @@ class CreateFinalInvoice
                 $amount -= $creditRemaining;
             }
 
+            // PPh 23 (default 2%) atas TOTAL DPP jasa Sales Order — dipotong sekali di pelunasan.
+            $serviceDpp = round((float) $order->lines->where('category', 'service')->sum('subtotal'), 2);
+            $pph23FinalRate = $serviceDpp > 0 ? max(0.0, min(10.0, $pph23Rate ?? 2.0)) : 0.0;
+            $pph23FinalAmount = round($serviceDpp * $pph23FinalRate / 100);
+
             $invoice->update([
                 'amount' => round($amount, 2),
                 'tax_amount' => round($taxTotal, 2),
+                'pph23_rate' => $pph23FinalRate,
+                'pph23_amount' => $pph23FinalAmount,
             ]);
 
             return $invoice->refresh();

@@ -5,17 +5,21 @@ function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
 }
 
-export default function Create({ salesOrder, allowedPhase, ratio, alreadyInvoiced }) {
+export default function Create({ salesOrder, allowedPhase, isDp = false, defaultDpPercent = 50, alreadyInvoiced, approvalDocs = [] }) {
     const { data, setData, post, processing, errors } = useForm({
         sales_order_id: salesOrder.id,
         phase: allowedPhase.value,
         due_date: '',
+        dp_percent: isDp ? String(defaultDpPercent) : '',
     });
 
     function submit(e) {
         e.preventDefault();
         post('/finance/invoices');
     }
+
+    const pct = isDp ? Math.min(99, Math.max(1, Number(data.dp_percent) || defaultDpPercent)) : 100;
+    const ratio = pct / 100;
 
     const lines = salesOrder.lines.map((l) => {
         const subtotal = Math.round(Number(l.subtotal) * ratio * 100) / 100;
@@ -37,6 +41,16 @@ export default function Create({ salesOrder, allowedPhase, ratio, alreadyInvoice
                     <p className="text-sm text-text-muted">{salesOrder.contact.name} · {salesOrder.contact.company_name || 'Tanpa perusahaan'}</p>
                 </div>
 
+                {(salesOrder.po_number || approvalDocs.length > 0) && (
+                    <section className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+                        <h2 className="text-sm font-semibold text-text">Referensi Persetujuan Customer</h2>
+                        <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-text-muted">
+                            {salesOrder.po_number && <span>Nomor PO: <span className="font-medium text-text">{salesOrder.po_number}</span></span>}
+                            {approvalDocs.map((doc) => <a key={doc.category} href={doc.url} target="_blank" rel="noreferrer" className="rounded-lg border border-info/30 px-3 py-1 text-xs font-semibold text-info">{doc.label}</a>)}
+                        </div>
+                    </section>
+                )}
+
                 {alreadyInvoiced && (
                     <div className="rounded-lg border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
                         Sales Order ini sudah memiliki invoice muka aktif.
@@ -47,12 +61,19 @@ export default function Create({ salesOrder, allowedPhase, ratio, alreadyInvoice
 
                 <form onSubmit={submit} className="space-y-5">
                     <section className="rounded-xl border border-border bg-surface p-5 shadow-sm">
-                        <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="grid gap-4 sm:grid-cols-3">
                             <div>
                                 <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Jenis Invoice</div>
                                 <div className="mt-1 font-medium text-text">{allowedPhase.label}</div>
                                 <p className="text-xs text-text-muted">Ditentukan otomatis dari Order Type.</p>
                             </div>
+                            {isDp && (
+                                <label className="text-sm font-medium text-text">Persentase DP (%)
+                                    <input type="number" min="1" max="99" step="0.01" value={data.dp_percent} onChange={(e) => setData('dp_percent', e.target.value)} className="input" />
+                                    <span className="text-xs text-text-muted">Default 50%. Sisanya ditagih di invoice pelunasan.</span>
+                                    {errors.dp_percent && <span className="block text-xs text-danger">{errors.dp_percent}</span>}
+                                </label>
+                            )}
                             <label className="text-sm font-medium text-text">Jatuh Tempo
                                 <input type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} className="input" />
                                 {errors.due_date && <span className="text-xs text-danger">{errors.due_date}</span>}
@@ -61,7 +82,7 @@ export default function Create({ salesOrder, allowedPhase, ratio, alreadyInvoice
                     </section>
 
                     <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-                        <div className="border-b border-border p-5"><h2 className="font-semibold text-text">Rincian Baris ({Math.round(ratio * 100)}% dari Sales Order)</h2></div>
+                        <div className="border-b border-border p-5"><h2 className="font-semibold text-text">Rincian Baris ({pct}% dari Sales Order)</h2></div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-bg text-text-muted"><tr><th className="px-4 py-3">Item</th><th className="px-4 py-3">Qty</th><th className="px-4 py-3 text-right">Diskon</th><th className="px-4 py-3">Pajak</th><th className="px-4 py-3 text-right">DPP</th></tr></thead>

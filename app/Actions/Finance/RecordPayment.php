@@ -51,11 +51,12 @@ class RecordPayment
             ]);
 
             // Update status DULU supaya cek turunan (Won / gate project) melihat status terbaru.
-            $grand = (float) $locked->amount + (float) $locked->tax_amount;
+            $grand = $locked->grandTotal();
             $totalPaid = (float) $locked->payments()->sum('amount_paid');
+            $settled = round($totalPaid + (float) $locked->pph23_amount, 2); // kas + PPh 23 (bukti potong)
 
             $status = match (true) {
-                $totalPaid >= $grand => InvoiceStatus::Paid->value,
+                $settled >= $grand => InvoiceStatus::Paid->value,
                 $totalPaid > 0 => InvoiceStatus::PartiallyPaid->value,
                 default => $locked->status,
             };

@@ -64,8 +64,9 @@ class QuotationController extends Controller
 
         $procurementRequest->load([
             'lead.contact:id,name,company_name,email,phone,address,npwp',
-            'lines:id,procurement_request_id,item_name,description,qty,unit,cost_price,tax_id,availability_status',
+            'lines:id,procurement_request_id,vendor_product_id,item_name,category,description,sourcing_note,qty,unit,cost_price,tax_id,availability_status',
             'lines.tax:id,name,rate',
+            'lines.vendorProduct:id,category',
         ]);
 
         return Inertia::render('Sales/Quotations/Form', [

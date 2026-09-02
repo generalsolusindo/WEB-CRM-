@@ -29,6 +29,21 @@ class InvoicePolicy
             && $invoice->status === InvoiceStatus::Draft->value;
     }
 
+    /** Kirim / kirim ulang PDF invoice ke customer (WhatsApp). */
+    public function sendWhatsapp(User $user, Invoice $invoice): bool
+    {
+        return $this->isFinance($user)
+            && $invoice->status !== InvoiceStatus::Cancelled->value;
+    }
+
+    /** Ubah rate PPh 23 & catat bukti potong. */
+    public function managePph23(User $user, Invoice $invoice): bool
+    {
+        return $this->isFinance($user)
+            && ! $invoice->isSurvey()
+            && $invoice->status !== InvoiceStatus::Cancelled->value;
+    }
+
     public function cancel(User $user, Invoice $invoice): bool
     {
         if (! $this->isFinance($user)) {

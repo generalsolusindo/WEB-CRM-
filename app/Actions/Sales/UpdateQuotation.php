@@ -49,6 +49,12 @@ class UpdateQuotation
                 );
 
                 $line->update([
+                    'category' => in_array($input['category'] ?? null, ['material', 'service'], true)
+                        ? $input['category']
+                        : $line->category,
+                    'sourcing_note' => array_key_exists('sourcing_note', $input)
+                        ? ($input['sourcing_note'] ?: null)
+                        : $line->sourcing_note,
                     'selling_price' => $input['selling_price'],
                     'discount_percent' => $priced['discount_percent'],
                     'discount_amount' => $priced['discount_amount'],

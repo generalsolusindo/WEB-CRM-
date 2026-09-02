@@ -53,7 +53,7 @@ class ProjectController extends Controller
         Gate::authorize('view', $project);
 
         $project->load([
-            'salesOrder:id,number,order_type,payment_rule,contact_id',
+            'salesOrder:id,number,order_type,payment_rule,contact_id,po_number',
             'salesOrder.contact:id,name,company_name,email,phone,address,npwp',
             'salesOrder.lines:id,sales_order_id,item_name,description,qty,unit',
             'creator:id,name',
@@ -96,6 +96,7 @@ class ProjectController extends Controller
 
         return Inertia::render('Operational/Projects/Show', [
             'project' => $project,
+            'approvalDocs' => \App\Services\Sales\CustomerApprovalDocs::of($project->salesOrder),
             'bastRecords' => $bastRecords,
             'taskPhotos' => $taskPhotos,
             'procurementProgress' => ['received' => $received, 'total' => $procurementItems->count()],

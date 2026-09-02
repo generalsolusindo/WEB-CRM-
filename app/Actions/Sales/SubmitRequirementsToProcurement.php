@@ -49,6 +49,7 @@ class SubmitRequirementsToProcurement
             foreach ($requirements as $requirement) {
                 $procurementRequest->lines()->create([
                     'requirement_id' => $requirement->id,
+                    'category' => $requirement->category,
                     'vendor_product_id' => null,
                     'item_name' => $requirement->item_name,
                     'description' => $requirement->description,

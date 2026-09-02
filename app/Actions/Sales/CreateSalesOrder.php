@@ -88,6 +88,7 @@ class CreateSalesOrder
                 $salesOrder->lines()->create([
                     'quotation_line_id' => $line->id,
                     'item_name' => $line->item_name,
+                    'category' => $line->category,
                     'description' => $line->description,
                     'qty' => $line->qty,
                     'unit' => $line->unit,

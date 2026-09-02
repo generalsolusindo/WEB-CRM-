@@ -17,6 +17,8 @@ function initialLine(line, taxes) {
     else if (rate != null && rate > 0) taxMode = 'custom';
     return {
         procurement_request_line_id: line.procurement_request_line_id ?? line.id,
+        category: line.category ?? line.vendor_product?.category ?? 'material',
+        sourcing_note: line.sourcing_note ?? '',
         selling_price: line.selling_price ?? suggestedPrice(line.cost_price),
         discount_mode: dp && dp > 0 ? 'percent' : (da > 0 ? 'amount' : 'percent'),
         discount_percent: dp && dp > 0 ? String(dp) : '',
@@ -42,6 +44,8 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
         ...payload,
         lines: payload.lines.map((l) => ({
             procurement_request_line_id: l.procurement_request_line_id,
+            category: l.category,
+            sourcing_note: l.sourcing_note,
             selling_price: l.selling_price,
             discount_percent: l.discount_mode === 'percent' && l.discount_percent !== '' ? Number(l.discount_percent) : null,
             discount_amount: l.discount_mode === 'amount' && l.discount_amount !== '' ? Number(l.discount_amount) : null,
@@ -164,6 +168,11 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                                 <td className="px-3 py-3">
                                                     <div className="font-medium text-text">{line.item_name}</div>
                                                     <div className="text-xs text-text-muted">{line.description || '—'}</div>
+                                                    <select value={data.lines[i].category} onChange={(e) => setLine(i, { category: e.target.value })} className="mt-1 rounded border border-border px-1 py-0.5 text-[11px]">
+                                                        <option value="material">Material</option>
+                                                        <option value="service">Jasa (kena PPh 23)</option>
+                                                    </select>
+                                                    <textarea rows="2" value={data.lines[i].sourcing_note} onChange={(e) => setLine(i, { sourcing_note: e.target.value })} placeholder="Catatan opsi merk (dari Procurement). Kosongkan bila tak perlu ditampilkan ke customer." className="mt-1 w-full rounded border border-border px-1.5 py-1 text-[11px]" />
                                                     <div className="mt-1 text-xs">
                                                         <span className={c.markup != null && c.markup < 0 ? 'text-danger' : 'text-text-muted'}>Markup {c.markup == null ? '—' : `${c.markup.toFixed(1)}%`}</span>
                                                         {' · '}

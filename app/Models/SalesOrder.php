@@ -25,6 +25,7 @@ class SalesOrder extends Model
         'payment_rule',
         'status',
         'survey_credit',
+        'dp_percent',
         'po_number',
         'confirmed_at',
         'confirmed_by',
@@ -35,6 +36,7 @@ class SalesOrder extends Model
     {
         return [
             'survey_credit' => 'decimal:2',
+            'dp_percent' => 'decimal:2',
         ];
     }
 

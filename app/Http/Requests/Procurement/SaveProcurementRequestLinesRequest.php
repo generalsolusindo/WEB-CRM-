@@ -22,6 +22,7 @@ class SaveProcurementRequestLinesRequest extends FormRequest
         return [
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.id' => ['required', 'integer', 'distinct'],
+            'lines.*.sourcing_note' => ['nullable', 'string', 'max:2000'],
             'lines.*.vendor_product_id' => [
                 'nullable',
                 'integer',

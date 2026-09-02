@@ -90,7 +90,7 @@ class LeadController extends Controller
 
         $lead->load([
             'contact:id,name,company_name,phone,email,address,npwp',
-            'requirements:id,lead_id,item_name,description,qty,unit,notes,created_at',
+            'requirements:id,lead_id,item_name,category,description,qty,unit,notes,created_at',
             'meetings' => fn ($query) => $query
                 ->select('id', 'lead_id', 'title', 'meeting_date', 'location', 'attendees', 'notes', 'created_at')
                 ->orderByDesc('meeting_date'),

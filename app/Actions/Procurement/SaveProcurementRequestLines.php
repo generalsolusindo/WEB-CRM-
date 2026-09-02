@@ -44,6 +44,7 @@ class SaveProcurementRequestLines
 
                 $line->update([
                     'vendor_product_id' => $input['vendor_product_id'] ?? null,
+                    'sourcing_note' => $input['sourcing_note'] ?? null,
                     'cost_price' => $input['cost_price'],
                     'tax_id' => $input['tax_id'] ?? null,
                     'availability_status' => $input['availability_status'],

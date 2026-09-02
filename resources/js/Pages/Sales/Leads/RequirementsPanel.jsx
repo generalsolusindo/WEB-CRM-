@@ -1,7 +1,7 @@
 import { router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
-const emptyForm = { item_name: '', description: '', qty: '1', unit: '', notes: '' };
+const emptyForm = { item_name: '', category: 'material', description: '', qty: '1', unit: '', notes: '' };
 
 export default function RequirementsPanel({ leadId, requirements, editable }) {
     const [editingId, setEditingId] = useState(null);
@@ -12,6 +12,7 @@ export default function RequirementsPanel({ leadId, requirements, editable }) {
         clearErrors();
         setData({
             item_name: item.item_name,
+            category: item.category ?? 'material',
             description: item.description ?? '',
             qty: item.qty,
             unit: item.unit,
@@ -71,7 +72,7 @@ export default function RequirementsPanel({ leadId, requirements, editable }) {
                         <tbody className="divide-y divide-border">
                             {requirements.map((item) => (
                                 <tr key={item.id}>
-                                    <td className="px-3 py-3"><div className="font-medium text-text">{item.item_name}</div>{item.notes && <div className="text-xs text-text-muted">{item.notes}</div>}</td>
+                                    <td className="px-3 py-3"><div className="font-medium text-text">{item.item_name}{item.category === 'service' && <span className="ml-1 rounded bg-info/10 px-1.5 py-0.5 text-[10px] font-semibold text-info">Jasa</span>}</div>{item.notes && <div className="text-xs text-text-muted">{item.notes}</div>}</td>
                                     <td className="whitespace-nowrap px-3 py-3 text-text-muted">{item.qty} {item.unit}</td>
                                     <td className="px-3 py-3 text-text-muted">{item.description || '—'}</td>
                                     {editable && <td className="whitespace-nowrap px-3 py-3 text-right"><button onClick={() => beginEdit(item)} className="mr-3 text-info">Edit</button><button onClick={() => destroy(item.id)} className="text-danger">Hapus</button></td>}
@@ -87,6 +88,12 @@ export default function RequirementsPanel({ leadId, requirements, editable }) {
                     <h3 className="font-medium text-text">{editingId ? 'Edit Requirement' : 'Tambah Requirement'}</h3>
                     <div className="grid gap-4 md:grid-cols-4">
                         <Field label="Nama item *" error={errors.item_name} className="md:col-span-2"><input value={data.item_name} onChange={(e) => setData('item_name', e.target.value)} className="input" /></Field>
+                        <Field label="Kategori" error={errors.category}>
+                            <select value={data.category} onChange={(e) => setData('category', e.target.value)} className="input">
+                                <option value="material">Material</option>
+                                <option value="service">Jasa</option>
+                            </select>
+                        </Field>
                         <Field label="Qty *" error={errors.qty}><input type="number" min="0.01" step="0.01" value={data.qty} onChange={(e) => setData('qty', e.target.value)} className="input" /></Field>
                         <Field label="Unit *" error={errors.unit}><input value={data.unit} onChange={(e) => setData('unit', e.target.value)} placeholder="pcs, unit, lot" className="input" /></Field>
                     </div>

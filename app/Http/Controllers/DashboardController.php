@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\InvoicePhase;
+use App\Enums\InvoiceStatus;
 use App\Enums\OrderType;
 use App\Models\Bast;
 use App\Models\Invoice;
@@ -94,12 +96,26 @@ class DashboardController extends Controller
             'href' => "/finance/invoices/{$inv->id}",
         ];
 
+        // Hanya invoice Sales Order (invoice survey dikelola di menu Survey, tak punya salesOrder).
+        $saleInvoices = fn () => Invoice::query()->where('invoice_type', 'sale');
         $withRels = fn ($query) => $query->with('salesOrder.contact:id,name')->latest()->get();
 
         return [
-            'draft' => $withRels(Invoice::query()->where('status', 'draft'))->map($map),
-            'unpaid_sent' => $withRels(Invoice::query()->whereIn('status', ['sent', 'partially_paid']))->map($map),
-            'overdue' => $withRels(Invoice::query()
+            'needs_upfront_invoice' => SalesOrder::query()
+                ->whereNotIn('status', ['cancelled'])
+                ->whereDoesntHave('invoices', fn ($query) => $query
+                    ->whereIn('invoice_phase', [InvoicePhase::Dp->value, InvoicePhase::Full->value])
+                    ->where('status', '!=', InvoiceStatus::Cancelled->value))
+                ->with('contact:id,name')
+                ->latest()
+                ->get(['id', 'number', 'contact_id'])
+                ->map(fn ($so) => [
+                    'label' => "{$so->number} · ".($so->contact->name ?? '—'),
+                    'href' => '/finance/invoices',
+                ]),
+            'draft' => $withRels($saleInvoices()->where('status', 'draft'))->map($map),
+            'unpaid_sent' => $withRels($saleInvoices()->whereIn('status', ['sent', 'partially_paid']))->map($map),
+            'overdue' => $withRels($saleInvoices()
                 ->whereNotIn('status', ['paid', 'cancelled'])
                 ->whereNotNull('due_date')
                 ->whereDate('due_date', '<', now()))->map($map),

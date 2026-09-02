@@ -102,8 +102,9 @@
                     <tr>
                         <td>{{ $i + 1 }}</td>
                         <td>
-                            <strong>{{ $line->item_name }}</strong>
+                            <strong>{{ $line->item_name }}</strong>@if ($line->category === 'service') <span class="muted">(Jasa)</span>@endif
                             @if ($line->description)<br><span class="muted">{{ $line->description }}</span>@endif
+                            @if ($line->sourcing_note)<br><span class="muted">Opsi: {{ $line->sourcing_note }}</span>@endif
                         </td>
                         <td class="num">{{ rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',') }}</td>
                         <td>{{ $line->unit }}</td>

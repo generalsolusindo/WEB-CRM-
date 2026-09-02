@@ -72,9 +72,6 @@ class SalesOrderController extends Controller
             'quotation:id,lead_id,revision_number,status,number',
             'quotation.lead:id,type,stage',
             'lines.tax:id,name,rate',
-            'attachments' => fn ($query) => $query
-                ->whereIn('category', ['quotation_signed', 'purchase_order'])
-                ->latest(),
             'invoices' => fn ($query) => $query
                 ->withSum('payments as total_paid', 'amount_paid')
                 ->with(['payments' => fn ($payment) => $payment
@@ -93,20 +90,16 @@ class SalesOrderController extends Controller
             )
         );
 
-        $approvalDocs = $salesOrder->attachments->map(fn ($a) => [
-            'category' => $a->category,
-            'label' => $a->category === 'purchase_order' ? 'Purchase Order' : 'Quotation ditandatangani',
-            'url' => \Illuminate\Support\Facades\Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay()),
-            'uploaded_at' => $a->created_at,
-        ]);
-
         return Inertia::render('Sales/SalesOrders/Show', [
             'salesOrder' => $salesOrder,
-            'approvalDocs' => $approvalDocs,
+            'approvalDocs' => \App\Services\Sales\CustomerApprovalDocs::of($salesOrder),
             'canManageDocs' => request()->user()->can('manageDocuments', $salesOrder),
             'totals' => \App\Services\Sales\DocumentTotals::of($salesOrder->lines, (float) $salesOrder->survey_credit),
             'orderTypeLabel' => OrderType::from($salesOrder->order_type)->label(),
-            'paymentRuleLabel' => PaymentRule::from($salesOrder->payment_rule)->label(),
+            'paymentRuleLabel' => $salesOrder->payment_rule === PaymentRule::Dp50->value
+                ? 'Down Payment '.rtrim(rtrim(number_format((float) ($salesOrder->dp_percent ?? 50), 2), '0'), '.').'%'
+                    .($salesOrder->dp_percent === null ? ' (default)' : '')
+                : PaymentRule::from($salesOrder->payment_rule)->label(),
             'requiredSettlementPhase' => $settlement->requiredInvoicePhase($salesOrder),
             'canCloseAsWon' => $settlement->canCloseAsWon($salesOrder)
                 && request()->user()->can('closeAsWon', $salesOrder),

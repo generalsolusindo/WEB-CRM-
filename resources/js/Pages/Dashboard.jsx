@@ -49,6 +49,7 @@ export default function Dashboard({ salesActions = null, procurementActions = nu
                 {financeActions && (
                     <div className="space-y-4">
                         <h2 className="text-lg font-semibold text-text">Perlu Aksi</h2>
+                        <ActionCard title="SO baru — perlu Invoice Muka" items={financeActions.needs_upfront_invoice} />
                         <ActionCard title="Invoice masih Draft" items={financeActions.draft} />
                         <ActionCard title="Invoice terkirim belum lunas" items={financeActions.unpaid_sent} />
                         <ActionCard title="Invoice jatuh tempo" items={financeActions.overdue} />

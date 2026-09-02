@@ -17,6 +17,7 @@ class StoreRequirementRequest extends FormRequest
     {
         return [
             'item_name' => ['required', 'string', 'max:255'],
+            'category' => ['nullable', \Illuminate\Validation\Rule::in(['material', 'service'])],
             'description' => ['nullable', 'string'],
             'qty' => ['required', 'numeric', 'gt:0', 'decimal:0,2'],
             'unit' => ['required', 'string', 'max:50'],

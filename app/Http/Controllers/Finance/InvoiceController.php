@@ -13,11 +13,14 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\SalesOrder;
 use App\Services\Sales\SalesOrderSettlement;
+use App\Services\Whatsapp\WhatsappGateway;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -101,8 +104,10 @@ class InvoiceController extends Controller
         return Inertia::render('Finance/Invoices/Create', [
             'salesOrder' => $salesOrder,
             'allowedPhase' => ['value' => $allowedPhase->value, 'label' => $allowedPhase->label()],
-            'ratio' => $allowedPhase === InvoicePhase::Dp ? 0.5 : 1.0,
+            'isDp' => $allowedPhase === InvoicePhase::Dp,
+            'defaultDpPercent' => 50,
             'alreadyInvoiced' => $alreadyInvoiced,
+            'approvalDocs' => \App\Services\Sales\CustomerApprovalDocs::of($salesOrder),
         ]);
     }
 
@@ -110,11 +115,14 @@ class InvoiceController extends Controller
     {
         $salesOrder = SalesOrder::findOrFail($request->validated('sales_order_id'));
 
+        $dpPercent = $request->validated('dp_percent');
+
         $invoice = $action->handle(
             $salesOrder,
             $request->user(),
             InvoicePhase::from($request->validated('phase')),
             $request->validated('due_date'),
+            $dpPercent !== null ? (float) $dpPercent : null,
         );
 
         return redirect()->route('finance.invoices.show', $invoice)
@@ -138,12 +146,19 @@ class InvoiceController extends Controller
         $invoice->load([
             'salesOrder:id,number,order_type,payment_rule,contact_id',
             'salesOrder.contact:id,name,company_name,email,phone,address,npwp',
+            'survey.lead.contact:id,name,phone',
             'lines.tax:id,name,rate',
             'payments' => fn ($query) => $query
                 ->with('attachments:id,attachable_type,attachable_id,category,file_path,created_at')
                 ->orderByDesc('paid_at'),
+            'attachments' => fn ($query) => $query->where('category', 'pph23_slip'),
+            'pph23RecordedBy:id,name',
             'creator:id,name',
         ]);
+
+        $contact = $invoice->salesOrder?->contact ?? $invoice->survey?->lead?->contact;
+
+        $pph23Slip = $invoice->attachments->firstWhere('category', 'pph23_slip');
 
         $payments = $invoice->payments->map(fn ($payment) => [
             'id' => $payment->id,
@@ -166,8 +181,27 @@ class InvoiceController extends Controller
                 'tax' => (float) $invoice->tax_amount,
             ],
             'totalPaid' => (float) $invoice->payments->sum('amount_paid'),
+            'customerHasWhatsapp' => $contact?->whatsappNumber() !== null,
+            'pph23' => [
+                'rate' => (float) $invoice->pph23_rate,
+                'amount' => (float) $invoice->pph23_amount,
+                'payable' => $invoice->payableAmount(),
+                'settled' => $invoice->settledAmount(),
+                'bukti_potong_no' => $invoice->pph23_bukti_potong_no,
+                'recorded_at' => $invoice->pph23_recorded_at,
+                'recorded_by' => $invoice->pph23RecordedBy?->name,
+                'slip_url' => $pph23Slip
+                    ? Storage::disk('local')->temporaryUrl($pph23Slip->file_path, now()->addDay())
+                    : null,
+                'rate_editable' => request()->user()->can('managePph23', $invoice)
+                    && ! $invoice->payments()->exists()
+                    && in_array($invoice->status, ['draft', 'sent'], true),
+                'applies' => (float) $invoice->pph23_amount > 0 || $invoice->invoice_phase === 'final',
+            ],
             'permissions' => [
                 'send' => request()->user()->can('send', $invoice),
+                'sendWhatsapp' => request()->user()->can('sendWhatsapp', $invoice),
+                'managePph23' => request()->user()->can('managePph23', $invoice),
                 'cancel' => request()->user()->can('cancel', $invoice),
                 'recordPayment' => request()->user()->can('create', [Payment::class, $invoice]),
             ],
@@ -178,8 +212,35 @@ class InvoiceController extends Controller
     {
         Gate::authorize('view', $invoice);
 
+        return view('finance.invoices.print', $this->printData($invoice));
+    }
+
+    /** Versi PDF (untuk Finance, ditampilkan inline di browser). */
+    public function pdf(Invoice $invoice): \Illuminate\Http\Response
+    {
+        Gate::authorize('view', $invoice);
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('finance.invoices.print', $this->printData($invoice, forPdf: true))
+            ->stream($this->pdfFilename($invoice));
+    }
+
+    /** Unduhan publik lewat tautan bertanda tangan (dipakai di pesan WhatsApp ke customer). */
+    public function downloadPdf(Invoice $invoice): \Illuminate\Http\Response
+    {
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('finance.invoices.print', $this->printData($invoice, forPdf: true))
+            ->download($this->pdfFilename($invoice));
+    }
+
+    private function pdfFilename(Invoice $invoice): string
+    {
+        return str_replace('/', '-', $invoice->number ?? "INV-{$invoice->id}").'.pdf';
+    }
+
+    /** @return array<string, mixed> */
+    private function printData(Invoice $invoice, bool $forPdf = false): array
+    {
         $invoice->load([
-            'salesOrder:id,number,contact_id',
+            'salesOrder:id,number,contact_id,po_number,dp_percent',
             'salesOrder.contact:id,name,company_name,email,phone,address,npwp',
             'survey:id,lead_id,site_region',
             'survey.lead.contact:id,name,company_name,email,phone,address,npwp',
@@ -189,27 +250,134 @@ class InvoiceController extends Controller
 
         $customer = $invoice->salesOrder?->contact ?? $invoice->survey?->lead?->contact;
 
+        $dpLabel = rtrim(rtrim(number_format((float) ($invoice->salesOrder?->dp_percent ?? 50), 2), '0'), '.');
         $title = $invoice->isSurvey()
             ? 'Invoice Biaya Survey'
-            : (['dp' => 'Invoice DP 50%', 'full' => 'Invoice Pembayaran 100%', 'final' => 'Invoice Pelunasan'][$invoice->invoice_phase] ?? 'Invoice');
+            : ([
+                'dp' => "Invoice DP {$dpLabel}%",
+                'full' => 'Invoice Pembayaran 100%',
+                'final' => 'Invoice Pelunasan',
+            ][$invoice->invoice_phase] ?? 'Invoice');
 
         $reference = $invoice->isSurvey()
             ? 'Survey: '.$invoice->survey?->code.($invoice->survey?->site_region ? ' · '.$invoice->survey->site_region : '')
-            : 'Sales Order: '.$invoice->salesOrder?->number;
+            : 'Sales Order: '.$invoice->salesOrder?->number
+                .($invoice->salesOrder?->po_number ? ' · PO Customer: '.$invoice->salesOrder->po_number : '');
 
-        return view('finance.invoices.print', [
+        return [
             'invoice' => $invoice,
             'customer' => $customer,
             'docTitle' => $title,
             'reference' => $reference,
+            'forPdf' => $forPdf,
             'totals' => [
                 ...\App\Services\Sales\DocumentTotals::of($invoice->lines),
                 'grand_total' => $invoice->grandTotal(),
                 'subtotal' => (float) $invoice->amount,
                 'tax' => (float) $invoice->tax_amount,
+                'pph23_rate' => (float) $invoice->pph23_rate,
+                'pph23_amount' => (float) $invoice->pph23_amount,
+                'payable' => $invoice->payableAmount(),
             ],
+            'pph23BuktiPotong' => $invoice->pph23_bukti_potong_no,
             'totalPaid' => (float) $invoice->payments->sum('amount_paid'),
+        ];
+    }
+
+    public function sendWhatsapp(Invoice $invoice, WhatsappGateway $whatsapp): RedirectResponse
+    {
+        Gate::authorize('sendWhatsapp', $invoice);
+
+        $invoice->load(['salesOrder.contact', 'survey.lead.contact']);
+        $contact = $invoice->salesOrder?->contact ?? $invoice->survey?->lead?->contact;
+        $number = $contact?->whatsappNumber();
+
+        if (! $number) {
+            return back()->with('error', 'Nomor WhatsApp customer belum ada / tidak valid. Lengkapi di data Contact dulu.');
+        }
+
+        DB::transaction(function () use ($invoice) {
+            if ($invoice->status === InvoiceStatus::Draft->value) {
+                $invoice->status = InvoiceStatus::Sent->value;
+            }
+            $invoice->whatsapp_sent_at = now();
+            $invoice->whatsapp_sent_by = request()->user()->id;
+            $invoice->save();
+        });
+
+        $pdfUrl = URL::temporarySignedRoute('invoices.pdf.public', now()->addDays(7), ['invoice' => $invoice->id]);
+
+        $grand = number_format($invoice->grandTotal(), 0, ',', '.');
+        $due = $invoice->due_date ? Carbon::parse($invoice->due_date)->translatedFormat('d F Y') : '-';
+        $message = "Yth. {$contact->name},\n\n"
+            ."Terlampir invoice *{$invoice->number}* dari PT General Solusindo.\n"
+            ."Total tagihan: Rp {$grand}\n"
+            ."Jatuh tempo: {$due}\n\n"
+            ."Unduh invoice (PDF):\n{$pdfUrl}\n\n"
+            .'Terima kasih.';
+
+        return back()->with('whatsappUrl', $whatsapp->link($number, $message));
+    }
+
+    public function updatePph23(Request $request, Invoice $invoice, \App\Services\Sales\SalesOrderWinNotifier $winNotifier): RedirectResponse
+    {
+        Gate::authorize('managePph23', $invoice);
+
+        $data = $request->validate([
+            'rate' => ['nullable', 'numeric', 'min:0', 'max:10', 'decimal:0,2'],
+            'bukti_potong_no' => ['nullable', 'string', 'max:100'],
+            'slip' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:1024'],
         ]);
+
+        DB::transaction(function () use ($request, $invoice, $data, $winNotifier) {
+            $rateEditable = ! $invoice->payments()->exists()
+                && in_array($invoice->status, [InvoiceStatus::Draft->value, InvoiceStatus::Sent->value], true);
+
+            if ($rateEditable && ($data['rate'] ?? null) !== null) {
+                $invoice->loadMissing('salesOrder.lines');
+                $serviceDpp = round((float) ($invoice->salesOrder?->lines->where('category', 'service')->sum('subtotal') ?? 0), 2);
+                $rate = max(0.0, min(10.0, (float) $data['rate']));
+                $invoice->pph23_rate = $serviceDpp > 0 ? $rate : 0;
+                $invoice->pph23_amount = $serviceDpp > 0 ? round($serviceDpp * $rate / 100) : 0;
+            }
+
+            if (! empty($data['bukti_potong_no'])) {
+                $invoice->pph23_bukti_potong_no = $data['bukti_potong_no'];
+                $invoice->pph23_recorded_at = now();
+                $invoice->pph23_recorded_by = $request->user()->id;
+            }
+
+            if ($request->hasFile('slip')) {
+                $invoice->attachments()->where('category', 'pph23_slip')->get()->each(function ($old) {
+                    Storage::disk('local')->delete($old->file_path);
+                    $old->delete();
+                });
+                $invoice->attachments()->create([
+                    'category' => 'pph23_slip',
+                    'file_path' => $request->file('slip')->store('pph23-slips'),
+                    'uploaded_by' => $request->user()->id,
+                ]);
+                $invoice->pph23_recorded_at ??= now();
+                $invoice->pph23_recorded_by ??= $request->user()->id;
+            }
+
+            $invoice->save();
+
+            $cash = (float) $invoice->payments()->sum('amount_paid');
+            $settled = round($cash + (float) $invoice->pph23_amount, 2);
+            $newStatus = match (true) {
+                $invoice->status === InvoiceStatus::Cancelled->value => $invoice->status,
+                $settled >= $invoice->grandTotal() => InvoiceStatus::Paid->value,
+                $cash > 0 => InvoiceStatus::PartiallyPaid->value,
+                default => $invoice->status,
+            };
+            if ($newStatus !== $invoice->status) {
+                $invoice->update(['status' => $newStatus]);
+                $winNotifier->evaluate($invoice->salesOrder);
+            }
+        });
+
+        return back()->with('success', 'Data PPh 23 diperbarui.');
     }
 
     public function send(Invoice $invoice): RedirectResponse

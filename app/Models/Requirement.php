@@ -18,6 +18,7 @@ class Requirement extends Model
     protected $fillable = [
         'lead_id',
         'item_name',
+        'category',
         'description',
         'qty',
         'unit',

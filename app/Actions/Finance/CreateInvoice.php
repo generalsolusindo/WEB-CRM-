@@ -16,9 +16,12 @@ class CreateInvoice
 {
     public function __construct(private DocumentNumber $documentNumber) {}
 
-    public function handle(SalesOrder $salesOrder, User $user, InvoicePhase $phase, ?string $dueDate): Invoice
+    /**
+     * @param  float|null  $dpPercent  Persentase DP (default 50) — hanya dipakai saat $phase = DP.
+     */
+    public function handle(SalesOrder $salesOrder, User $user, InvoicePhase $phase, ?string $dueDate, ?float $dpPercent = null, ?float $pph23Rate = null): Invoice
     {
-        return DB::transaction(function () use ($salesOrder, $user, $phase, $dueDate) {
+        return DB::transaction(function () use ($salesOrder, $user, $phase, $dueDate, $dpPercent, $pph23Rate) {
             $order = SalesOrder::query()
                 ->with('lines.tax')
                 ->whereKey($salesOrder->id)
@@ -52,8 +55,12 @@ class CreateInvoice
                 ]);
             }
 
-            $ratio = $phase === InvoicePhase::Dp ? 0.5 : 1.0;
-            $suffix = $phase === InvoicePhase::Dp ? ' (DP 50%)' : '';
+            $percent = $phase === InvoicePhase::Dp
+                ? max(1.0, min(99.0, $dpPercent ?? 50.0))
+                : 100.0;
+            $ratio = $percent / 100;
+            $percentLabel = rtrim(rtrim(number_format($percent, 2), '0'), '.');
+            $suffix = $phase === InvoicePhase::Dp ? " (DP {$percentLabel}%)" : '';
 
             $invoice = Invoice::create([
                 'number' => $this->documentNumber->nextInvoiceNumber(),
@@ -79,6 +86,7 @@ class CreateInvoice
                 $invoice->lines()->create([
                     'sales_order_line_id' => $soLine->id,
                     'item_name' => $soLine->item_name.$suffix,
+                    'category' => $soLine->category,
                     'qty' => $soLine->qty,
                     'unit_price' => $unitPrice,
                     'discount_amount' => $discountAmount,
@@ -107,10 +115,27 @@ class CreateInvoice
                 $amount -= $creditPortion;
             }
 
+            // PPh 23 dipotong sekali — hanya di invoice pembayaran penuh (bukan DP).
+            $pph23FinalRate = 0.0;
+            $pph23FinalAmount = 0.0;
+            if ($phase === InvoicePhase::Full) {
+                $serviceDpp = round((float) $order->lines->where('category', 'service')->sum('subtotal'), 2);
+                if ($serviceDpp > 0) {
+                    $pph23FinalRate = max(0.0, min(10.0, $pph23Rate ?? 2.0));
+                    $pph23FinalAmount = round($serviceDpp * $pph23FinalRate / 100);
+                }
+            }
+
             $invoice->update([
                 'amount' => round($amount, 2),
                 'tax_amount' => round($taxTotal, 2),
+                'pph23_rate' => $pph23FinalRate,
+                'pph23_amount' => $pph23FinalAmount,
             ]);
+
+            if ($phase === InvoicePhase::Dp) {
+                $order->update(['dp_percent' => $percent]);
+            }
 
             return $invoice->refresh();
         });

@@ -23,6 +23,7 @@ class InvoiceLine extends Model
         'invoice_id',
         'sales_order_line_id',
         'item_name',
+        'category',
         'qty',
         'unit_price',
         'discount_amount',

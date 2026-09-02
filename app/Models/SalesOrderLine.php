@@ -23,6 +23,7 @@ class SalesOrderLine extends Model
         'sales_order_id',
         'quotation_line_id',
         'item_name',
+        'category',
         'description',
         'qty',
         'unit',

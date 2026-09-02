@@ -39,4 +39,23 @@ class Contact extends Model
     {
         return $this->hasMany(Lead::class);
     }
+
+    /**
+     * Nomor telepon dalam format internasional siap-WA (62xxxxxxxxxx), atau null bila tidak valid.
+     */
+    public function whatsappNumber(): ?string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $this->phone);
+
+        if ($digits === '' || $digits === null) {
+            return null;
+        }
+
+        $digits = ltrim($digits, '0');           // 0812... -> 812...
+        if (! str_starts_with($digits, '62')) {
+            $digits = '62'.$digits;              // 812... -> 62812...
+        }
+
+        return strlen($digits) >= 10 && strlen($digits) <= 15 ? $digits : null;
+    }
 }

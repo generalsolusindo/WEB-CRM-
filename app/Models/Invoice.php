@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Invoice extends Model
 {
@@ -25,7 +26,14 @@ class Invoice extends Model
         'status',
         'amount',
         'tax_amount',
+        'pph23_rate',
+        'pph23_amount',
+        'pph23_bukti_potong_no',
+        'pph23_recorded_at',
+        'pph23_recorded_by',
         'due_date',
+        'whatsapp_sent_at',
+        'whatsapp_sent_by',
         'created_by',
     ];
 
@@ -39,16 +47,36 @@ class Invoice extends Model
         return [
             'amount' => 'decimal:2',
             'tax_amount' => 'decimal:2',
+            'pph23_rate' => 'decimal:2',
+            'pph23_amount' => 'decimal:2',
             'due_date' => 'date:Y-m-d',
+            'whatsapp_sent_at' => 'datetime',
+            'pph23_recorded_at' => 'datetime',
         ];
     }
 
     /**
-     * Total tagihan (DPP + PPN).
+     * Nilai faktur (DPP + PPN) — piutang penuh.
      */
     public function grandTotal(): float
     {
         return (float) $this->amount + (float) $this->tax_amount;
+    }
+
+    /**
+     * Jumlah kas yang ditransfer customer (setelah dipotong PPh 23).
+     */
+    public function payableAmount(): float
+    {
+        return round($this->grandTotal() - (float) $this->pph23_amount, 2);
+    }
+
+    /**
+     * Total penyelesaian: kas masuk + PPh 23 (dilunasi lewat bukti potong).
+     */
+    public function settledAmount(): float
+    {
+        return round((float) $this->payments()->sum('amount_paid') + (float) $this->pph23_amount, 2);
     }
 
     public function salesOrder(): BelongsTo
@@ -79,6 +107,16 @@ class Invoice extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
+    }
+
+    public function pph23RecordedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'pph23_recorded_by');
     }
 
     public function totalPaid()

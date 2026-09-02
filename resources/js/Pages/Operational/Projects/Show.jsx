@@ -16,7 +16,7 @@ function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
 }
 
-export default function Show({ project, bastRecords, taskPhotos, procurementProgress, statusOptions, availabilityOptions, technicianOptions, changeRequestTypes, permissions }) {
+export default function Show({ project, approvalDocs = [], bastRecords, taskPhotos, procurementProgress, statusOptions, availabilityOptions, technicianOptions, changeRequestTypes, permissions }) {
     const number = `PRJ-${String(project.id).padStart(6, '0')}`;
     const so = project.sales_order;
 
@@ -47,6 +47,16 @@ export default function Show({ project, bastRecords, taskPhotos, procurementProg
                         )}
                     </div>
                 </div>
+
+                {(so.po_number || approvalDocs.length > 0) && (
+                    <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+                        <h2 className="mb-2 font-semibold text-text">Dokumen Persetujuan Customer</h2>
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-text-muted">
+                            {so.po_number && <span>Nomor PO: <span className="font-medium text-text">{so.po_number}</span></span>}
+                            {approvalDocs.map((doc) => <a key={doc.category} href={doc.url} target="_blank" rel="noreferrer" className="rounded-lg border border-info/30 px-3 py-1 text-xs font-semibold text-info">{doc.label}</a>)}
+                        </div>
+                    </section>
+                )}
 
                 <Planning project={project} canPlan={permissions.plan} />
                 <ActualProcurement project={project} availabilityOptions={availabilityOptions} progress={procurementProgress} editable={permissions.manageResources} />

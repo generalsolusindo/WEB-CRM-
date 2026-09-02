@@ -30,6 +30,7 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
     const { data, setData, put, processing, errors, transform } = useForm({
         lines: pr.lines.map((line) => ({
             id: line.id,
+            sourcing_note: line.sourcing_note ?? '',
             vendor_product_id: line.vendor_product_id ?? '',
             cost_price: line.cost_price ?? '',
             tax_id: line.tax_id ?? '',
@@ -114,9 +115,13 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
                                 {pr.lines.map((line, i) => (
                                     <tr key={line.id}>
                                         <td className="px-3 py-3">
-                                            <div className="font-medium text-text">{line.item_name}</div>
+                                            <div className="font-medium text-text">{line.item_name}{line.category === 'service' && <span className="ml-1 rounded bg-info/10 px-1.5 py-0.5 text-[10px] font-semibold text-info">Jasa</span>}</div>
                                             <div className="text-xs text-text-muted">{line.description || '—'}</div>
                                             {line.requirement?.notes && <div className="mt-1 text-xs text-warning">Catatan: {line.requirement.notes}</div>}
+                                            <label className="mt-2 block text-[11px] font-medium text-text-muted">Catatan Sourcing / Opsi Merk
+                                                <textarea rows="2" disabled={!editable} value={data.lines[i].sourcing_note} onChange={(e) => setLine(i, { sourcing_note: e.target.value })} placeholder="mis. Rekomendasi Hikvision DS-2CD; alternatif Dahua (−10%). Customer belum tentukan merk." className="mt-1 w-full rounded-lg border border-border px-2 py-1.5 text-xs outline-none focus:border-navy disabled:bg-bg" />
+                                            </label>
+                                            {errors[`lines.${i}.sourcing_note`] && <span className="text-xs text-danger">{errors[`lines.${i}.sourcing_note`]}</span>}
                                         </td>
                                         <td className="whitespace-nowrap px-3 py-3 text-text-muted">{line.qty} {line.unit}</td>
                                         <td className="min-w-56 px-3 py-3">

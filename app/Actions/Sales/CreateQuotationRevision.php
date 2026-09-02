@@ -44,7 +44,7 @@ class CreateQuotationRevision
 
             foreach ($source->lines as $line) {
                 $revision->lines()->create($line->only([
-                    'procurement_request_line_id', 'item_name', 'description', 'qty', 'unit',
+                    'procurement_request_line_id', 'item_name', 'category', 'description', 'sourcing_note', 'qty', 'unit',
                     'cost_price', 'selling_price', 'discount_percent', 'discount_amount',
                     'markup_percent', 'tax_id', 'tax_rate', 'subtotal',
                 ]));
