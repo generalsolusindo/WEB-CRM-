@@ -1,5 +1,4 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useMemo } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
 import SearchableSelect from '../../../Components/SearchableSelect';
 
@@ -7,18 +6,12 @@ function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
 }
 
-export default function Show({ survey, canSource, vendors, surveyors }) {
+export default function Show({ survey, canSource, vendors }) {
     const isVendorMode = survey.delivery_mode === 'vendor';
     const { data, setData, post, processing, errors } = useForm({
         vendor_id: survey.vendor_id ?? '',
-        surveyor_id: survey.surveyor_id ?? '',
         cost: survey.cost ?? '',
     });
-
-    const surveyorChoices = useMemo(() => {
-        if (isVendorMode) return surveyors.filter((s) => String(s.vendor_id) === String(data.vendor_id));
-        return surveyors.filter((s) => !s.vendor_id);
-    }, [isVendorMode, surveyors, data.vendor_id]);
 
     function submit(e) {
         e.preventDefault();
@@ -50,15 +43,15 @@ export default function Show({ survey, canSource, vendors, surveyors }) {
 
                 {canSource ? (
                     <form onSubmit={submit} className="space-y-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
-                        <h2 className="font-semibold text-text">{survey.surveyor_id ? 'Ubah Surveyor & Biaya' : 'Tetapkan Surveyor & Biaya'}</h2>
-                        {survey.surveyor_id && <p className="text-sm text-text-muted">Masih bisa diubah selama Operasional belum menjadwalkan dan Finance belum menerbitkan invoice.</p>}
+                        <h2 className="font-semibold text-text">{survey.sourced_by ? 'Ubah Vendor & Biaya' : 'Tetapkan Vendor & Biaya'}</h2>
+                        <p className="text-sm text-text-muted">Penugasan tim surveyor dilakukan Operasional saat memberi arahan. {survey.sourced_by && 'Masih bisa diubah selama Operasional belum menjadwalkan dan Finance belum menerbitkan invoice.'}</p>
                         {errors.survey && <div className="rounded-lg border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">{errors.survey}</div>}
 
                         {isVendorMode && (
                             <div className="text-sm font-medium text-text">Vendor (menyediakan jasa survey) *
                                 <SearchableSelect
                                     value={data.vendor_id}
-                                    onChange={(v) => { setData('vendor_id', v); setData('surveyor_id', ''); }}
+                                    onChange={(v) => setData('vendor_id', v)}
                                     options={vendors.map((v) => ({ value: v.id, label: `${v.name}${v.city ? ` · ${v.city}` : ''}` }))}
                                     placeholder="— pilih vendor —"
                                     emptyText="Belum ada vendor yang ditandai bisa jasa survey. Aktifkan di Vendor & Katalog Produk."
@@ -68,20 +61,6 @@ export default function Show({ survey, canSource, vendors, surveyors }) {
                             </div>
                         )}
 
-                        <div className="text-sm font-medium text-text">Surveyor *
-                            <SearchableSelect
-                                value={data.surveyor_id}
-                                onChange={(v) => setData('surveyor_id', v)}
-                                options={surveyorChoices.map((s) => ({ value: s.id, label: `${s.name}${s.phone ? ` · ${s.phone}` : ''}` }))}
-                                placeholder="— pilih surveyor —"
-                                disabled={isVendorMode && !data.vendor_id}
-                                emptyText="Belum ada akun surveyor untuk kategori ini."
-                            />
-                            {isVendorMode && !data.vendor_id && <span className="mt-1 block text-xs text-text-muted">Pilih vendor dulu.</span>}
-                            {surveyorChoices.length === 0 && (!isVendorMode || data.vendor_id) && <span className="mt-1 block text-xs text-warning">Belum ada akun surveyor untuk kategori ini. Buat di menu Surveyor &amp; Teknisi.</span>}
-                            {errors.surveyor_id && <span className="mt-1 block text-xs text-danger">{errors.surveyor_id}</span>}
-                        </div>
-
                         <label className="block text-sm font-medium text-text">Biaya Survey (pass-through, tanpa markup) *
                             <input type="number" min="0" step="0.01" value={data.cost} onChange={(e) => setData('cost', e.target.value)} className="input" />
                             {errors.cost && <span className="mt-1 block text-xs text-danger">{errors.cost}</span>}
@@ -89,7 +68,7 @@ export default function Show({ survey, canSource, vendors, surveyors }) {
 
                         <div className="flex justify-end">
                             <button disabled={processing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
-                                {processing ? 'Menyimpan...' : (survey.surveyor_id ? 'Simpan Perubahan' : 'Konfirmasi Surveyor')}
+                                {processing ? 'Menyimpan...' : (survey.sourced_by ? 'Simpan Perubahan' : 'Konfirmasi Vendor & Biaya')}
                             </button>
                         </div>
                     </form>
@@ -97,10 +76,15 @@ export default function Show({ survey, canSource, vendors, surveyors }) {
                     <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
                         <h2 className="font-semibold text-text">Hasil Sourcing</h2>
                         <div className="mt-3 grid gap-4 sm:grid-cols-2">
-                            <Info label="Surveyor" value={survey.surveyor?.name} />
                             <Info label="Vendor" value={survey.vendor?.name} />
                             <Info label="Biaya" value={money(survey.cost)} />
                             <Info label="Ditetapkan oleh" value={survey.sourced_by?.name} />
+                            <Info
+                                label="Tim Surveyor"
+                                value={(survey.team && survey.team.length)
+                                    ? survey.team.map((t) => `${t.name}${t.is_leader ? ' (leader)' : ''}`).join('\n')
+                                    : 'Belum ditugaskan Operasional'}
+                            />
                         </div>
                     </section>
                 )}

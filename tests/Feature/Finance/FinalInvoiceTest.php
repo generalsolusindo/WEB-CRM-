@@ -65,7 +65,7 @@ class FinalInvoiceTest extends TestCase
 
         $final = Invoice::where('invoice_phase', 'final')->with('lines')->firstOrFail();
         $this->assertSame('draft', $final->status);
-        $this->assertMatchesRegularExpression('/^INV-\d{4}-\d{4}$/', $final->number);
+        $this->assertMatchesRegularExpression('#^\d+/GS-INV/\d{2}/\d{4}$#', $final->number);
         $line = $final->lines->first();
         $this->assertSame('1300000.00', $line->subtotal);
         $this->assertStringContainsString('(Pelunasan)', $line->item_name);

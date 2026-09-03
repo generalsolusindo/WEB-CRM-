@@ -130,6 +130,14 @@ class SurveyPolicy
             && $survey->status === SurveyStatus::AwaitingBriefing->value;
     }
 
+    /** Operasional mengubah komposisi tim selama survey berjalan. */
+    public function updateTeam(User $user, Survey $survey): bool
+    {
+        return $user->role === 'operational'
+            && $user->is_active
+            && $survey->status === SurveyStatus::InProgress->value;
+    }
+
     /** Operasional memverifikasi laporan surveyor. */
     public function verifyReport(User $user, Survey $survey): bool
     {
@@ -143,13 +151,22 @@ class SurveyPolicy
     {
         return $user->role === 'technician'
             && $user->is_active
-            && $survey->surveyor_id === $user->id;
+            && $survey->isSurveyor($user);
     }
 
-    /** Surveyor mengisi / mengirim laporan (hanya saat survey berjalan). */
+    /** Anggota tim mengisi draft / unggah lampiran (hanya saat survey berjalan). */
     public function workReport(User $user, Survey $survey): bool
     {
         return $this->viewAsSurveyor($user, $survey)
+            && $survey->status === SurveyStatus::InProgress->value;
+    }
+
+    /** Hanya leader tim yang boleh mengirim laporan final ke Operasional. */
+    public function submitReport(User $user, Survey $survey): bool
+    {
+        return $user->role === 'technician'
+            && $user->is_active
+            && $survey->isLeader($user)
             && $survey->status === SurveyStatus::InProgress->value;
     }
 }

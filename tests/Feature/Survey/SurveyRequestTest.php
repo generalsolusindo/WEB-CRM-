@@ -87,13 +87,11 @@ class SurveyRequestTest extends TestCase
         ]);
 
         $this->actingAs($procurement)->post("/procurement/surveys/{$survey->id}/source", [
-            'surveyor_id' => $surveyor->id,
             'cost' => 0,
         ])->assertRedirect();
 
         $survey->refresh();
         $this->assertSame('awaiting_briefing', $survey->status);
-        $this->assertSame($surveyor->id, $survey->surveyor_id);
         $this->assertSame($procurement->id, $survey->sourced_by);
         $this->assertSame(1, Notification::where('type', 'survey.awaiting_briefing')->where('user_id', $operational->id)->count());
     }
@@ -111,7 +109,6 @@ class SurveyRequestTest extends TestCase
         ]);
 
         $this->actingAs($procurement)->post("/procurement/surveys/{$survey->id}/source", [
-            'surveyor_id' => $surveyor->id,
             'cost' => 500000,
         ])->assertRedirect();
 
@@ -119,61 +116,35 @@ class SurveyRequestTest extends TestCase
         $this->assertSame(1, Notification::where('type', 'survey.finance_review')->where('user_id', $finance->id)->count());
     }
 
-    public function test_vendor_survey_requires_matching_vendor_surveyor(): void
+    public function test_vendor_survey_requires_vendor_selection(): void
     {
         $sales = User::factory()->create(['role' => 'sales']);
         $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
-        $vendorA = Vendor::create(['name' => 'Vendor A', 'provides_survey' => true]);
-        $vendorB = Vendor::create(['name' => 'Vendor B', 'provides_survey' => true]);
-        $surveyorB = User::factory()->create(['role' => 'technician', 'is_active' => true, 'vendor_id' => $vendorB->id]);
+        $vendor = Vendor::create(['name' => 'Vendor A', 'provides_survey' => true]);
         $lead = $this->opportunity($sales);
         $survey = $lead->surveys()->create([
             'requested_by' => $sales->id, 'site_address' => 'a', 'site_region' => 'Papua',
             'delivery_mode' => 'vendor', 'billable' => true, 'status' => 'requested',
         ]);
 
-        // surveyor milik vendor B, tapi vendor A dipilih -> ditolak
+        // tanpa vendor -> ditolak
         $this->actingAs($procurement)->post("/procurement/surveys/{$survey->id}/source", [
-            'vendor_id' => $vendorA->id,
-            'surveyor_id' => $surveyorB->id,
             'cost' => 1000000,
-        ])->assertSessionHasErrors('surveyor_id');
+        ])->assertSessionHasErrors('vendor_id');
 
-        // vendor B cocok -> lolos
         $this->actingAs($procurement)->post("/procurement/surveys/{$survey->id}/source", [
-            'vendor_id' => $vendorB->id,
-            'surveyor_id' => $surveyorB->id,
+            'vendor_id' => $vendor->id,
             'cost' => 1000000,
         ])->assertRedirect();
 
-        $this->assertSame($vendorB->id, $survey->fresh()->vendor_id);
+        $this->assertSame($vendor->id, $survey->fresh()->vendor_id);
     }
 
-    public function test_internal_mode_rejects_vendor_surveyor(): void
-    {
-        $sales = User::factory()->create(['role' => 'sales']);
-        $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
-        $vendor = Vendor::create(['name' => 'V', 'provides_survey' => true]);
-        $vendorSurveyor = User::factory()->create(['role' => 'technician', 'is_active' => true, 'vendor_id' => $vendor->id]);
-        $lead = $this->opportunity($sales);
-        $survey = $lead->surveys()->create([
-            'requested_by' => $sales->id, 'site_address' => 'a', 'site_region' => 'Depok',
-            'delivery_mode' => 'internal', 'billable' => false, 'status' => 'requested',
-        ]);
-
-        $this->actingAs($procurement)->post("/procurement/surveys/{$survey->id}/source", [
-            'surveyor_id' => $vendorSurveyor->id,
-            'cost' => 0,
-        ])->assertSessionHasErrors('surveyor_id');
-    }
-
-    public function test_procurement_can_reassign_surveyor_before_scheduling(): void
+    public function test_procurement_can_adjust_vendor_and_cost_before_scheduling(): void
     {
         $sales = User::factory()->create(['role' => 'sales']);
         $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
         User::factory()->create(['role' => 'operational', 'is_active' => true]);
-        $first = User::factory()->create(['role' => 'technician', 'is_active' => true]);
-        $second = User::factory()->create(['role' => 'technician', 'is_active' => true]);
         $lead = $this->opportunity($sales);
         $survey = $lead->surveys()->create([
             'requested_by' => $sales->id, 'site_address' => 'a', 'site_region' => 'Solo',
@@ -181,18 +152,16 @@ class SurveyRequestTest extends TestCase
         ]);
 
         $this->actingAs($procurement)->post("/procurement/surveys/{$survey->id}/source", [
-            'surveyor_id' => $first->id, 'cost' => 0,
+            'cost' => 0,
         ])->assertRedirect();
         $this->assertSame('awaiting_briefing', $survey->fresh()->status);
 
-        // ganti surveyor, status jalur tetap
         $this->actingAs($procurement)->post("/procurement/surveys/{$survey->id}/source", [
-            'surveyor_id' => $second->id, 'cost' => 50000,
+            'cost' => 50000,
         ])->assertRedirect();
 
         $survey->refresh();
         $this->assertSame('awaiting_briefing', $survey->status);
-        $this->assertSame($second->id, $survey->surveyor_id);
         $this->assertSame('50000.00', $survey->cost);
     }
 
@@ -204,12 +173,13 @@ class SurveyRequestTest extends TestCase
         $lead = $this->opportunity($sales);
         $survey = $lead->surveys()->create([
             'requested_by' => $sales->id, 'site_address' => 'a', 'site_region' => 'x',
-            'delivery_mode' => 'internal', 'billable' => false, 'surveyor_id' => $tech->id,
+            'delivery_mode' => 'internal', 'billable' => false,
             'status' => 'in_progress',
         ]);
+        $survey->surveyors()->attach($tech->id, ['is_leader' => true]);
 
         $this->actingAs($procurement)->post("/procurement/surveys/{$survey->id}/source", [
-            'surveyor_id' => $tech->id, 'cost' => 0,
+            'cost' => 0,
         ])->assertForbidden();
     }
 
@@ -222,8 +192,9 @@ class SurveyRequestTest extends TestCase
         $survey = $lead->surveys()->create([
             'requested_by' => $sales->id, 'site_address' => 'a', 'site_region' => 'x',
             'delivery_mode' => 'internal', 'billable' => true, 'cost' => 300000,
-            'surveyor_id' => $tech->id, 'status' => 'awaiting_payment',
+            'status' => 'awaiting_payment',
         ]);
+        $survey->surveyors()->attach($tech->id, ['is_leader' => true]);
         \App\Models\Invoice::create([
             'number' => 'SRV-2026-0001', 'invoice_type' => 'survey', 'sales_order_id' => null,
             'survey_id' => $survey->id, 'invoice_phase' => null, 'status' => 'sent',
@@ -231,7 +202,7 @@ class SurveyRequestTest extends TestCase
         ]);
 
         $this->actingAs($procurement)->post("/procurement/surveys/{$survey->id}/source", [
-            'surveyor_id' => $tech->id, 'cost' => 300000,
+            'cost' => 300000,
         ])->assertForbidden();
     }
 

@@ -158,6 +158,28 @@ class QuotationTaxTest extends TestCase
         $this->assertDatabaseHas('taxes', ['id' => $ppn->id]);
     }
 
+    public function test_document_totals_estimates_pph23_from_service_lines_only(): void
+    {
+        [$sales, $pr] = $this->readyProcurementRequest();
+        $line = $pr->lines()->firstOrFail();
+
+        $this->actingAs($sales)->post("/sales/procurement-requests/{$pr->id}/quotations", [
+            'lines' => [
+                ['procurement_request_line_id' => $line->id, 'selling_price' => 1000000, 'category' => 'service'],
+            ],
+        ]);
+        $quotation = Quotation::with('lines')->firstOrFail();
+
+        $totals = \App\Services\Sales\DocumentTotals::of($quotation->lines);
+        $this->assertSame(2000000.0, $totals['service_dpp']);   // 2 unit x 1jt
+        $this->assertSame(40000.0, $totals['pph23_estimate']);  // 2% x 2jt
+
+        // baris material tidak masuk estimasi
+        $quotation->lines()->update(['category' => 'material']);
+        $totals = \App\Services\Sales\DocumentTotals::of($quotation->fresh('lines')->lines);
+        $this->assertSame(0.0, $totals['pph23_estimate']);
+    }
+
     /** @return array{User, ProcurementRequest} */
     private function readyProcurementRequest(): array
     {

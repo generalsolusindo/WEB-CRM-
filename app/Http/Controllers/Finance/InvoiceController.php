@@ -101,11 +101,17 @@ class InvoiceController extends Controller
             ->where('status', '!=', InvoiceStatus::Cancelled->value)
             ->exists();
 
+        $lineRates = $salesOrder->lines->pluck('tax_rate')->map(fn ($r) => (float) $r)->unique()->values();
+
         return Inertia::render('Finance/Invoices/Create', [
             'salesOrder' => $salesOrder,
             'allowedPhase' => ['value' => $allowedPhase->value, 'label' => $allowedPhase->label()],
             'isDp' => $allowedPhase === InvoicePhase::Dp,
             'defaultDpPercent' => 50,
+            'agreedDpp' => $salesOrder->agreed_dpp !== null ? (float) $salesOrder->agreed_dpp : null,
+            'currentPpnRate' => $lineRates->count() === 1 ? $lineRates->first() : null,
+            'hasServiceLine' => $salesOrder->lines->contains('category', 'service'),
+            'defaultPph23Rate' => 2,
             'alreadyInvoiced' => $alreadyInvoiced,
             'approvalDocs' => \App\Services\Sales\CustomerApprovalDocs::of($salesOrder),
         ]);
@@ -116,6 +122,9 @@ class InvoiceController extends Controller
         $salesOrder = SalesOrder::findOrFail($request->validated('sales_order_id'));
 
         $dpPercent = $request->validated('dp_percent');
+        $agreedDpp = $request->validated('agreed_dpp');
+        $ppnRate = $request->validated('ppn_rate');
+        $pph23Rate = $request->validated('pph23_rate');
 
         $invoice = $action->handle(
             $salesOrder,
@@ -123,6 +132,10 @@ class InvoiceController extends Controller
             InvoicePhase::from($request->validated('phase')),
             $request->validated('due_date'),
             $dpPercent !== null ? (float) $dpPercent : null,
+            $pph23Rate !== null ? (float) $pph23Rate : null,
+            $agreedDpp !== null && $agreedDpp !== '' ? (float) $agreedDpp : null,
+            $ppnRate !== null && $ppnRate !== '' ? (float) $ppnRate : null,
+            (bool) $request->validated('pph23_enabled'),
         );
 
         return redirect()->route('finance.invoices.show', $invoice)
@@ -144,8 +157,9 @@ class InvoiceController extends Controller
         Gate::authorize('view', $invoice);
 
         $invoice->load([
-            'salesOrder:id,number,order_type,payment_rule,contact_id',
+            'salesOrder:id,number,order_type,payment_rule,contact_id,dp_percent,agreed_dpp',
             'salesOrder.contact:id,name,company_name,email,phone,address,npwp',
+            'salesOrder.lines:id,sales_order_id,category,subtotal,tax_rate',
             'survey.lead.contact:id,name,phone',
             'lines.tax:id,name,rate',
             'payments' => fn ($query) => $query
@@ -181,6 +195,7 @@ class InvoiceController extends Controller
                 'tax' => (float) $invoice->tax_amount,
             ],
             'totalPaid' => (float) $invoice->payments->sum('amount_paid'),
+            'settlement' => $this->settlementInfo($invoice),
             'customerHasWhatsapp' => $contact?->whatsappNumber() !== null,
             'pph23' => [
                 'rate' => (float) $invoice->pph23_rate,
@@ -196,7 +211,12 @@ class InvoiceController extends Controller
                 'rate_editable' => request()->user()->can('managePph23', $invoice)
                     && ! $invoice->payments()->exists()
                     && in_array($invoice->status, ['draft', 'sent'], true),
-                'applies' => (float) $invoice->pph23_amount > 0 || $invoice->invoice_phase === 'final',
+                'applies' => (bool) $invoice->pph23_enabled,
+                'has_service' => $invoice->lines->contains('category', 'service'),
+                'can_toggle' => request()->user()->can('managePph23', $invoice)
+                    && ! $invoice->payments()->exists()
+                    && in_array($invoice->status, ['draft', 'sent'], true)
+                    && $invoice->lines->contains('category', 'service'),
             ],
             'permissions' => [
                 'send' => request()->user()->can('send', $invoice),
@@ -240,11 +260,14 @@ class InvoiceController extends Controller
     private function printData(Invoice $invoice, bool $forPdf = false): array
     {
         $invoice->load([
-            'salesOrder:id,number,contact_id,po_number,dp_percent',
+            'salesOrder:id,number,contact_id,po_number,dp_percent,agreed_dpp',
             'salesOrder.contact:id,name,company_name,email,phone,address,npwp',
+            'salesOrder.lines:id,sales_order_id,category,subtotal,tax_rate',
             'survey:id,lead_id,site_region',
             'survey.lead.contact:id,name,company_name,email,phone,address,npwp',
             'lines.tax:id,name,rate',
+            'lines.salesOrderLine:id,unit',
+            'creator:id,name',
             'payments' => fn ($q) => $q->orderBy('paid_at'),
         ]);
 
@@ -281,6 +304,66 @@ class InvoiceController extends Controller
             ],
             'pph23BuktiPotong' => $invoice->pph23_bukti_potong_no,
             'totalPaid' => (float) $invoice->payments->sum('amount_paid'),
+            'settlement' => $this->settlementInfo($invoice),
+            'grouped' => ! $invoice->isSurvey(),
+            'globalDiscount' => $invoice->salesOrder?->agreed_dpp !== null,
+            'preparedBy' => $invoice->creator?->name,
+            'company' => [
+                'name' => 'CV General Solusindo',
+                'tagline' => 'IT - Consultant Integrator Supplier Training',
+                'address' => 'Pondok Jati II AS - 31, Sidoarjo, 61252',
+                'email' => 'informasi@generalsolusindo.com',
+                'phone' => '08113219992',
+                'website' => 'generalsolusindo.com',
+            ],
+            'bank' => [
+                'holder' => 'CV GENERAL SOLUSINDO',
+                'bank' => 'BANK MANDIRI CAB. SIDOARJO',
+                'account' => '141-00-1353843-4',
+            ],
+            'terms' => [
+                'Price Include Tax',
+                'Payment DP 50%',
+                'Payment 50% After BAST',
+                'Warranty 1 Month',
+                'No Cancellation',
+            ],
+        ];
+    }
+
+    /**
+     * Untuk invoice DP: rincian nilai kontrak penuh + sisa pelunasan yang
+     * ditagih setelah BAST. Null untuk invoice full / pelunasan / survey.
+     *
+     * @return array<string, float|string>|null
+     */
+    private function settlementInfo(Invoice $invoice): ?array
+    {
+        if ($invoice->invoice_phase !== InvoicePhase::Dp->value || ! $invoice->salesOrder) {
+            return null;
+        }
+
+        $lines = $invoice->salesOrder->lines;
+        $fullDpp = round((float) $lines->sum('subtotal'), 2);
+        $fullTax = round((float) $lines->sum(fn ($l) => (float) $l->subtotal * (float) $l->tax_rate / 100), 2);
+        $fullGrand = round($fullDpp + $fullTax, 2);
+
+        $fullPph23 = 0.0;
+        if ($invoice->pph23_enabled && (float) $invoice->pph23_rate > 0) {
+            $serviceDpp = round((float) $lines->where('category', 'service')->sum('subtotal'), 2);
+            $fullPph23 = round($serviceDpp * (float) $invoice->pph23_rate / 100);
+        }
+
+        $fullPayable = round($fullGrand - $fullPph23, 2);
+        $dpPayable = $invoice->payableAmount();
+        $percent = rtrim(rtrim(number_format((float) ($invoice->salesOrder->dp_percent ?? 50), 2), '0'), '.');
+
+        return [
+            'dp_percent' => $percent,
+            'contract_grand' => $fullGrand,
+            'contract_payable' => $fullPayable,
+            'dp_payable' => $dpPayable,
+            'remaining' => round($fullPayable - $dpPayable, 2),
         ];
     }
 
@@ -325,6 +408,7 @@ class InvoiceController extends Controller
 
         $data = $request->validate([
             'rate' => ['nullable', 'numeric', 'min:0', 'max:10', 'decimal:0,2'],
+            'enabled' => ['sometimes', 'boolean'],
             'bukti_potong_no' => ['nullable', 'string', 'max:100'],
             'slip' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:1024'],
         ]);
@@ -333,12 +417,17 @@ class InvoiceController extends Controller
             $rateEditable = ! $invoice->payments()->exists()
                 && in_array($invoice->status, [InvoiceStatus::Draft->value, InvoiceStatus::Sent->value], true);
 
-            if ($rateEditable && ($data['rate'] ?? null) !== null) {
-                $invoice->loadMissing('salesOrder.lines');
-                $serviceDpp = round((float) ($invoice->salesOrder?->lines->where('category', 'service')->sum('subtotal') ?? 0), 2);
-                $rate = max(0.0, min(10.0, (float) $data['rate']));
-                $invoice->pph23_rate = $serviceDpp > 0 ? $rate : 0;
-                $invoice->pph23_amount = $serviceDpp > 0 ? round($serviceDpp * $rate / 100) : 0;
+            if ($rateEditable && array_key_exists('enabled', $data)) {
+                $invoice->pph23_enabled = (bool) $data['enabled'];
+            }
+
+            if ($rateEditable && (($data['rate'] ?? null) !== null || array_key_exists('enabled', $data))) {
+                $invoice->loadMissing('lines');
+                $serviceDpp = round((float) $invoice->lines->where('category', 'service')->sum('subtotal'), 2);
+                $rate = max(0.0, min(10.0, (float) ($data['rate'] ?? $invoice->pph23_rate ?: 2.0)));
+                $on = $invoice->pph23_enabled && $serviceDpp > 0;
+                $invoice->pph23_rate = $on ? $rate : 0;
+                $invoice->pph23_amount = $on ? round($serviceDpp * $rate / 100) : 0;
             }
 
             if (! empty($data['bukti_potong_no'])) {

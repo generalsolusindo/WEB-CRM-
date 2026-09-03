@@ -120,6 +120,57 @@ class LineCategoryTest extends TestCase
         $this->assertSame('service', Quotation::firstOrFail()->lines()->firstOrFail()->category);
     }
 
+    public function test_reimburse_category_flows_end_to_end(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Cust', 'created_by' => $sales->id]);
+        $lead = Lead::create([
+            'contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified',
+        ]);
+
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/requirements", [
+            'item_name' => 'Transport Tim', 'category' => 'reimburse', 'qty' => 1, 'unit' => 'lot',
+        ])->assertRedirect();
+        $this->assertSame('reimburse', $lead->requirements()->firstOrFail()->category);
+
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/submit-procurement");
+        $pr = ProcurementRequest::with('lines')->firstOrFail();
+        $this->assertSame('reimburse', $pr->lines->first()->category);
+
+        $pr->lines()->update(['cost_price' => 250000, 'availability_status' => 'available']);
+        $pr->update(['status' => 'ready']);
+        $this->actingAs($sales)->post("/sales/procurement-requests/{$pr->id}/quotations", [
+            'lines' => [['procurement_request_line_id' => $pr->lines->first()->id, 'selling_price' => 250000]],
+        ]);
+        $this->assertSame('reimburse', Quotation::firstOrFail()->lines()->firstOrFail()->category);
+    }
+
+    public function test_procurement_can_correct_line_category(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
+        $contact = Contact::create(['name' => 'Cust', 'created_by' => $sales->id]);
+        $lead = Lead::create([
+            'contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified',
+        ]);
+        $lead->requirements()->create(['item_name' => 'Akomodasi', 'category' => 'service', 'qty' => 1, 'unit' => 'lot', 'created_by' => $sales->id]);
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/submit-procurement");
+
+        $pr = ProcurementRequest::with('lines')->firstOrFail();
+        $pr->update(['status' => 'searching']);
+
+        $this->actingAs($procurement)->put("/procurement/procurement-requests/{$pr->id}/lines", [
+            'lines' => [[
+                'id' => $pr->lines->first()->id,
+                'category' => 'reimburse',
+                'cost_price' => 500000,
+                'availability_status' => 'available',
+            ]],
+        ])->assertRedirect();
+
+        $this->assertSame('reimburse', $pr->lines->first()->fresh()->category);
+    }
+
     public function test_invalid_category_rejected(): void
     {
         [$sales, $pr] = $this->readyPr('material');

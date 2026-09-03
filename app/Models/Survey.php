@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
@@ -23,7 +24,6 @@ class Survey extends Model
         'notes',
         'status',
         'vendor_id',
-        'surveyor_id',
         'cost',
         'sourced_by',
         'sourced_at',
@@ -73,9 +73,39 @@ class Survey extends Model
         return $this->belongsTo(Vendor::class);
     }
 
-    public function surveyor(): BelongsTo
+    /** Tim surveyor yang ditugaskan (leader + anggota). */
+    public function surveyors(): BelongsToMany
     {
-        return $this->belongsTo(User::class, 'surveyor_id');
+        return $this->belongsToMany(User::class, 'survey_surveyors', 'survey_id', 'technician_id')
+            ->withPivot('is_leader')
+            ->withTimestamps();
+    }
+
+    public function surveyorAssignments(): HasMany
+    {
+        return $this->hasMany(SurveySurveyor::class);
+    }
+
+    /** Leader tim survey (bila sudah ditugaskan). */
+    public function leaderUser(): ?User
+    {
+        $team = $this->relationLoaded('surveyors') ? $this->surveyors : $this->surveyors()->get();
+
+        return $team->firstWhere('pivot.is_leader', true);
+    }
+
+    public function isSurveyor(User|int $user): bool
+    {
+        $id = $user instanceof User ? $user->getKey() : $user;
+
+        return $this->surveyorAssignments()->where('technician_id', $id)->exists();
+    }
+
+    public function isLeader(User|int $user): bool
+    {
+        $id = $user instanceof User ? $user->getKey() : $user;
+
+        return $this->surveyorAssignments()->where('technician_id', $id)->where('is_leader', true)->exists();
     }
 
     public function sourcedBy(): BelongsTo

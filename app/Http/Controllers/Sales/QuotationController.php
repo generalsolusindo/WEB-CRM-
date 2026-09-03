@@ -72,7 +72,6 @@ class QuotationController extends Controller
         return Inertia::render('Sales/Quotations/Form', [
             'procurementRequest' => $procurementRequest,
             'taxes' => $this->activeTaxes(),
-            'surveyCredit' => \App\Services\Sales\SurveyCredit::forLead($procurementRequest->lead_id),
         ]);
     }
 
@@ -109,7 +108,7 @@ class QuotationController extends Controller
         return Inertia::render('Sales/Quotations/Show', [
             'quotation' => $quotation,
             'history' => $history,
-            'totals' => \App\Services\Sales\DocumentTotals::of($quotation->lines, (float) $quotation->survey_credit),
+            'totals' => \App\Services\Sales\DocumentTotals::of($quotation->lines),
             'permissions' => [
                 'update' => request()->user()->can('update', $quotation),
                 'delete' => request()->user()->can('delete', $quotation),
@@ -132,7 +131,6 @@ class QuotationController extends Controller
         return Inertia::render('Sales/Quotations/Form', [
             'quotation' => $quotation,
             'taxes' => $this->activeTaxes(),
-            'surveyCredit' => (float) $quotation->survey_credit,
         ]);
     }
 
@@ -154,7 +152,7 @@ class QuotationController extends Controller
 
         return view('sales.quotations.print', [
             'quotation' => $quotation,
-            'totals' => \App\Services\Sales\DocumentTotals::of($quotation->lines, (float) $quotation->survey_credit),
+            'totals' => \App\Services\Sales\DocumentTotals::of($quotation->lines),
         ]);
     }
 

@@ -147,6 +147,7 @@ Route::middleware('auth')->group(function () {
         Route::get('surveys', [OperationalSurveyController::class, 'index'])->name('surveys.index');
         Route::get('surveys/{survey}', [OperationalSurveyController::class, 'show'])->name('surveys.show');
         Route::post('surveys/{survey}/brief', [OperationalSurveyController::class, 'brief'])->name('surveys.brief');
+        Route::patch('surveys/{survey}/team', [OperationalSurveyController::class, 'updateTeam'])->name('surveys.team');
         Route::post('surveys/{survey}/verify', [OperationalSurveyController::class, 'verify'])->name('surveys.verify');
         Route::post('surveys/{survey}/cancel', [OperationalSurveyController::class, 'cancel'])->name('surveys.cancel');
         Route::resource('projects', ProjectController::class)->only(['index', 'show']);

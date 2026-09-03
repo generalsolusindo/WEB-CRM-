@@ -55,7 +55,7 @@ export default function Show({ survey, invoice, payments, taxes = [], canHandle,
                 <section className="grid gap-4 rounded-xl border border-border bg-surface p-6 shadow-sm sm:grid-cols-2">
                     <Info label="Lokasi" value={`${survey.site_region} — ${survey.site_address}`} />
                     <Info label="Pelaksana" value={survey.delivery_mode_label} />
-                    <Info label="Surveyor" value={survey.surveyor?.name} />
+                    <Info label="Tim Surveyor" value={(survey.surveyors ?? []).map((u) => u.name).join(', ') || '—'} />
                     <Info label="Vendor" value={survey.vendor?.name} />
                     <Info label="Biaya (pass-through)" value={money(survey.cost)} />
                     <Info label="Ditagih ke Customer" value={survey.billable ? 'Ya' : 'Tidak'} />

@@ -66,11 +66,8 @@ class CreateFinalInvoice
 
             $dpSubtotalByLine = [];
             $dpDiscountByLine = [];
-            $dpCreditBilled = 0.0;
             foreach ($dpInvoice?->lines ?? [] as $line) {
                 if ($line->sales_order_line_id === null) {
-                    $dpCreditBilled += abs((float) $line->subtotal); // baris kredit survey (negatif)
-
                     continue;
                 }
                 $dpSubtotalByLine[$line->sales_order_line_id] = ($dpSubtotalByLine[$line->sales_order_line_id] ?? 0) + (float) $line->subtotal;
@@ -116,31 +113,25 @@ class CreateFinalInvoice
                 $taxTotal += $taxAmount;
             }
 
-            // Sisa kredit biaya survey (bagian pelunasan) — apa pun yang belum dipotong di DP.
-            $creditFull = (float) $order->survey_credit;
-            $creditRemaining = round($creditFull - round($dpCreditBilled, 2), 2);
-            if ($creditRemaining > 0) {
-                $invoice->lines()->create([
-                    'sales_order_line_id' => null,
-                    'item_name' => 'Kredit Biaya Survey (Pelunasan)',
-                    'qty' => 1,
-                    'unit_price' => -$creditRemaining,
-                    'discount_amount' => 0,
-                    'tax_id' => null,
-                    'tax_rate' => 0,
-                    'subtotal' => -$creditRemaining,
-                ]);
-                $amount -= $creditRemaining;
-            }
 
-            // PPh 23 (default 2%) atas TOTAL DPP jasa Sales Order — dipotong sekali di pelunasan.
-            $serviceDpp = round((float) $order->lines->where('category', 'service')->sum('subtotal'), 2);
-            $pph23FinalRate = $serviceDpp > 0 ? max(0.0, min(10.0, $pph23Rate ?? 2.0)) : 0.0;
-            $pph23FinalAmount = round($serviceDpp * $pph23FinalRate / 100);
+            // PPh 23 mengikuti invoice DP: bila DP kena potong, pelunasan menanggung
+            // sisanya — basis = baris JASA pelunasan ini, tarif ikut invoice DP.
+            $pph23Enabled = (bool) ($dpInvoice?->pph23_enabled);
+            $pph23FinalRate = 0.0;
+            $pph23FinalAmount = 0.0;
+            if ($pph23Enabled) {
+                $serviceDpp = round((float) $invoice->lines()->where('category', 'service')->sum('subtotal'), 2);
+                if ($serviceDpp > 0) {
+                    $default = (float) ($dpInvoice->pph23_rate ?: 2.0);
+                    $pph23FinalRate = max(0.0, min(10.0, $pph23Rate ?? $default));
+                    $pph23FinalAmount = round($serviceDpp * $pph23FinalRate / 100);
+                }
+            }
 
             $invoice->update([
                 'amount' => round($amount, 2),
                 'tax_amount' => round($taxTotal, 2),
+                'pph23_enabled' => $pph23Enabled,
                 'pph23_rate' => $pph23FinalRate,
                 'pph23_amount' => $pph23FinalAmount,
             ]);

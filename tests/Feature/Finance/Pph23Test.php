@@ -51,18 +51,23 @@ class Pph23Test extends TestCase
         return SalesOrder::firstOrFail();
     }
 
-    private function payDp(SalesOrder $so, User $finance): void
+    private function payDp(SalesOrder $so, User $finance, bool $pph23 = true): void
     {
-        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'dp']);
+        $this->actingAs($finance)->post('/finance/invoices', [
+            'sales_order_id' => $so->id, 'phase' => 'dp',
+            'pph23_enabled' => $pph23 ? '1' : '0',
+        ]);
         $dp = Invoice::where('invoice_phase', 'dp')->firstOrFail();
-        $this->assertSame('0.00', $dp->pph23_amount); // DP tidak kena PPh 23
+        // PPh 23 proporsional: 2% x 500rb (porsi DP dari jasa 1jt)
+        $this->assertSame($pph23 ? '10000.00' : '0.00', $dp->pph23_amount);
         $this->actingAs($finance)->post("/finance/invoices/{$dp->id}/payments", [
-            'amount_paid' => (float) $dp->amount + (float) $dp->tax_amount,
+            'amount_paid' => $dp->payableAmount(),
             'paid_at' => now()->toDateTimeString(),
         ]);
+        $this->assertSame('paid', $dp->fresh()->status);
     }
 
-    public function test_final_invoice_computes_pph23_2_percent_of_full_service_dpp(): void
+    public function test_pph23_is_split_proportionally_between_dp_and_final(): void
     {
         $finance = $this->finance();
         $so = $this->serviceOrder();
@@ -72,10 +77,24 @@ class Pph23Test extends TestCase
         $this->actingAs($finance)->post("/finance/sales-orders/{$so->id}/final-invoice")->assertRedirect();
 
         $final = Invoice::where('invoice_phase', 'final')->firstOrFail();
+        $this->assertTrue($final->pph23_enabled);
         $this->assertSame('2.00', $final->pph23_rate);
-        $this->assertSame('20000.00', $final->pph23_amount);           // 2% x 1.000.000 (DPP jasa penuh)
+        $this->assertSame('10000.00', $final->pph23_amount);           // 2% x 500rb (sisa jasa)
         $this->assertSame(500000.0, (float) $final->amount);           // sisa 50%
-        $this->assertEqualsWithDelta(480000.0, $final->payableAmount(), 0.01); // 500rb - 20rb
+        $this->assertEqualsWithDelta(490000.0, $final->payableAmount(), 0.01); // 500rb - 10rb
+    }
+
+    public function test_pph23_absent_when_finance_does_not_enable_it(): void
+    {
+        $finance = $this->finance();
+        $so = $this->serviceOrder();
+        $this->payDp($so, $finance, pph23: false);
+        Project::create(['sales_order_id' => $so->id, 'status' => 'completed']);
+        $this->actingAs($finance)->post("/finance/sales-orders/{$so->id}/final-invoice");
+
+        $final = Invoice::where('invoice_phase', 'final')->firstOrFail();
+        $this->assertFalse($final->pph23_enabled);
+        $this->assertSame('0.00', $final->pph23_amount);
     }
 
     public function test_material_only_final_has_no_pph23(): void
@@ -84,9 +103,9 @@ class Pph23Test extends TestCase
         $finance = $this->finance();
         $so = $this->serviceOrder('material');
 
-        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'full']);
+        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'full', 'pph23_enabled' => '1']);
         $invoice = Invoice::firstOrFail();
-        $this->assertSame('0.00', $invoice->pph23_amount);
+        $this->assertSame('0.00', $invoice->pph23_amount); // tidak ada baris jasa
     }
 
     public function test_invoice_lunas_by_cash_plus_pph23(): void
@@ -98,9 +117,9 @@ class Pph23Test extends TestCase
         $this->actingAs($finance)->post("/finance/sales-orders/{$so->id}/final-invoice");
         $final = Invoice::where('invoice_phase', 'final')->firstOrFail();
 
-        // bayar kas sebesar payable (500rb - 20rb PPh23 = 480rb)
+        // bayar kas sebesar payable (500rb - 10rb PPh23 = 490rb)
         $this->actingAs($finance)->post("/finance/invoices/{$final->id}/payments", [
-            'amount_paid' => 480000, 'paid_at' => now()->toDateTimeString(),
+            'amount_paid' => 490000, 'paid_at' => now()->toDateTimeString(),
         ]);
 
         $this->assertSame('paid', $final->fresh()->status);
@@ -118,7 +137,7 @@ class Pph23Test extends TestCase
         $this->actingAs($finance)->post("/finance/invoices/{$final->id}/pph23", ['rate' => 4])
             ->assertRedirect();
         $this->assertSame('4.00', $final->fresh()->pph23_rate);
-        $this->assertSame('40000.00', $final->fresh()->pph23_amount);
+        $this->assertSame('20000.00', $final->fresh()->pph23_amount); // 4% x 500rb (sisa jasa)
 
         // setelah ada pembayaran, rate terkunci
         $this->actingAs($finance)->post("/finance/invoices/{$final->id}/payments", [

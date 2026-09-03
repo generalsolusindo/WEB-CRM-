@@ -28,14 +28,14 @@ class Quotation extends Model
         'parent_quotation_id',
         'valid_until',
         'notes',
-        'survey_credit',
+        'agreed_dpp',
     ];
 
     /** @return array<string, string> */
     protected function casts(): array
     {
         return [
-            'survey_credit' => 'decimal:2',
+            'agreed_dpp' => 'decimal:2',
         ];
     }
 

@@ -35,7 +35,7 @@ class InvoiceCreationTest extends TestCase
 
         $invoice = Invoice::with('lines')->firstOrFail();
         $this->assertSame('full', $invoice->invoice_phase);
-        $this->assertMatchesRegularExpression('/^INV-\d{4}-0001$/', $invoice->number);
+        $this->assertMatchesRegularExpression('#^1/GS-INV/\d{2}/\d{4}$#', $invoice->number);
         $this->assertSame('2600000.00', $invoice->amount);
         $this->assertSame('2600000.00', $invoice->lines->first()->subtotal);
         $this->assertStringNotContainsString('DP', $invoice->lines->first()->item_name);

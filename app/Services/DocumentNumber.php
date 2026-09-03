@@ -32,9 +32,21 @@ class DocumentNumber
         return $this->nextSequential(SalesOrder::query(), 'SO');
     }
 
+    /** Format: {urutan}/GS-INV/{MM}/{YYYY} — nomor urut reset tiap tahun. */
     public function nextInvoiceNumber(): string
     {
-        return $this->nextSequential(Invoice::query(), 'INV');
+        $now = now();
+        $year = $now->year;
+        $month = $now->format('m');
+
+        $lastSequence = Invoice::query()
+            ->where('number', 'like', "%/GS-INV/%/{$year}")
+            ->lockForUpdate()
+            ->pluck('number')
+            ->map(fn (string $number) => (int) explode('/', $number)[0])
+            ->max() ?? 0;
+
+        return ($lastSequence + 1)."/GS-INV/{$month}/{$year}";
     }
 
     public function nextSurveyInvoiceNumber(): string

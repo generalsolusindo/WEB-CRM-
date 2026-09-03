@@ -26,7 +26,7 @@ class QuotationConfirmationController extends Controller
         return Inertia::render('Sales/Quotations/Confirm', [
             'quotation' => $quotation,
             'orderTypes' => OrderType::options(),
-            'totals' => \App\Services\Sales\DocumentTotals::of($quotation->lines, (float) $quotation->survey_credit),
+            'totals' => \App\Services\Sales\DocumentTotals::of($quotation->lines),
         ]);
     }
 

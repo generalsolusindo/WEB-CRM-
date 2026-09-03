@@ -96,7 +96,7 @@ class LeadController extends Controller
                 ->orderByDesc('meeting_date'),
             'surveys' => fn ($query) => $query
                 ->with([
-                    'surveyor:id,name', 'vendor:id,name', 'invoice:id,survey_id,number,status',
+                    'surveyors:id,name', 'vendor:id,name', 'invoice:id,survey_id,number,status',
                     'report.items' => fn ($q) => $q->orderBy('id'),
                     'report.attachments:id,attachable_type,attachable_id,category,file_path',
                 ])
@@ -119,7 +119,7 @@ class LeadController extends Controller
                 'status' => $survey->status,
                 'status_label' => \App\Enums\SurveyStatus::from($survey->status)->label(),
                 'cost' => (float) $survey->cost,
-                'surveyor' => $survey->surveyor?->name,
+                'surveyor' => $survey->leaderUser()?->name ?? $survey->surveyors->pluck('name')->join(', ') ?: null,
                 'vendor' => $survey->vendor?->name,
                 'notes' => $survey->notes,
                 'invoice_number' => $survey->invoice?->number,

@@ -94,7 +94,7 @@ class SalesOrderController extends Controller
             'salesOrder' => $salesOrder,
             'approvalDocs' => \App\Services\Sales\CustomerApprovalDocs::of($salesOrder),
             'canManageDocs' => request()->user()->can('manageDocuments', $salesOrder),
-            'totals' => \App\Services\Sales\DocumentTotals::of($salesOrder->lines, (float) $salesOrder->survey_credit),
+            'totals' => \App\Services\Sales\DocumentTotals::of($salesOrder->lines),
             'orderTypeLabel' => OrderType::from($salesOrder->order_type)->label(),
             'paymentRuleLabel' => $salesOrder->payment_rule === PaymentRule::Dp50->value
                 ? 'Down Payment '.rtrim(rtrim(number_format((float) ($salesOrder->dp_percent ?? 50), 2), '0'), '.').'%'

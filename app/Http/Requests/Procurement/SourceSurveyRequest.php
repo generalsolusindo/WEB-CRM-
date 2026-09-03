@@ -15,7 +15,6 @@ class SourceSurveyRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'surveyor_id' => ['required', 'integer', 'exists:users,id'],
             'vendor_id' => ['nullable', 'integer', 'exists:vendors,id'],
             'cost' => ['required', 'numeric', 'min:0', 'decimal:0,2'],
         ];

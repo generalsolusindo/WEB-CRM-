@@ -4,7 +4,7 @@ import AppLayout from '../../../Layouts/AppLayout';
 
 const emptyItem = { item_name: '', qty: 1, unit: '', notes: '' };
 
-export default function Show({ survey, report, canWork }) {
+export default function Show({ survey, report, canWork, canSubmit }) {
     const { data, setData, put, processing, errors } = useForm({
         summary: report?.summary ?? '',
         items: report?.items?.map((i) => ({ item_name: i.item_name, qty: i.qty, unit: i.unit ?? '', notes: i.notes ?? '' })) ?? [],
@@ -48,6 +48,11 @@ export default function Show({ survey, report, canWork }) {
                         <span className="rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning">{survey.status_label}</span>
                     </div>
                     <p className="text-sm text-text-muted">{survey.customer} · {survey.site_region}</p>
+                    {(survey.team ?? []).length > 0 && (
+                        <p className="mt-1 text-xs text-text-muted">
+                            Tim: {survey.team.map((t) => `${t.name}${t.is_leader ? ' (leader)' : ''}`).join(', ')}
+                        </p>
+                    )}
                 </div>
 
                 <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
@@ -120,7 +125,9 @@ export default function Show({ survey, report, canWork }) {
                         <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
                             {submitError && <span className="mr-auto self-center text-xs text-danger">{submitError}</span>}
                             <button type="button" onClick={save} disabled={processing} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold disabled:opacity-50">Simpan Draft</button>
-                            <button type="button" onClick={submitReport} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white">Kirim Laporan</button>
+                            {canSubmit
+                                ? <button type="button" onClick={submitReport} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white">Kirim Laporan</button>
+                                : <span className="self-center text-xs text-text-muted">Hanya leader tim yang mengirim laporan final.</span>}
                         </div>
                     )}
                 </section>

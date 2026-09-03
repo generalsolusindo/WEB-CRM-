@@ -18,7 +18,7 @@ class CancelSurvey
     {
         return DB::transaction(function () use ($survey, $actor, $reason) {
             $locked = Survey::query()
-                ->with(['lead.contact', 'lead.sales', 'surveyor'])
+                ->with(['lead.contact', 'lead.sales', 'surveyors'])
                 ->whereKey($survey->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -65,8 +65,10 @@ class CancelSurvey
             if ($locked->lead->sales && $locked->lead->sales->id !== $actor->id) {
                 $recipients->push($locked->lead->sales);
             }
-            if ($locked->surveyor && $locked->surveyor->id !== $actor->id) {
-                $recipients->push($locked->surveyor);
+            foreach ($locked->surveyors as $member) {
+                if ($member->id !== $actor->id) {
+                    $recipients->push($member);
+                }
             }
             $recipients = $recipients
                 ->merge(User::query()->where('role', 'procurement')->where('is_active', true)->get())

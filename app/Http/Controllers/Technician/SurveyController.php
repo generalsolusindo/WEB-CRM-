@@ -25,7 +25,7 @@ class SurveyController extends Controller
         $userId = $request->user()->id;
 
         $surveys = Survey::query()
-            ->where('surveyor_id', $userId)
+            ->whereHas('surveyorAssignments', fn ($q) => $q->where('technician_id', $userId))
             ->whereIn('status', [
                 SurveyStatus::InProgress->value,
                 SurveyStatus::ReportReview->value,
@@ -54,9 +54,12 @@ class SurveyController extends Controller
 
         $survey->load([
             'lead.contact:id,name,company_name,phone,address',
+            'surveyors:id,name',
             'report.items' => fn ($q) => $q->orderBy('id'),
             'report.attachments:id,attachable_type,attachable_id,category,file_path,created_at',
         ]);
+
+        $userId = request()->user()->id;
 
         return Inertia::render('Technician/Surveys/Show', [
             'survey' => [
@@ -69,9 +72,15 @@ class SurveyController extends Controller
                 'status' => $survey->status,
                 'status_label' => SurveyStatus::from($survey->status)->label(),
                 'briefing' => $survey->briefing,
+                'team' => $survey->surveyors->map(fn ($u) => [
+                    'name' => $u->name,
+                    'is_leader' => (bool) $u->pivot->is_leader,
+                ]),
+                'is_leader' => (bool) $survey->surveyors->firstWhere('id', $userId)?->pivot->is_leader,
             ],
             'report' => $this->reportPayload($survey),
             'canWork' => request()->user()->can('workReport', $survey),
+            'canSubmit' => request()->user()->can('submitReport', $survey),
         ]);
     }
 
@@ -103,7 +112,7 @@ class SurveyController extends Controller
 
     public function submitReport(Survey $survey, SubmitSurveyReport $action): RedirectResponse
     {
-        Gate::authorize('workReport', $survey);
+        Gate::authorize('submitReport', $survey);
         $action->handle($survey, request()->user());
 
         return redirect()->route('technician.surveys.show', $survey)

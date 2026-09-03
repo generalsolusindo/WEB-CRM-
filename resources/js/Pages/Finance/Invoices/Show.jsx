@@ -15,11 +15,14 @@ const statusBadge = {
     cancelled: 'bg-text-muted/10 text-text-muted',
 };
 
-export default function Show({ invoice, payments, totals, totalPaid, customerHasWhatsapp = false, pph23 = null, permissions }) {
+export default function Show({ invoice, payments, totals, totalPaid, customerHasWhatsapp = false, pph23 = null, settlement = null, permissions }) {
     const grandTotal = totals.grand_total;
     const payable = pph23 && pph23.amount > 0 ? pph23.payable : grandTotal;
 
     const pphForm = useForm({ rate: pph23 ? String(pph23.rate || 2) : '2', bukti_potong_no: pph23?.bukti_potong_no ?? '', slip: null });
+    function togglePph23(enabled) {
+        router.post(`/finance/invoices/${invoice.id}/pph23`, { enabled, rate: pphForm.data.rate }, { preserveScroll: true });
+    }
     function savePph23(e) {
         e.preventDefault();
         pphForm.post(`/finance/invoices/${invoice.id}/pph23`, { forceFormData: true, preserveScroll: true, onSuccess: () => pphForm.setData('slip', null) });
@@ -105,9 +108,33 @@ export default function Show({ invoice, payments, totals, totalPaid, customerHas
                     <Info label="Sisa" value={money(payable - totalPaid)} />
                 </section>
 
+                {settlement && (
+                    <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+                        <h2 className="font-semibold text-text">Rincian DP &amp; Pelunasan</h2>
+                        <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                            <Info label="Nilai Kontrak (100%)" value={money(settlement.contract_payable)} />
+                            <Info label={`Ditagih di invoice ini (DP ${settlement.dp_percent}%)`} value={money(settlement.dp_payable)} />
+                            <Info label="Sisa — pelunasan setelah BAST" value={money(settlement.remaining)} />
+                        </div>
+                        <p className="mt-2 text-xs text-text-muted">Invoice pelunasan dibuat setelah project Completed / BAST.</p>
+                    </section>
+                )}
+
+                {pph23 && !pph23.applies && pph23.can_toggle && (
+                    <section className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm text-text-muted">Invoice ini punya baris jasa. Kalau customer memotong PPh 23, aktifkan agar potongan 2% dihitung.</p>
+                            <button onClick={() => togglePph23(true)} className="shrink-0 rounded-lg border border-navy px-3 py-1.5 text-sm font-semibold text-navy">Aktifkan PPh 23</button>
+                        </div>
+                    </section>
+                )}
+
                 {pph23 && pph23.applies && (
                     <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
-                        <h2 className="font-semibold text-text">PPh 23 (Jasa)</h2>
+                        <div className="flex items-center justify-between">
+                            <h2 className="font-semibold text-text">PPh 23 (Jasa)</h2>
+                            {pph23.can_toggle && <button onClick={() => togglePph23(false)} className="text-xs text-danger">Nonaktifkan</button>}
+                        </div>
                         <div className="mt-3 grid gap-4 sm:grid-cols-4">
                             <Info label="Rate" value={`${pph23.rate || 0}%`} />
                             <Info label="Dipotong" value={money(pph23.amount)} />

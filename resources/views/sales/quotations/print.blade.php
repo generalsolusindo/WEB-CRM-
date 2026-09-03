@@ -122,7 +122,6 @@
                 @endif
                 <tr><td colspan="{{ $labelSpan }}" class="num muted">{{ $hasTax ? 'DPP' : 'Subtotal' }}</td><td class="num">{{ $rupiah($totals['subtotal']) }}</td></tr>
                 @if ($hasTax)<tr><td colspan="{{ $labelSpan }}" class="num muted">Total PPN</td><td class="num">{{ $rupiah($totals['tax']) }}</td></tr>@endif
-                @if (($totals['survey_credit'] ?? 0) > 0)<tr><td colspan="{{ $labelSpan }}" class="num muted">Kredit Biaya Survey</td><td class="num">− {{ $rupiah($totals['survey_credit']) }}</td></tr>@endif
                 <tr class="grand"><td colspan="{{ $labelSpan }}" class="num">Grand Total</td><td class="num">{{ $rupiah($totals['grand_total']) }}</td></tr>
             </tfoot>
         </table>

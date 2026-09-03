@@ -72,7 +72,7 @@ export default function SurveyPanel({ leadId, surveys = [], requestable = false,
                             </div>
                             <div className="mt-2 whitespace-pre-line text-sm text-text">{s.site_address}</div>
                             <div className="mt-2 grid gap-1 text-xs text-text-muted sm:grid-cols-3">
-                                <span>Surveyor: {s.surveyor || '—'}</span>
+                                <span>Tim Surveyor: {s.surveyor || '—'}</span>
                                 <span>Vendor: {s.vendor || '—'}</span>
                                 <span>Biaya: {s.cost > 0 ? money(s.cost) : '—'}</span>
                             </div>

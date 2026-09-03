@@ -14,7 +14,10 @@ class SourceSurvey
     public function __construct(private Notify $notify) {}
 
     /**
-     * @param  array{surveyor_id: int, vendor_id: ?int, cost: float|string}  $data
+     * Procurement mengamankan sumber daya: mode/vendor + biaya. Penugasan orang
+     * (tim surveyor) dilakukan Operasional saat memberi arahan.
+     *
+     * @param  array{vendor_id: ?int, cost: float|string}  $data
      */
     public function handle(Survey $survey, User $user, array $data): Survey
     {
@@ -32,42 +35,22 @@ class SourceSurvey
 
             if (! $reassigning && $locked->status !== SurveyStatus::Requested->value) {
                 throw ValidationException::withMessages([
-                    'survey' => 'Survey ini sudah dijadwalkan / diproses, surveyor tidak bisa diubah lagi.',
+                    'survey' => 'Survey ini sudah dijadwalkan / diproses, vendor & biaya tidak bisa diubah lagi.',
                 ]);
             }
 
             if ($locked->invoices()->where('status', '!=', 'cancelled')->exists()) {
                 throw ValidationException::withMessages([
-                    'survey' => 'Invoice survey sudah diterbitkan Finance — biaya & surveyor terkunci.',
+                    'survey' => 'Invoice survey sudah diterbitkan Finance — biaya & vendor terkunci.',
                 ]);
             }
 
-            $surveyor = User::query()->findOrFail($data['surveyor_id']);
-
-            if ($surveyor->role !== 'technician') {
+            if ($locked->delivery_mode === 'vendor' && empty($data['vendor_id'])) {
                 throw ValidationException::withMessages([
-                    'surveyor_id' => 'Surveyor harus akun teknisi/surveyor.',
+                    'vendor_id' => 'Pilih vendor untuk survey di luar jangkauan.',
                 ]);
             }
 
-            if ($locked->delivery_mode === 'vendor') {
-                if (empty($data['vendor_id'])) {
-                    throw ValidationException::withMessages([
-                        'vendor_id' => 'Pilih vendor untuk survey di luar jangkauan.',
-                    ]);
-                }
-                if ($surveyor->vendor_id !== (int) $data['vendor_id']) {
-                    throw ValidationException::withMessages([
-                        'surveyor_id' => 'Surveyor yang dipilih bukan bagian dari vendor tersebut.',
-                    ]);
-                }
-            } elseif ($surveyor->vendor_id !== null) {
-                throw ValidationException::withMessages([
-                    'surveyor_id' => 'Mode internal hanya boleh memakai surveyor internal / HO.',
-                ]);
-            }
-
-            // Saat re-assign, status jalur (Finance/Operasional) sudah ditentukan — jangan dihitung ulang.
             $next = $reassigning
                 ? $locked->status
                 : ($locked->needsFinance()
@@ -76,7 +59,6 @@ class SourceSurvey
 
             $locked->update([
                 'vendor_id' => $locked->delivery_mode === 'vendor' ? (int) $data['vendor_id'] : null,
-                'surveyor_id' => $surveyor->id,
                 'cost' => $data['cost'],
                 'sourced_by' => $user->id,
                 'sourced_at' => now(),
@@ -100,7 +82,7 @@ class SourceSurvey
                 $this->notify->onceForEach(
                     User::query()->where('role', 'operational')->where('is_active', true)->get(),
                     'survey.awaiting_briefing',
-                    "Survey {$locked->code} ({$customer}) siap dijadwalkan & diberi arahan ke surveyor.",
+                    "Survey {$locked->code} ({$customer}) siap dijadwalkan & ditugaskan surveyor.",
                     $locked,
                 );
             }

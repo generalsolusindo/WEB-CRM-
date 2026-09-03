@@ -54,7 +54,7 @@ class SurveyController extends Controller
         $survey->load([
             'lead.contact:id,name,company_name,email,phone,address,npwp',
             'requestedBy:id,name',
-            'surveyor:id,name',
+            'surveyors:id,name',
             'vendor:id,name',
             'invoice.lines',
             'invoice.payments' => fn ($query) => $query

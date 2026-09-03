@@ -29,7 +29,7 @@ class SurveyController extends Controller
                 SurveyStatus::InProgress->value,
                 SurveyStatus::ReportReview->value,
             ])
-            ->with(['lead.contact:id,name,company_name', 'surveyor:id,name', 'report:id,survey_id,status,revision'])
+            ->with(['lead.contact:id,name,company_name', 'surveyors:id,name', 'report:id,survey_id,status,revision'])
             ->orderByRaw("FIELD(status, 'report_review', 'awaiting_briefing', 'in_progress')")
             ->latest()
             ->paginate(12)
@@ -38,7 +38,7 @@ class SurveyController extends Controller
                 'code' => $s->code,
                 'customer' => $s->lead->contact?->name,
                 'site_region' => $s->site_region,
-                'surveyor' => $s->surveyor?->name,
+                'surveyor' => $s->leaderUser()?->name ?? ($s->surveyors->pluck('name')->join(', ') ?: null),
                 'status' => $s->status,
                 'status_label' => SurveyStatus::from($s->status)->label(),
                 'revision' => $s->report?->revision,
@@ -54,7 +54,7 @@ class SurveyController extends Controller
         $survey->load([
             'lead.contact:id,name,company_name,email,phone,address',
             'requestedBy:id,name',
-            'surveyor:id,name,phone',
+            'surveyors:id,name,phone',
             'vendor:id,name',
             'report.items' => fn ($q) => $q->orderBy('id'),
             'report.submittedBy:id,name',
@@ -72,7 +72,14 @@ class SurveyController extends Controller
                 'site_region' => $survey->site_region,
                 'site_address' => $survey->site_address,
                 'delivery_mode' => SurveyDeliveryMode::from($survey->delivery_mode)->label(),
-                'surveyor' => $survey->surveyor?->name,
+                'surveyor' => $survey->leaderUser()?->name ?? ($survey->surveyors->pluck('name')->join(', ') ?: null),
+                'team' => $survey->surveyors->map(fn ($u) => [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'is_leader' => (bool) $u->pivot->is_leader,
+                ]),
+                'delivery_mode_raw' => $survey->delivery_mode,
+                'vendor_id' => $survey->vendor_id,
                 'vendor' => $survey->vendor?->name,
                 'status' => $survey->status,
                 'status_label' => SurveyStatus::from($survey->status)->label(),
@@ -98,15 +105,45 @@ class SurveyController extends Controller
             'canBrief' => request()->user()->can('brief', $survey),
             'canVerify' => request()->user()->can('verifyReport', $survey),
             'canCancel' => request()->user()->can('cancel', $survey),
+            'canManageTeam' => request()->user()->can('updateTeam', $survey),
+            'surveyorOptions' => \App\Models\User::query()
+                ->where('role', 'technician')
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'phone', 'vendor_id'])
+                ->map(fn ($u) => [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'phone' => $u->phone,
+                    'vendor_id' => $u->vendor_id,
+                ]),
         ]);
     }
 
     public function brief(BriefSurveyRequest $request, Survey $survey, BriefSurvey $action): RedirectResponse
     {
-        $action->handle($survey, $request->user(), $request->validated('briefing'));
+        $action->handle(
+            $survey,
+            $request->user(),
+            $request->validated('briefing'),
+            array_map('intval', $request->validated('surveyor_ids')),
+            (int) $request->validated('leader_id'),
+        );
 
         return redirect()->route('operational.surveys.show', $survey)
-            ->with('success', 'Arahan dikirim ke surveyor.');
+            ->with('success', 'Tim surveyor ditugaskan & arahan dikirim.');
+    }
+
+    public function updateTeam(\App\Http\Requests\Operational\UpdateSurveyTeamRequest $request, Survey $survey, \App\Actions\Operational\SyncSurveyTeam $action): RedirectResponse
+    {
+        $action->handle(
+            $survey,
+            array_map('intval', $request->validated('surveyor_ids')),
+            (int) $request->validated('leader_id'),
+        );
+
+        return redirect()->route('operational.surveys.show', $survey)
+            ->with('success', 'Komposisi tim surveyor diperbarui.');
     }
 
     public function verify(VerifySurveyReportRequest $request, Survey $survey, VerifySurveyReport $action): RedirectResponse

@@ -19,7 +19,7 @@ class VerifySurveyReport
     {
         return DB::transaction(function () use ($survey, $user, $approved, $notes) {
             $locked = Survey::query()
-                ->with(['lead.contact', 'lead.sales', 'report', 'surveyor'])
+                ->with(['lead.contact', 'lead.sales', 'report', 'surveyors'])
                 ->whereKey($survey->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -75,9 +75,9 @@ class VerifySurveyReport
             ]);
             $locked->update(['status' => SurveyStatus::InProgress->value]);
 
-            if ($locked->surveyor) {
+            foreach ($locked->surveyors as $member) {
                 $this->notify->once(
-                    $locked->surveyor,
+                    $member,
                     'survey.rework',
                     "Laporan survey {$locked->code} perlu revisi: {$notes}",
                     $locked,

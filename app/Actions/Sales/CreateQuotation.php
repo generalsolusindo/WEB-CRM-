@@ -9,8 +9,8 @@ use App\Models\Quotation;
 use App\Models\Tax;
 use App\Models\User;
 use App\Services\DocumentNumber;
+use App\Services\Sales\AgreedDpp;
 use App\Services\Sales\LinePricing;
-use App\Services\Sales\SurveyCredit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -58,12 +58,18 @@ class CreateQuotation
                 'parent_quotation_id' => null,
                 'valid_until' => $data['valid_until'] ?? null,
                 'notes' => $data['notes'] ?? null,
-                'survey_credit' => SurveyCredit::forLead($request->lead_id),
+                'agreed_dpp' => isset($data['agreed_dpp']) && $data['agreed_dpp'] !== null && $data['agreed_dpp'] !== ''
+                    ? (float) $data['agreed_dpp']
+                    : null,
             ]);
 
             foreach ($request->lines as $source) {
                 $input = $submitted[$source->id];
                 $quotation->lines()->create($this->buildLine($source, $input, $taxRates));
+            }
+
+            if ($quotation->agreed_dpp !== null) {
+                AgreedDpp::distribute($quotation->lines()->get(), (float) $quotation->agreed_dpp);
             }
 
             $request->lead->update(['stage' => LeadStage::Quotation->value]);
@@ -91,7 +97,7 @@ class CreateQuotation
             isset($input['discount_amount']) ? (float) $input['discount_amount'] : null,
         );
 
-        $category = in_array($input['category'] ?? null, ['material', 'service'], true)
+        $category = in_array($input['category'] ?? null, ['material', 'service', 'reimburse'], true)
             ? $input['category']
             : ($source->category ?? $source->vendorProduct?->category ?? 'material');
 

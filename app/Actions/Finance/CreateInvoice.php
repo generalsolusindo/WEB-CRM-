@@ -18,10 +18,22 @@ class CreateInvoice
 
     /**
      * @param  float|null  $dpPercent  Persentase DP (default 50) — hanya dipakai saat $phase = DP.
+     * @param  float|null  $agreedDpp  Finalisasi nilai DPP oleh Finance — menimpa diskon Sales Order (satu deal, 100%).
+     * @param  float|null  $ppnRate  Override tarif PPN untuk seluruh baris Sales Order (0/11/12).
+     * @param  bool  $pph23Enabled  Customer memotong PPh 23 atas baris jasa.
      */
-    public function handle(SalesOrder $salesOrder, User $user, InvoicePhase $phase, ?string $dueDate, ?float $dpPercent = null, ?float $pph23Rate = null): Invoice
-    {
-        return DB::transaction(function () use ($salesOrder, $user, $phase, $dueDate, $dpPercent, $pph23Rate) {
+    public function handle(
+        SalesOrder $salesOrder,
+        User $user,
+        InvoicePhase $phase,
+        ?string $dueDate,
+        ?float $dpPercent = null,
+        ?float $pph23Rate = null,
+        ?float $agreedDpp = null,
+        ?float $ppnRate = null,
+        bool $pph23Enabled = false,
+    ): Invoice {
+        return DB::transaction(function () use ($salesOrder, $user, $phase, $dueDate, $dpPercent, $pph23Rate, $agreedDpp, $ppnRate, $pph23Enabled) {
             $order = SalesOrder::query()
                 ->with('lines.tax')
                 ->whereKey($salesOrder->id)
@@ -53,6 +65,21 @@ class CreateInvoice
                 throw ValidationException::withMessages([
                     'sales_order' => 'Sales Order tidak memiliki line item.',
                 ]);
+            }
+
+            // Finance memfinalisasi nilai deal & PPN Sales Order sebelum invoice muka
+            // pertama terbit. Disimpan di Sales Order supaya pelunasan ikut konsisten.
+            if ($agreedDpp !== null) {
+                \App\Services\Sales\AgreedDpp::distribute($order->lines, $agreedDpp);
+                $order->update(['agreed_dpp' => $agreedDpp]);
+                $order->load('lines.tax');
+            }
+
+            if ($ppnRate !== null) {
+                foreach ($order->lines as $soLine) {
+                    $soLine->update(['tax_id' => null, 'tax_rate' => round($ppnRate, 2)]);
+                }
+                $order->load('lines.tax');
             }
 
             $percent = $phase === InvoicePhase::Dp
@@ -99,27 +126,12 @@ class CreateInvoice
                 $taxTotal += $taxAmount;
             }
 
-            // Kredit biaya survey yang sudah dibayar customer — dipotong proporsional.
-            $creditPortion = round((float) $order->survey_credit * $ratio, 2);
-            if ($creditPortion > 0) {
-                $invoice->lines()->create([
-                    'sales_order_line_id' => null,
-                    'item_name' => 'Kredit Biaya Survey',
-                    'qty' => 1,
-                    'unit_price' => -$creditPortion,
-                    'discount_amount' => 0,
-                    'tax_id' => null,
-                    'tax_rate' => 0,
-                    'subtotal' => -$creditPortion,
-                ]);
-                $amount -= $creditPortion;
-            }
-
-            // PPh 23 dipotong sekali — hanya di invoice pembayaran penuh (bukan DP).
+            // PPh 23 dipotong customer bila ditandai — basis = baris JASA pada invoice
+            // ini (sudah porsi DP / penuh), sehingga potongannya proporsional.
             $pph23FinalRate = 0.0;
             $pph23FinalAmount = 0.0;
-            if ($phase === InvoicePhase::Full) {
-                $serviceDpp = round((float) $order->lines->where('category', 'service')->sum('subtotal'), 2);
+            if ($pph23Enabled) {
+                $serviceDpp = round((float) $invoice->lines()->where('category', 'service')->sum('subtotal'), 2);
                 if ($serviceDpp > 0) {
                     $pph23FinalRate = max(0.0, min(10.0, $pph23Rate ?? 2.0));
                     $pph23FinalAmount = round($serviceDpp * $pph23FinalRate / 100);
@@ -129,6 +141,7 @@ class CreateInvoice
             $invoice->update([
                 'amount' => round($amount, 2),
                 'tax_amount' => round($taxTotal, 2),
+                'pph23_enabled' => $pph23Enabled,
                 'pph23_rate' => $pph23FinalRate,
                 'pph23_amount' => $pph23FinalAmount,
             ]);

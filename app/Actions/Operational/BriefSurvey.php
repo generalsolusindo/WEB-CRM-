@@ -5,19 +5,21 @@ namespace App\Actions\Operational;
 use App\Enums\SurveyStatus;
 use App\Models\Survey;
 use App\Models\User;
-use App\Services\Notifications\Notify;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class BriefSurvey
 {
-    public function __construct(private Notify $notify) {}
+    public function __construct(private SyncSurveyTeam $syncTeam) {}
 
-    public function handle(Survey $survey, User $user, string $briefing): Survey
+    /**
+     * @param  list<int>  $surveyorIds
+     */
+    public function handle(Survey $survey, User $user, string $briefing, array $surveyorIds, int $leaderId): Survey
     {
-        return DB::transaction(function () use ($survey, $user, $briefing) {
+        return DB::transaction(function () use ($survey, $user, $briefing, $surveyorIds, $leaderId) {
             $locked = Survey::query()
-                ->with('lead.contact', 'surveyor')
+                ->with('lead.contact', 'surveyors')
                 ->whereKey($survey->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -27,6 +29,8 @@ class BriefSurvey
                     'survey' => 'Survey ini belum siap diberi arahan.',
                 ]);
             }
+
+            $this->syncTeam->handle($locked, $surveyorIds, $leaderId);
 
             $locked->update([
                 'briefing' => $briefing,
@@ -39,15 +43,6 @@ class BriefSurvey
                 ['survey_id' => $locked->id],
                 ['status' => 'draft', 'revision' => 1],
             );
-
-            if ($locked->surveyor) {
-                $this->notify->once(
-                    $locked->surveyor,
-                    'survey.assigned',
-                    "Kamu ditugaskan survey {$locked->code} di {$locked->site_region}. Cek arahan lalu kirim laporan.",
-                    $locked,
-                );
-            }
 
             return $locked;
         });

@@ -33,9 +33,10 @@ class SaveQuotationRequest extends FormRequest
         return [
             'valid_until' => ['nullable', 'date', 'after_or_equal:today'],
             'notes' => ['nullable', 'string'],
+            'agreed_dpp' => ['nullable', 'numeric', 'min:0', 'decimal:0,2'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.procurement_request_line_id' => ['required', 'integer', 'distinct'],
-            'lines.*.category' => ['nullable', Rule::in(['material', 'service'])],
+            'lines.*.category' => ['nullable', Rule::in(['material', 'service', 'reimburse'])],
             'lines.*.sourcing_note' => ['nullable', 'string', 'max:2000'],
             'lines.*.selling_price' => ['required', 'numeric', 'min:0', 'decimal:0,2'],
             'lines.*.discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100', 'decimal:0,2'],

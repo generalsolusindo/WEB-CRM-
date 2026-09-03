@@ -26,7 +26,7 @@ class SurveyExecutionTest extends TestCase
         $survey = $lead->surveys()->create([
             'requested_by' => $sales->id, 'site_address' => 'Jl. Z', 'site_region' => 'Solo',
             'delivery_mode' => 'internal', 'billable' => false, 'cost' => 0,
-            'surveyor_id' => $surveyor->id, 'status' => 'awaiting_briefing',
+            'status' => 'awaiting_briefing',
         ]);
 
         return [$survey, $surveyor, $sales];
@@ -37,13 +37,20 @@ class SurveyExecutionTest extends TestCase
         return User::factory()->create(['role' => 'operational', 'is_active' => true]);
     }
 
+    private function brief(Survey $survey, User $surveyor, User $operational, string $briefing = 'b'): \Illuminate\Testing\TestResponse
+    {
+        return $this->actingAs($operational)->post("/operational/surveys/{$survey->id}/brief", [
+            'briefing' => $briefing,
+            'surveyor_ids' => [$surveyor->id],
+            'leader_id' => $surveyor->id,
+        ]);
+    }
+
     public function test_operational_briefs_and_surveyor_is_notified(): void
     {
         [$survey, $surveyor] = $this->briefingSurvey();
 
-        $this->actingAs($this->operational())->post("/operational/surveys/{$survey->id}/brief", [
-            'briefing' => 'Ukur ruang server lantai 3.',
-        ])->assertRedirect();
+        $this->brief($survey, $surveyor, $this->operational(), 'Ukur ruang server lantai 3.')->assertRedirect();
 
         $survey->refresh();
         $this->assertSame('in_progress', $survey->status);
@@ -67,7 +74,7 @@ class SurveyExecutionTest extends TestCase
     {
         [$survey, $surveyor] = $this->briefingSurvey();
         $operational = $this->operational();
-        $this->actingAs($operational)->post("/operational/surveys/{$survey->id}/brief", ['briefing' => 'brief']);
+        $this->brief($survey, $surveyor, $operational);
 
         $this->actingAs($surveyor)->put("/technician/surveys/{$survey->id}/report", [
             'summary' => 'Ruangan siap, butuh 2 rak dan kabel.',
@@ -92,7 +99,7 @@ class SurveyExecutionTest extends TestCase
     public function test_cannot_submit_empty_report(): void
     {
         [$survey, $surveyor] = $this->briefingSurvey();
-        $this->actingAs($this->operational())->post("/operational/surveys/{$survey->id}/brief", ['briefing' => 'b']);
+        $this->brief($survey, $surveyor, $this->operational());
 
         $this->actingAs($surveyor)->post("/technician/surveys/{$survey->id}/report/submit")
             ->assertSessionHasErrors('summary');
@@ -103,7 +110,7 @@ class SurveyExecutionTest extends TestCase
     {
         [$survey, $surveyor, $sales] = $this->briefingSurvey();
         $operational = $this->operational();
-        $this->actingAs($operational)->post("/operational/surveys/{$survey->id}/brief", ['briefing' => 'b']);
+        $this->brief($survey, $surveyor, $operational);
         $this->actingAs($surveyor)->put("/technician/surveys/{$survey->id}/report", [
             'summary' => 'ok', 'items' => [['item_name' => 'X', 'qty' => 1, 'unit' => 'pcs', 'notes' => null]],
         ]);
@@ -123,7 +130,7 @@ class SurveyExecutionTest extends TestCase
     {
         [$survey, $surveyor] = $this->briefingSurvey();
         $operational = $this->operational();
-        $this->actingAs($operational)->post("/operational/surveys/{$survey->id}/brief", ['briefing' => 'b']);
+        $this->brief($survey, $surveyor, $operational);
         $this->actingAs($surveyor)->put("/technician/surveys/{$survey->id}/report", [
             'summary' => 'kurang', 'items' => [['item_name' => 'X', 'qty' => 1, 'unit' => 'pcs', 'notes' => null]],
         ]);
@@ -162,7 +169,7 @@ class SurveyExecutionTest extends TestCase
     {
         Storage::fake('local');
         [$survey, $surveyor] = $this->briefingSurvey();
-        $this->actingAs($this->operational())->post("/operational/surveys/{$survey->id}/brief", ['briefing' => 'b']);
+        $this->brief($survey, $surveyor, $this->operational());
 
         $this->actingAs($surveyor)->post("/technician/surveys/{$survey->id}/report/attachments", [
             'file' => UploadedFile::fake()->create('foto.jpg', 100, 'image/jpeg'),
@@ -174,5 +181,81 @@ class SurveyExecutionTest extends TestCase
         $this->actingAs($surveyor)->delete("/technician/surveys/{$survey->id}/report/attachments/{$attachment->id}")
             ->assertRedirect();
         $this->assertSame(0, $survey->fresh()->report->attachments()->count());
+    }
+
+    public function test_operational_assigns_multi_surveyor_team_with_one_leader(): void
+    {
+        [$survey, $leader] = $this->briefingSurvey();
+        $member = User::factory()->create(['role' => 'technician', 'is_active' => true]);
+        $operational = $this->operational();
+
+        $this->actingAs($operational)->post("/operational/surveys/{$survey->id}/brief", [
+            'briefing' => 'Bagi tugas: leader ukur, member foto.',
+            'surveyor_ids' => [$leader->id, $member->id],
+            'leader_id' => $leader->id,
+        ])->assertRedirect();
+
+        $survey->refresh();
+        $this->assertEqualsCanonicalizing([$leader->id, $member->id], $survey->surveyors()->pluck('users.id')->all());
+        $this->assertTrue($survey->isLeader($leader));
+        $this->assertFalse($survey->isLeader($member));
+        $this->assertSame(1, Notification::where('type', 'survey.assigned')->where('user_id', $member->id)->count());
+    }
+
+    public function test_leader_must_be_a_selected_member(): void
+    {
+        [$survey, $leader] = $this->briefingSurvey();
+        $outsider = User::factory()->create(['role' => 'technician', 'is_active' => true]);
+
+        $this->actingAs($this->operational())->post("/operational/surveys/{$survey->id}/brief", [
+            'briefing' => 'x',
+            'surveyor_ids' => [$leader->id],
+            'leader_id' => $outsider->id,
+        ])->assertSessionHasErrors('leader_id');
+    }
+
+    public function test_only_leader_can_submit_report(): void
+    {
+        [$survey, $leader] = $this->briefingSurvey();
+        $member = User::factory()->create(['role' => 'technician', 'is_active' => true]);
+        $operational = $this->operational();
+        $this->actingAs($operational)->post("/operational/surveys/{$survey->id}/brief", [
+            'briefing' => 'b',
+            'surveyor_ids' => [$leader->id, $member->id],
+            'leader_id' => $leader->id,
+        ]);
+
+        // member boleh mengisi draft
+        $this->actingAs($member)->put("/technician/surveys/{$survey->id}/report", [
+            'summary' => 'draft dari member', 'items' => [['item_name' => 'X', 'qty' => 1, 'unit' => 'pcs', 'notes' => null]],
+        ])->assertRedirect();
+
+        // tapi tidak boleh submit
+        $this->actingAs($member)->post("/technician/surveys/{$survey->id}/report/submit")->assertForbidden();
+
+        // leader boleh submit
+        $this->actingAs($leader)->post("/technician/surveys/{$survey->id}/report/submit")->assertRedirect();
+        $this->assertSame('report_review', $survey->fresh()->status);
+    }
+
+    public function test_operational_can_edit_team_while_in_progress(): void
+    {
+        [$survey, $leader] = $this->briefingSurvey();
+        $member = User::factory()->create(['role' => 'technician', 'is_active' => true]);
+        $replacement = User::factory()->create(['role' => 'technician', 'is_active' => true]);
+        $operational = $this->operational();
+        $this->actingAs($operational)->post("/operational/surveys/{$survey->id}/brief", [
+            'briefing' => 'b', 'surveyor_ids' => [$leader->id, $member->id], 'leader_id' => $leader->id,
+        ]);
+
+        $this->actingAs($operational)->patch("/operational/surveys/{$survey->id}/team", [
+            'surveyor_ids' => [$leader->id, $replacement->id],
+            'leader_id' => $replacement->id,
+        ])->assertRedirect();
+
+        $survey->refresh();
+        $this->assertEqualsCanonicalizing([$leader->id, $replacement->id], $survey->surveyors()->pluck('users.id')->all());
+        $this->assertTrue($survey->isLeader($replacement));
+        $this->assertSame(1, Notification::where('type', 'survey.assigned')->where('user_id', $replacement->id)->count());
     }
 }

@@ -4,6 +4,7 @@ namespace App\Actions\Sales;
 
 use App\Models\Quotation;
 use App\Models\Tax;
+use App\Services\Sales\AgreedDpp;
 use App\Services\Sales\LinePricing;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -30,6 +31,9 @@ class UpdateQuotation
             $locked->update([
                 'valid_until' => $data['valid_until'] ?? null,
                 'notes' => $data['notes'] ?? null,
+                'agreed_dpp' => isset($data['agreed_dpp']) && $data['agreed_dpp'] !== null && $data['agreed_dpp'] !== ''
+                    ? (float) $data['agreed_dpp']
+                    : null,
             ]);
 
             $taxRates = Tax::pluck('rate', 'id');
@@ -49,7 +53,7 @@ class UpdateQuotation
                 );
 
                 $line->update([
-                    'category' => in_array($input['category'] ?? null, ['material', 'service'], true)
+                    'category' => in_array($input['category'] ?? null, ['material', 'service', 'reimburse'], true)
                         ? $input['category']
                         : $line->category,
                     'sourcing_note' => array_key_exists('sourcing_note', $input)
@@ -63,6 +67,10 @@ class UpdateQuotation
                     'tax_rate' => round((float) $taxRate, 2),
                     'subtotal' => $priced['subtotal'],
                 ]);
+            }
+
+            if ($locked->agreed_dpp !== null) {
+                AgreedDpp::distribute($locked->lines()->get(), (float) $locked->agreed_dpp);
             }
 
             return $locked->refresh();

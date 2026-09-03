@@ -29,7 +29,7 @@ function initialLine(line, taxes) {
     };
 }
 
-export default function Form({ procurementRequest = null, quotation = null, taxes = [], surveyCredit = 0 }) {
+export default function Form({ procurementRequest = null, quotation = null, taxes = [] }) {
     const editing = Boolean(quotation);
     const sourceLines = editing ? quotation.lines : procurementRequest.lines;
     const customer = editing ? quotation.contact : procurementRequest.lead.contact;
@@ -37,11 +37,13 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
     const { data, setData, post, put, processing, errors, transform } = useForm({
         valid_until: quotation?.valid_until ?? '',
         notes: quotation?.notes ?? '',
+        agreed_dpp: quotation?.agreed_dpp != null ? String(Number(quotation.agreed_dpp)) : '',
         lines: sourceLines.map((l) => initialLine(l, taxes)),
     });
 
     transform((payload) => ({
         ...payload,
+        agreed_dpp: payload.agreed_dpp === '' ? null : Number(payload.agreed_dpp),
         lines: payload.lines.map((l) => ({
             procurement_request_line_id: l.procurement_request_line_id,
             category: l.category,
@@ -58,11 +60,19 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
         setData('lines', data.lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
     }
 
+    const grossAll = r2(sourceLines.reduce((s, line, i) => s + Number(line.qty) * Number(data.lines[i].selling_price || 0), 0));
+    const agreedDpp = data.agreed_dpp !== '' ? Number(data.agreed_dpp) : null;
+    const agreedFactor = agreedDpp != null && agreedDpp > 0 && grossAll > 0
+        ? Math.min(agreedDpp, grossAll) / grossAll
+        : null;
+
     function calc(line, i) {
         const d = data.lines[i];
         const gross = r2(Number(line.qty) * Number(d.selling_price || 0));
         let discount = 0;
-        if (d.discount_mode === 'percent' && d.discount_percent !== '') discount = r2(gross * Number(d.discount_percent) / 100);
+        if (agreedFactor != null) {
+            discount = r2(gross - r2(gross * agreedFactor));
+        } else if (d.discount_mode === 'percent' && d.discount_percent !== '') discount = r2(gross * Number(d.discount_percent) / 100);
         else if (d.discount_mode === 'amount' && d.discount_amount !== '') discount = Math.min(Number(d.discount_amount), gross);
         const dpp = r2(gross - discount);
         const tax = r2(dpp * Number(d.tax_rate || 0) / 100);
@@ -102,10 +112,11 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
         const c = calc(line, i);
         acc.gross += c.gross; acc.discount += c.discount; acc.dpp += c.dpp; acc.tax += c.tax;
         acc.cost += r2(Number(line.qty) * Number(line.cost_price));
+        if (data.lines[i].category === 'service') acc.serviceDpp += c.dpp;
         return acc;
-    }, { gross: 0, discount: 0, dpp: 0, tax: 0, cost: 0 });
-    const credit = r2(Math.max(Number(surveyCredit) || 0, 0));
-    const grand = r2(totals.dpp + totals.tax - credit);
+    }, { gross: 0, discount: 0, dpp: 0, tax: 0, cost: 0, serviceDpp: 0 });
+    const grand = r2(totals.dpp + totals.tax);
+    const pph23Estimate = r2(totals.serviceDpp * 0.02);
     const discPct = totals.gross > 0 ? r2(totals.discount / totals.gross * 100) : 0;
     const marginRp = r2(totals.dpp - totals.cost);
     const marginPct = totals.cost > 0 ? r2((totals.dpp - totals.cost) / totals.cost * 100) : null;
@@ -139,6 +150,18 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                             <label className="text-sm font-medium text-text">Catatan
                                 <textarea rows="2" value={data.notes} onChange={(e) => setData('notes', e.target.value)} className="input" />
                             </label>
+                            <label className="text-sm font-medium text-text sm:col-span-2">Nilai DPP disepakati <span className="font-normal text-text-muted">(opsional — harga nett hasil negosiasi)</span>
+                                <input type="number" min="0" step="0.01" value={data.agreed_dpp} onChange={(e) => setData('agreed_dpp', e.target.value)} placeholder="mis. 10000000 — kosongkan untuk pakai diskon per-baris" className="input" />
+                                {errors.agreed_dpp && <span className="text-xs text-danger">{errors.agreed_dpp}</span>}
+                                {agreedFactor != null && (
+                                    <span className="mt-1 block text-xs text-info">
+                                        Diskon global {r2((1 - agreedFactor) * 100)}% (−{money(r2(grossAll - Math.min(agreedDpp, grossAll)))}) dibagi rata ke semua baris. Diskon per-baris dinonaktifkan.
+                                    </span>
+                                )}
+                                {agreedDpp != null && agreedDpp > grossAll && (
+                                    <span className="mt-1 block text-xs text-warning">Nilai DPP melebihi subtotal bruto ({money(grossAll)}) — dibatasi ke subtotal bruto (tanpa diskon).</span>
+                                )}
+                            </label>
                         </div>
                     </section>
 
@@ -171,6 +194,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                                     <select value={data.lines[i].category} onChange={(e) => setLine(i, { category: e.target.value })} className="mt-1 rounded border border-border px-1 py-0.5 text-[11px]">
                                                         <option value="material">Material</option>
                                                         <option value="service">Jasa (kena PPh 23)</option>
+                                                        <option value="reimburse">Biaya Reimburse</option>
                                                     </select>
                                                     <textarea rows="2" value={data.lines[i].sourcing_note} onChange={(e) => setLine(i, { sourcing_note: e.target.value })} placeholder="Catatan opsi merk (dari Procurement). Kosongkan bila tak perlu ditampilkan ke customer." className="mt-1 w-full rounded border border-border px-1.5 py-1 text-[11px]" />
                                                     <div className="mt-1 text-xs">
@@ -187,11 +211,11 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                                 </td>
                                                 <td className="min-w-40 px-3 py-3">
                                                     <div className="flex items-center gap-1">
-                                                        <input type="number" min="0" max="100" step="0.01" placeholder="%" value={data.lines[i].discount_percent} onChange={(e) => onDiscountPercent(i, line, e.target.value)} className="w-16 rounded-lg border border-border px-2 py-1.5 text-right text-xs" />
+                                                        <input type="number" min="0" max="100" step="0.01" placeholder="%" disabled={agreedFactor != null} value={data.lines[i].discount_percent} onChange={(e) => onDiscountPercent(i, line, e.target.value)} className="w-16 rounded-lg border border-border px-2 py-1.5 text-right text-xs disabled:bg-bg" />
                                                         <span className="text-xs text-text-muted">/</span>
-                                                        <input type="number" min="0" step="0.01" placeholder="Rp" value={data.lines[i].discount_amount} onChange={(e) => onDiscountAmount(i, line, e.target.value)} className="w-full rounded-lg border border-border px-2 py-1.5 text-right text-xs" />
+                                                        <input type="number" min="0" step="0.01" placeholder="Rp" disabled={agreedFactor != null} value={data.lines[i].discount_amount} onChange={(e) => onDiscountAmount(i, line, e.target.value)} className="w-full rounded-lg border border-border px-2 py-1.5 text-right text-xs disabled:bg-bg" />
                                                     </div>
-                                                    {c.discount > 0 && <div className="mt-0.5 text-right text-[10px] text-text-muted">−{money(c.discount)}</div>}
+                                                    {c.discount > 0 && <div className="mt-0.5 text-right text-[10px] text-text-muted">−{money(c.discount)}{agreedFactor != null ? ' (dari Nilai DPP)' : ''}</div>}
                                                 </td>
                                                 <td className="min-w-36 px-3 py-3">
                                                     <select value={data.lines[i].tax_mode === 'custom' ? 'custom' : data.lines[i].tax_id} onChange={(e) => onTaxPick(i, e.target.value)} className="w-full rounded-lg border border-border px-1 py-1.5 text-[11px]">
@@ -219,8 +243,11 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                     <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Total Diskon{discPct > 0 ? ` (${discPct}%)` : ''}</td><td className="px-3 py-1.5 text-right font-medium text-danger">−{money(totals.discount)}</td></tr>
                                     <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">DPP</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.dpp)}</td></tr>
                                     <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Total PPN</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.tax)}</td></tr>
-                                    {credit > 0 && <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Kredit Biaya Survey</td><td className="px-3 py-1.5 text-right font-medium text-danger">−{money(credit)}</td></tr>}
                                     <tr><td colSpan="6" className="px-3 py-3 text-right font-semibold">Grand Total</td><td className="px-3 py-3 text-right text-lg font-bold">{money(grand)}</td></tr>
+                                    {pph23Estimate > 0 && <>
+                                        <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi PPh 23 (2%) — jika customer memotong</td><td className="px-3 py-1.5 text-right text-xs font-medium text-warning">−{money(pph23Estimate)}</td></tr>
+                                        <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi diterima tunai</td><td className="px-3 py-1.5 text-right text-xs font-medium">{money(r2(grand - pph23Estimate))}</td></tr>
+                                    </>}
                                     {marginPct != null && <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi margin keseluruhan</td><td className={`px-3 py-1.5 text-right text-xs font-medium ${marginPct < 0 ? 'text-danger' : 'text-success'}`}>{money(marginRp)} ({marginPct}%)</td></tr>}
                                 </tfoot>
                             </table>

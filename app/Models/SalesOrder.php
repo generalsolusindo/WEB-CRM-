@@ -24,7 +24,7 @@ class SalesOrder extends Model
         'order_type',
         'payment_rule',
         'status',
-        'survey_credit',
+        'agreed_dpp',
         'dp_percent',
         'po_number',
         'confirmed_at',
@@ -35,7 +35,7 @@ class SalesOrder extends Model
     protected function casts(): array
     {
         return [
-            'survey_credit' => 'decimal:2',
+            'agreed_dpp' => 'decimal:2',
             'dp_percent' => 'decimal:2',
         ];
     }

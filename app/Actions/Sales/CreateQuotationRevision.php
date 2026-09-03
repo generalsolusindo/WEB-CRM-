@@ -6,7 +6,6 @@ use App\Enums\QuotationStatus;
 use App\Models\Quotation;
 use App\Models\User;
 use App\Services\DocumentNumber;
-use App\Services\Sales\SurveyCredit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -39,7 +38,7 @@ class CreateQuotationRevision
                 'parent_quotation_id' => $source->id,
                 'valid_until' => $source->valid_until,
                 'notes' => $source->notes,
-                'survey_credit' => SurveyCredit::forLead($source->lead_id),
+                'agreed_dpp' => $source->agreed_dpp,
             ]);
 
             foreach ($source->lines as $line) {

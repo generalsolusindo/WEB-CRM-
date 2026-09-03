@@ -24,6 +24,7 @@ class Invoice extends Model
         'survey_id',
         'invoice_phase',
         'status',
+        'pph23_enabled',
         'amount',
         'tax_amount',
         'pph23_rate',
@@ -47,6 +48,7 @@ class Invoice extends Model
         return [
             'amount' => 'decimal:2',
             'tax_amount' => 'decimal:2',
+            'pph23_enabled' => 'boolean',
             'pph23_rate' => 'decimal:2',
             'pph23_amount' => 'decimal:2',
             'due_date' => 'date:Y-m-d',

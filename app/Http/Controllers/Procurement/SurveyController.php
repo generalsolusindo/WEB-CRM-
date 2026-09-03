@@ -8,7 +8,6 @@ use App\Enums\SurveyStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Procurement\SourceSurveyRequest;
 use App\Models\Survey;
-use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,7 +27,7 @@ class SurveyController extends Controller
         ]);
 
         $surveys = Survey::query()
-            ->with(['lead.contact:id,name,company_name', 'surveyor:id,name', 'vendor:id,name'])
+            ->with(['lead.contact:id,name,company_name', 'surveyors:id,name', 'vendor:id,name'])
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->orderByRaw("FIELD(status, 'requested') DESC")
             ->latest()
@@ -43,7 +42,8 @@ class SurveyController extends Controller
                 'billable' => $survey->billable,
                 'status' => $survey->status,
                 'status_label' => SurveyStatus::from($survey->status)->label(),
-                'surveyor' => $survey->surveyor?->name,
+                'vendor' => $survey->vendor?->name,
+                'team_count' => $survey->surveyors->count(),
             ]);
 
         return Inertia::render('Procurement/Surveys/Index', [
@@ -60,7 +60,7 @@ class SurveyController extends Controller
         $survey->load([
             'lead.contact:id,name,company_name,email,phone,address',
             'requestedBy:id,name',
-            'surveyor:id,name,vendor_id',
+            'surveyors:id,name',
             'vendor:id,name',
             'sourcedBy:id,name',
         ]);
@@ -71,17 +71,16 @@ class SurveyController extends Controller
                 'status_label' => SurveyStatus::from($survey->status)->label(),
                 'delivery_mode_label' => SurveyDeliveryMode::from($survey->delivery_mode)->label(),
                 'needs_finance' => $survey->needsFinance(),
+                'team' => $survey->surveyors->map(fn ($u) => [
+                    'name' => $u->name,
+                    'is_leader' => (bool) $u->pivot->is_leader,
+                ]),
             ],
             'canSource' => request()->user()->can('source', $survey),
             'vendors' => Vendor::query()
                 ->where('provides_survey', true)
                 ->orderBy('name')
                 ->get(['id', 'name', 'city', 'coverage_area']),
-            'surveyors' => User::query()
-                ->where('role', 'technician')
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(['id', 'name', 'vendor_id', 'phone']),
         ]);
     }
 
@@ -90,6 +89,6 @@ class SurveyController extends Controller
         $action->handle($survey, $request->user(), $request->validated());
 
         return redirect()->route('procurement.surveys.show', $survey)
-            ->with('success', 'Surveyor & biaya ditetapkan. Tahap berikutnya sudah dinotifikasi.');
+            ->with('success', 'Vendor & biaya ditetapkan. Tahap berikutnya sudah dinotifikasi.');
     }
 }

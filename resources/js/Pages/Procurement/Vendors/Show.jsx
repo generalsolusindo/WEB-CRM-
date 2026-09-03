@@ -79,7 +79,7 @@ export default function Show({ vendor }) {
                                 {vendor.products.map((product) => (
                                     <tr key={product.id}>
                                         <td className="px-4 py-3"><div className="font-medium text-text">{product.item_name}</div><div className="text-xs text-text-muted">{product.description || '—'}</div></td>
-                                        <td className="px-4 py-3 capitalize text-text-muted">{product.category === 'service' ? 'Jasa' : 'Material'}</td>
+                                        <td className="px-4 py-3 capitalize text-text-muted">{{ service: 'Jasa', reimburse: 'Biaya Reimburse' }[product.category] ?? 'Material'}</td>
                                         <td className="px-4 py-3 text-text-muted">{product.unit}</td>
                                         <td className="px-4 py-3 text-right text-text">{money(product.price)}</td>
                                         <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${product.is_active ? 'bg-success/10 text-success' : 'bg-text-muted/10 text-text-muted'}`}>{product.is_active ? 'Aktif' : 'Nonaktif'}</span></td>

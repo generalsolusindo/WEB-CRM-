@@ -1,11 +1,24 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
 
-export default function Show({ survey, report, canBrief, canVerify, canCancel }) {
-    const briefForm = useForm({ briefing: survey.briefing ?? '' });
+export default function Show({ survey, report, canBrief, canVerify, canCancel, canManageTeam, surveyorOptions = [] }) {
+    const currentTeam = survey.team ?? [];
+    const currentLeader = currentTeam.find((t) => t.is_leader)?.id ?? currentTeam[0]?.id ?? null;
+
+    const briefForm = useForm({
+        briefing: survey.briefing ?? '',
+        surveyor_ids: currentTeam.map((t) => t.id),
+        leader_id: currentLeader,
+    });
+    const teamForm = useForm({
+        surveyor_ids: currentTeam.map((t) => t.id),
+        leader_id: currentLeader,
+    });
     const verifyForm = useForm({ decision: 'approve', notes: '' });
 
     function submitBrief(e) { e.preventDefault(); briefForm.post(`/operational/surveys/${survey.id}/brief`); }
+    function submitTeam(e) { e.preventDefault(); teamForm.patch(`/operational/surveys/${survey.id}/team`, { preserveScroll: true }); }
     function submitVerify(e) { e.preventDefault(); verifyForm.post(`/operational/surveys/${survey.id}/verify`); }
     function cancelSurvey() {
         const reason = prompt('Alasan pembatalan survey (opsional):');
@@ -32,25 +45,62 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel })
                 <section className="grid gap-4 rounded-xl border border-border bg-surface p-6 shadow-sm sm:grid-cols-2">
                     <Info label="Lokasi" value={`${survey.site_region} — ${survey.site_address}`} />
                     <Info label="Pelaksana" value={survey.delivery_mode} />
-                    <Info label="Surveyor" value={survey.surveyor} />
                     <Info label="Vendor" value={survey.vendor} />
+                    <Info
+                        label="Tim Surveyor"
+                        value={currentTeam.length
+                            ? currentTeam.map((t) => `${t.name}${t.is_leader ? ' (leader)' : ''}`).join('\n')
+                            : 'Belum ditugaskan'}
+                    />
                     {survey.notes && <div className="sm:col-span-2"><Info label="Catatan Sales" value={survey.notes} /></div>}
                 </section>
 
                 {canBrief ? (
                     <form onSubmit={submitBrief} className="space-y-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
-                        <h2 className="font-semibold text-text">Arahan untuk Surveyor</h2>
-                        <textarea rows="4" value={briefForm.data.briefing} onChange={(e) => briefForm.setData('briefing', e.target.value)} className="input" placeholder="Titik yang harus disurvey, data yang harus diambil, kontak lokasi, dsb." />
-                        {briefForm.errors.briefing && <span className="text-xs text-danger">{briefForm.errors.briefing}</span>}
+                        <h2 className="font-semibold text-text">Tugaskan Tim & Beri Arahan</h2>
+                        <TeamPicker
+                            options={surveyorOptions}
+                            vendorId={survey.vendor_id}
+                            selected={briefForm.data.surveyor_ids}
+                            leaderId={briefForm.data.leader_id}
+                            onChange={(ids, leader) => briefForm.setData({ ...briefForm.data, surveyor_ids: ids, leader_id: leader })}
+                            error={briefForm.errors.surveyor_ids || briefForm.errors.leader_id}
+                        />
+                        <div>
+                            <label className="text-sm font-medium text-text">Arahan untuk tim</label>
+                            <textarea rows="4" value={briefForm.data.briefing} onChange={(e) => briefForm.setData('briefing', e.target.value)} className="input" placeholder="Titik yang harus disurvey, data yang harus diambil, kontak lokasi, dsb." />
+                            {briefForm.errors.briefing && <span className="text-xs text-danger">{briefForm.errors.briefing}</span>}
+                        </div>
                         <div className="flex justify-end">
-                            <button disabled={briefForm.processing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">Kirim Arahan</button>
+                            <button disabled={briefForm.processing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">Tugaskan & Kirim Arahan</button>
                         </div>
                     </form>
-                ) : survey.briefing && (
-                    <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
-                        <h2 className="font-semibold text-text">Arahan</h2>
-                        <p className="mt-2 whitespace-pre-line text-sm text-text">{survey.briefing}</p>
-                    </section>
+                ) : (
+                    <>
+                        {survey.briefing && (
+                            <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+                                <h2 className="font-semibold text-text">Arahan</h2>
+                                <p className="mt-2 whitespace-pre-line text-sm text-text">{survey.briefing}</p>
+                            </section>
+                        )}
+                        {canManageTeam && (
+                            <form onSubmit={submitTeam} className="space-y-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
+                                <h2 className="font-semibold text-text">Ubah Komposisi Tim</h2>
+                                <p className="text-sm text-text-muted">Masih bisa diubah selama survey berjalan.</p>
+                                <TeamPicker
+                                    options={surveyorOptions}
+                                    vendorId={survey.vendor_id}
+                                    selected={teamForm.data.surveyor_ids}
+                                    leaderId={teamForm.data.leader_id}
+                                    onChange={(ids, leader) => teamForm.setData({ surveyor_ids: ids, leader_id: leader })}
+                                    error={teamForm.errors.surveyor_ids || teamForm.errors.leader_id}
+                                />
+                                <div className="flex justify-end">
+                                    <button disabled={teamForm.processing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">Simpan Tim</button>
+                                </div>
+                            </form>
+                        )}
+                    </>
                 )}
 
                 {report && ['submitted', 'verified', 'rejected'].includes(report.status) && (
@@ -103,6 +153,58 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel })
                 )}
             </div>
         </AppLayout>
+    );
+}
+
+function TeamPicker({ options, vendorId, selected, leaderId, onChange, error }) {
+    const [showAll, setShowAll] = useState(!vendorId);
+
+    const visible = useMemo(() => {
+        const sorted = [...options].sort((a, b) => Number(b.vendor_id === vendorId) - Number(a.vendor_id === vendorId));
+        if (showAll || !vendorId) return sorted;
+        return sorted.filter((o) => o.vendor_id === vendorId || selected.includes(o.id));
+    }, [options, vendorId, showAll, selected]);
+
+    function toggle(id) {
+        const next = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id];
+        let leader = leaderId;
+        if (!next.includes(leader)) leader = next[0] ?? null;
+        if (next.length && !leader) leader = next[0];
+        onChange(next, leader);
+    }
+
+    return (
+        <div>
+            <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-text">Anggota Tim Surveyor *</label>
+                {vendorId != null && (
+                    <button type="button" onClick={() => setShowAll((v) => !v)} className="text-xs text-info">
+                        {showAll ? 'Tampilkan surveyor vendor saja' : 'Tampilkan semua surveyor'}
+                    </button>
+                )}
+            </div>
+            <div className="mt-2 divide-y divide-border rounded-lg border border-border">
+                {visible.length === 0 && <p className="px-3 py-4 text-sm text-text-muted">Belum ada akun surveyor aktif.</p>}
+                {visible.map((o) => {
+                    const checked = selected.includes(o.id);
+                    return (
+                        <div key={o.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                            <label className="flex flex-1 items-center gap-2">
+                                <input type="checkbox" checked={checked} onChange={() => toggle(o.id)} />
+                                <span className="font-medium text-text">{o.name}</span>
+                                {o.phone && <span className="text-xs text-text-muted">· {o.phone}</span>}
+                                {o.vendor_id != null && <span className="rounded bg-bg px-1.5 py-0.5 text-[10px] text-text-muted">vendor</span>}
+                            </label>
+                            <label className={`flex items-center gap-1 text-xs ${checked ? 'text-text-muted' : 'text-text-muted/40'}`}>
+                                <input type="radio" name="team-leader" disabled={!checked} checked={checked && leaderId === o.id} onChange={() => onChange(selected, o.id)} />
+                                leader
+                            </label>
+                        </div>
+                    );
+                })}
+            </div>
+            {error && <span className="mt-1 block text-xs text-danger">{error}</span>}
+        </div>
     );
 }
 

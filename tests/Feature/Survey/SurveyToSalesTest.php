@@ -84,9 +84,9 @@ class SurveyToSalesTest extends TestCase
         ])->assertForbidden();
     }
 
-    public function test_paid_survey_fee_is_credited_on_quotation_and_dp_invoice(): void
+    public function test_survey_invoice_and_order_invoice_are_billed_separately(): void
     {
-        // Sales chain: opportunity -> requirement -> PR ready
+        // Biaya survey dan tagihan order tidak saling potong.
         $sales = User::factory()->create(['role' => 'sales']);
         $contact = Contact::create(['name' => 'Cust', 'created_by' => $sales->id]);
         $lead = Lead::create(['contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified']);
@@ -96,37 +96,31 @@ class SurveyToSalesTest extends TestCase
         $pr->lines()->update(['cost_price' => 1000000, 'availability_status' => 'available']);
         $pr->update(['status' => 'ready']);
 
-        // A paid survey invoice worth 500.000 for this lead
+        // Invoice survey lunas Rp 500.000 untuk lead ini
         $survey = $lead->surveys()->create([
             'requested_by' => $sales->id, 'site_address' => 'a', 'site_region' => 'x',
             'delivery_mode' => 'internal', 'billable' => true, 'cost' => 500000, 'status' => 'awaiting_payment',
         ]);
-        $srv = Invoice::create([
+        Invoice::create([
             'number' => 'SRV-2026-0001', 'invoice_type' => 'survey', 'sales_order_id' => null,
             'survey_id' => $survey->id, 'invoice_phase' => null, 'status' => 'paid',
             'amount' => 500000, 'tax_amount' => 0,
         ]);
 
-        // Quotation
         $this->actingAs($sales)->post("/sales/procurement-requests/{$pr->id}/quotations", [
             'lines' => [['procurement_request_line_id' => $pr->lines()->first()->id, 'selling_price' => 1300000]],
         ]);
         $quotation = Quotation::firstOrFail();
-        $this->assertSame('500000.00', $quotation->survey_credit);
-
-        // Confirm -> SO carries credit
         $quotation->update(['status' => 'sent']);
-        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload("mixed"));
+        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload('mixed'));
         $so = \App\Models\SalesOrder::firstOrFail();
-        $this->assertSame('500000.00', $so->survey_credit);
 
-        // DP invoice: half of 2.6jt line = 1.3jt, minus half credit 250rb = 1.05jt
         $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
         $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'dp']);
         $invoice = Invoice::where('invoice_phase', 'dp')->with('lines')->firstOrFail();
-        $this->assertSame('1050000.00', $invoice->amount);
-        $creditLine = $invoice->lines->firstWhere('item_name', 'Kredit Biaya Survey');
-        $this->assertNotNull($creditLine);
-        $this->assertSame('-250000.00', $creditLine->subtotal);
+
+        // DP 50% dari 2.6jt = 1.3jt penuh, tanpa potongan biaya survey
+        $this->assertSame('1300000.00', $invoice->amount);
+        $this->assertNull($invoice->lines->firstWhere('sales_order_line_id', null));
     }
 }

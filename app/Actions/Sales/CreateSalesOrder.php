@@ -68,7 +68,7 @@ class CreateSalesOrder
                 'order_type' => $orderType->value,
                 'payment_rule' => $orderType->paymentRule()->value,
                 'status' => SalesOrderStatus::Confirmed->value,
-                'survey_credit' => $source->survey_credit,
+                'agreed_dpp' => $source->agreed_dpp,
                 'po_number' => $poNumber,
                 'confirmed_at' => now(),
                 'confirmed_by' => $user->id,

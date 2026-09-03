@@ -56,6 +56,9 @@ class SurveyFinanceTest extends TestCase
         $this->assertMatchesRegularExpression('/^SRV-\d{4}-0001$/', $invoice->number);
         $this->assertSame('750000.00', $invoice->amount);
         $this->assertSame('0.00', $invoice->tax_amount);
+
+        // PDF invoice survey (tanpa grup Materials/Services) tetap render
+        $this->actingAs($this->finance())->get("/finance/invoices/{$invoice->id}/pdf")->assertOk();
         $this->assertSame('awaiting_payment', $survey->fresh()->status);
         $this->assertSame(1, $invoice->lines()->count());
     }
