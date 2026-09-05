@@ -1,5 +1,6 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
+import { pickFile } from '../../../utils/fileValidation';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -137,7 +138,8 @@ export default function Show({ survey, invoice, payments, taxes = [], canHandle,
                                             {payForm.errors.paid_at && <span className="text-xs text-danger">{payForm.errors.paid_at}</span>}
                                         </label>
                                         <label className="text-sm font-medium text-text">Bukti (pdf/jpg/png)
-                                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => payForm.setData('proof', e.target.files[0] ?? null)} className="mt-1 block w-full text-sm" />
+                                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile(payForm, 'proof', e.target.files[0], 5)} className="mt-1 block w-full text-sm" />
+                                            <span className="block text-[11px] text-text-muted">maks 5 MB</span>
                                             {payForm.errors.proof && <span className="text-xs text-danger">{payForm.errors.proof}</span>}
                                         </label>
                                     </div>

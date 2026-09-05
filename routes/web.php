@@ -6,9 +6,13 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Finance\InvoiceController;
 use App\Http\Controllers\Finance\PaymentController;
 use App\Http\Controllers\Finance\SurveyController as FinanceSurveyController;
+use App\Http\Controllers\Management\ProjectController as ManagementProjectController;
+use App\Http\Controllers\Management\ProjectManagerAccountController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ProjectManager\ProjectController as ProjectManagerProjectController;
 use App\Http\Controllers\Operational\ActualProcurementController;
 use App\Http\Controllers\Operational\BastVerificationController;
+use App\Http\Controllers\Operational\DeliveryNoteController;
 use App\Http\Controllers\Operational\ProjectChangeRequestController;
 use App\Http\Controllers\Operational\ProjectController;
 use App\Http\Controllers\Operational\ProjectTaskController;
@@ -19,6 +23,7 @@ use App\Http\Controllers\Procurement\ProjectProcurementController;
 use App\Http\Controllers\Procurement\SurveyController as ProcurementSurveyController;
 use App\Http\Controllers\Procurement\TechnicianAccountController;
 use App\Http\Controllers\Technician\BastController as TechnicianBastController;
+use App\Http\Controllers\Technician\DeliveryNoteController as TechnicianDeliveryNoteController;
 use App\Http\Controllers\Technician\SurveyController as TechnicianSurveyController;
 use App\Http\Controllers\Technician\TaskController as TechnicianTaskController;
 use App\Http\Controllers\Procurement\VendorController;
@@ -56,6 +61,27 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('admin')->name('admin.')->middleware('role:administrator')->group(function () {
         Route::resource('taxes', TaxController::class)->except('show');
+    });
+
+    Route::prefix('management')->name('management.')->middleware('role:management')->group(function () {
+        Route::get('project-managers', [ProjectManagerAccountController::class, 'index'])
+            ->name('project-managers.index');
+        Route::get('project-managers/create', [ProjectManagerAccountController::class, 'create'])
+            ->name('project-managers.create');
+        Route::post('project-managers', [ProjectManagerAccountController::class, 'store'])
+            ->name('project-managers.store');
+        Route::get('project-managers/{projectManager}/edit', [ProjectManagerAccountController::class, 'edit'])
+            ->name('project-managers.edit');
+        Route::put('project-managers/{projectManager}', [ProjectManagerAccountController::class, 'update'])
+            ->name('project-managers.update');
+        Route::get('projects', [ManagementProjectController::class, 'index'])->name('projects.index');
+        Route::get('projects/{project}', [ManagementProjectController::class, 'show'])->name('projects.show');
+        Route::put('projects/{project}/delegate', [ManagementProjectController::class, 'delegate'])->name('projects.delegate');
+    });
+
+    Route::prefix('project-manager')->name('project-manager.')->middleware('role:project_manager')->group(function () {
+        Route::get('projects', [ProjectManagerProjectController::class, 'index'])->name('projects.index');
+        Route::get('projects/{project}', [ProjectManagerProjectController::class, 'show'])->name('projects.show');
     });
 
     Route::prefix('procurement')->name('procurement.')->middleware('role:procurement')->group(function () {
@@ -109,12 +135,20 @@ Route::middleware('auth')->group(function () {
         Route::post('surveys/{survey}/report/submit', [TechnicianSurveyController::class, 'submitReport'])->name('surveys.report.submit');
         Route::post('surveys/{survey}/report/attachments', [TechnicianSurveyController::class, 'uploadAttachment'])->name('surveys.report.attachments');
         Route::delete('surveys/{survey}/report/attachments/{attachment}', [TechnicianSurveyController::class, 'deleteAttachment'])->name('surveys.report.attachments.destroy');
+        Route::post('surveys/{survey}/checkin', [TechnicianSurveyController::class, 'checkIn'])->name('surveys.checkin');
         Route::get('tasks', [TechnicianTaskController::class, 'index'])->name('tasks.index');
         Route::get('tasks/{task}', [TechnicianTaskController::class, 'show'])->name('tasks.show');
         Route::post('tasks/{task}/status', [TechnicianTaskController::class, 'updateStatus'])->name('tasks.status');
         Route::post('tasks/{task}/photos', [TechnicianTaskController::class, 'uploadPhoto'])->name('tasks.photos');
+        Route::post('projects/{project}/checkin', [TechnicianTaskController::class, 'checkIn'])->name('projects.checkin');
         Route::get('projects/{project}/bast/create', [TechnicianBastController::class, 'create'])->name('projects.bast.create');
         Route::post('projects/{project}/bast', [TechnicianBastController::class, 'store'])->name('projects.bast.store');
+        Route::get('projects/{project}/delivery-notes', [TechnicianDeliveryNoteController::class, 'index'])
+            ->name('projects.delivery-notes.index');
+        Route::get('delivery-notes/{deliveryNote}', [TechnicianDeliveryNoteController::class, 'show'])
+            ->name('delivery-notes.show');
+        Route::post('delivery-notes/{deliveryNote}/receive', [TechnicianDeliveryNoteController::class, 'receive'])
+            ->name('delivery-notes.receive');
     });
 
     Route::prefix('operational')->name('operational.')->middleware('role:operational')->group(function () {
@@ -150,6 +184,16 @@ Route::middleware('auth')->group(function () {
         Route::patch('surveys/{survey}/team', [OperationalSurveyController::class, 'updateTeam'])->name('surveys.team');
         Route::post('surveys/{survey}/verify', [OperationalSurveyController::class, 'verify'])->name('surveys.verify');
         Route::post('surveys/{survey}/cancel', [OperationalSurveyController::class, 'cancel'])->name('surveys.cancel');
+        Route::get('sales-orders/{salesOrder}/delivery-notes', [DeliveryNoteController::class, 'index'])
+            ->name('sales-orders.delivery-notes.index');
+        Route::get('sales-orders/{salesOrder}/delivery-notes/create', [DeliveryNoteController::class, 'create'])
+            ->name('sales-orders.delivery-notes.create');
+        Route::post('sales-orders/{salesOrder}/delivery-notes', [DeliveryNoteController::class, 'store'])
+            ->name('sales-orders.delivery-notes.store');
+        Route::get('delivery-notes/{deliveryNote}', [DeliveryNoteController::class, 'show'])
+            ->name('delivery-notes.show');
+        Route::get('delivery-notes/{deliveryNote}/pdf', [DeliveryNoteController::class, 'pdf'])
+            ->name('delivery-notes.pdf');
         Route::resource('projects', ProjectController::class)->only(['index', 'show']);
     });
 

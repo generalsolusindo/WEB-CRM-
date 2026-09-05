@@ -1,7 +1,11 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import AppLayout from '../Layouts/AppLayout';
 
-export default function Dashboard({ salesActions = null, procurementActions = null, financeActions = null, operationalActions = null }) {
+function money(v) {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(v || 0));
+}
+
+export default function Dashboard({ salesActions = null, procurementActions = null, financeActions = null, operationalActions = null, managementOverview = null }) {
     const { auth } = usePage().props;
     const user = auth?.user;
 
@@ -26,6 +30,8 @@ export default function Dashboard({ salesActions = null, procurementActions = nu
                         Logout
                     </button>
                 </div>
+
+                {managementOverview && <ManagementOverview data={managementOverview} />}
 
                 {procurementActions && (
                     <div className="space-y-4">
@@ -80,6 +86,76 @@ export default function Dashboard({ salesActions = null, procurementActions = nu
                 )}
             </div>
         </AppLayout>
+    );
+}
+
+function ManagementOverview({ data }) {
+    return (
+        <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-text">Ringkasan Monitoring</h2>
+
+            <StatSection title="Sales">
+                <StatGrid items={data.sales.leads_by_stage} />
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <Stat label="Quotation Terbuka (Draft/Sent)" value={data.sales.open_quotations} />
+                    <Stat label="Nilai Pipeline (Quotation Terbuka)" value={money(data.sales.pipeline_value)} />
+                </div>
+            </StatSection>
+
+            <StatSection title="Procurement">
+                <StatGrid items={data.procurement.by_status} />
+            </StatSection>
+
+            <StatSection title="Finance">
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <Stat label="Total Piutang Belum Lunas" value={money(data.finance.outstanding_total)} warn={data.finance.outstanding_total > 0} />
+                    <Stat label="Invoice Jatuh Tempo" value={data.finance.overdue_count} warn={data.finance.overdue_count > 0} />
+                </div>
+            </StatSection>
+
+            <StatSection title="Operational — Project">
+                <StatGrid items={data.operational.projects_by_status} />
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <Stat label="Task Telat (belum selesai, lewat jadwal)" value={data.operational.tasks_overdue} warn={data.operational.tasks_overdue > 0} />
+                    <Stat label="BAST Menunggu Verifikasi" value={data.operational.bast_pending} warn={data.operational.bast_pending > 0} />
+                </div>
+            </StatSection>
+
+            <StatSection title="Survey">
+                <StatGrid items={data.survey.by_status} />
+            </StatSection>
+        </div>
+    );
+}
+
+function StatSection({ title, children }) {
+    return (
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+            <h3 className="mb-3 text-sm font-semibold text-text">{title}</h3>
+            {children}
+        </div>
+    );
+}
+
+function StatGrid({ items }) {
+    return (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {items.map((item, i) => (
+                <div key={i} className="rounded-lg bg-bg px-3 py-2">
+                    <div className="text-lg font-bold text-text">{item.count}</div>
+                    <div className="text-xs text-text-muted">{item.label}</div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function Stat({ label, value, warn = false }) {
+    return (
+        <div className="rounded-lg bg-bg px-3 py-2">
+            <div className={`text-lg font-bold ${warn ? 'text-danger' : 'text-text'}`}>{value}</div>
+            <div className="text-xs text-text-muted">{label}</div>
+        </div>
     );
 }
 

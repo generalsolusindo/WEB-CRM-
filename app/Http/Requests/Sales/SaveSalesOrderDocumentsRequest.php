@@ -18,6 +18,7 @@ class SaveSalesOrderDocumentsRequest extends FormRequest
             'signed_quotation' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:1024'],
             'purchase_order' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:1024'],
             'po_number' => ['nullable', 'string', 'max:100'],
+            'po_date' => ['nullable', 'date'],
         ];
     }
 }

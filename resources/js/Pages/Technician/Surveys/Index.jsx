@@ -27,7 +27,14 @@ export default function Index({ surveys }) {
                                 <div className="font-semibold text-text">{s.code} · {s.site_region}</div>
                                 <div className="text-xs text-text-muted">{s.customer}{s.revision > 1 ? ` · revisi ke-${s.revision}` : ''}</div>
                             </div>
-                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badge(s.status)}`}>{s.status_label}</span>
+                            <div className="flex items-center gap-2">
+                                {s.status === 'in_progress' && (
+                                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${s.checked_in ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+                                        {s.checked_in ? 'Sudah absen' : 'Belum absen'}
+                                    </span>
+                                )}
+                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badge(s.status)}`}>{s.status_label}</span>
+                            </div>
                         </div>
                     </Link>
                 ))}

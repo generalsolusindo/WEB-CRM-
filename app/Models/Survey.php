@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Survey extends Model
 {
@@ -126,6 +127,20 @@ class Survey extends Model
     public function report(): HasOne
     {
         return $this->hasOne(SurveyReport::class);
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
+    }
+
+    /** Sudah absen (selfie kedatangan) — wajib sebelum bisa mengisi laporan survey. */
+    public function hasCheckedIn(User $user): bool
+    {
+        return $this->attachments()
+            ->where('category', 'checkin_selfie')
+            ->where('uploaded_by', $user->id)
+            ->exists();
     }
 
     /** Invoice survey yang masih aktif (mengabaikan yang dibatalkan). */

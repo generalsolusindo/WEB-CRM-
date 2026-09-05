@@ -16,7 +16,7 @@ function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
 }
 
-export default function Show({ project, approvalDocs = [], bastRecords, taskPhotos, procurementProgress, statusOptions, availabilityOptions, technicianOptions, changeRequestTypes, permissions }) {
+export default function Show({ project, approvalDocs = [], bastRecords, taskPhotos, checkIns = [], materialStatus, procurementProgress, statusOptions, availabilityOptions, technicianOptions, changeRequestTypes, permissions }) {
     const number = `PRJ-${String(project.id).padStart(6, '0')}`;
     const so = project.sales_order;
 
@@ -58,9 +58,25 @@ export default function Show({ project, approvalDocs = [], bastRecords, taskPhot
                     </section>
                 )}
 
+                <section className="flex items-center justify-between rounded-xl border border-border bg-surface p-6 shadow-sm">
+                    <div>
+                        <h2 className="font-semibold text-text">Delivery Note</h2>
+                        <p className="text-sm text-text-muted">Pengiriman material ke lokasi project ini.</p>
+                        {materialStatus && materialStatus.total > 0 && (
+                            <span className={`mt-2 inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${materialStatus.is_complete ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+                                Status Material: {materialStatus.complete} dari {materialStatus.total} item lengkap terkirim
+                            </span>
+                        )}
+                    </div>
+                    <Link href={`/operational/sales-orders/${so.id}/delivery-notes`} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text">
+                        Lihat Delivery Note
+                    </Link>
+                </section>
+
                 <Planning project={project} canPlan={permissions.plan} />
                 <ActualProcurement project={project} availabilityOptions={availabilityOptions} progress={procurementProgress} editable={permissions.manageResources} />
                 <TechnicianTeam project={project} options={technicianOptions} editable={permissions.manageResources} />
+                <CheckIns items={checkIns} />
                 <Tasks project={project} photos={taskPhotos} editable={permissions.manageTasks} />
                 <BastSection project={project} records={bastRecords} canVerify={permissions.verifyBast} />
                 <ChangeRequests project={project} types={changeRequestTypes} editable={permissions.manageChangeRequests} />
@@ -300,6 +316,29 @@ function TechnicianTeam({ project, options, editable }) {
                     </div>
                     {Object.keys(form.errors).length > 0 && <p className="text-xs text-danger">{Object.values(form.errors)[0]}</p>}
                     <div className="flex justify-end"><button onClick={save} disabled={form.processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Simpan Tim</button></div>
+                </div>
+            )}
+        </section>
+    );
+}
+
+function CheckIns({ items }) {
+    return (
+        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+            <h2 className="font-semibold text-text">Absensi Kehadiran</h2>
+            {items.length === 0 ? (
+                <p className="mt-2 text-sm text-text-muted">Belum ada teknisi yang absen.</p>
+            ) : (
+                <div className="mt-3 flex flex-wrap gap-4">
+                    {items.map((c) => (
+                        <a key={c.id} href={c.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-lg border border-border p-2 text-sm">
+                            <img src={c.url} alt={c.technician} className="h-12 w-12 rounded-lg object-cover" />
+                            <div>
+                                <div className="font-medium text-text">{c.technician}</div>
+                                <div className="text-xs text-text-muted">{new Date(c.at).toLocaleString('id-ID')}</div>
+                            </div>
+                        </a>
+                    ))}
                 </div>
             )}
         </section>

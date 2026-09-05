@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Project extends Model
 {
@@ -18,6 +19,9 @@ class Project extends Model
         'created_by',
         'planned_start',
         'planned_end',
+        'delegated_to',
+        'delegated_by',
+        'delegated_at',
     ];
 
     /**
@@ -28,6 +32,7 @@ class Project extends Model
         return [
             'planned_start' => 'date:Y-m-d',
             'planned_end' => 'date:Y-m-d',
+            'delegated_at' => 'datetime',
         ];
     }
 
@@ -41,9 +46,33 @@ class Project extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function delegatedTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'delegated_to');
+    }
+
+    public function delegatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'delegated_by');
+    }
+
     public function technicians(): HasMany
     {
         return $this->hasMany(ProjectTechnician::class);
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
+    }
+
+    /** Sudah absen (selfie kedatangan) — wajib sebelum bisa mengerjakan task. */
+    public function hasCheckedIn(User $user): bool
+    {
+        return $this->attachments()
+            ->where('category', 'checkin_selfie')
+            ->where('uploaded_by', $user->id)
+            ->exists();
     }
 
     public function tasks(): HasMany

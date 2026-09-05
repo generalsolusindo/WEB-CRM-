@@ -111,7 +111,7 @@ class SalesOrderController extends Controller
         $data = $request->validated();
 
         DB::transaction(function () use ($request, $salesOrder, $data) {
-            $salesOrder->update(['po_number' => $data['po_number'] ?? null]);
+            $salesOrder->update(['po_number' => $data['po_number'] ?? null, 'po_date' => $data['po_date'] ?? null]);
 
             foreach (['quotation_signed' => 'signed_quotation', 'purchase_order' => 'purchase_order'] as $category => $field) {
                 if (! $request->hasFile($field)) {

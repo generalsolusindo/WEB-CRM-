@@ -33,5 +33,8 @@ class AppServiceProvider extends ServiceProvider
 
         // Procurement mengelola akun teknisi/surveyor (internal maupun milik vendor).
         Gate::define('manage-technicians', fn (User $user): bool => $user->role === 'procurement' && $user->is_active);
+
+        // Manager mengelola akun Project Manager (bawahannya) — PM sendiri tidak boleh.
+        Gate::define('manage-project-managers', fn (User $user): bool => $user->role === 'management' && $user->is_active);
     }
 }

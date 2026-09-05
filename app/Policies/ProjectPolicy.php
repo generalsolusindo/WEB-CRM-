@@ -10,12 +10,19 @@ class ProjectPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $this->isOperational($user);
+        return $this->isOperational($user)
+            || $this->isManagement($user)
+            || $this->isProjectManager($user);
     }
 
+    /** Operational lihat semua; Management lihat semua (monitoring); PM cuma project yang didelegasikan ke dia. */
     public function view(User $user, Project $project): bool
     {
-        return $this->isOperational($user);
+        if ($this->isOperational($user) || $this->isManagement($user)) {
+            return true;
+        }
+
+        return $this->isProjectManager($user) && $project->delegated_to === $user->id;
     }
 
     public function create(User $user): bool
@@ -96,8 +103,33 @@ class ProjectPolicy
         return $this->isOperational($user);
     }
 
+    /** Absen kehadiran (selfie) — anggota tim teknisi, hanya selama project berjalan. */
+    public function checkIn(User $user, Project $project): bool
+    {
+        return $user->role === 'technician'
+            && $user->is_active
+            && $project->status === ProjectStatus::InProgress->value
+            && $project->technicians()->where('technician_id', $user->id)->exists();
+    }
+
+    /** Manager mendelegasikan project ke Project Manager (atau menarik delegasinya kembali). */
+    public function delegate(User $user, Project $project): bool
+    {
+        return $this->isManagement($user);
+    }
+
     private function isOperational(User $user): bool
     {
         return $user->role === 'operational' && $user->is_active;
+    }
+
+    private function isManagement(User $user): bool
+    {
+        return $user->role === 'management' && $user->is_active;
+    }
+
+    private function isProjectManager(User $user): bool
+    {
+        return $user->role === 'project_manager' && $user->is_active;
     }
 }

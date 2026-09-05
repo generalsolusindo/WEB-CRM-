@@ -154,11 +154,19 @@ class SurveyPolicy
             && $survey->isSurveyor($user);
     }
 
-    /** Anggota tim mengisi draft / unggah lampiran (hanya saat survey berjalan). */
-    public function workReport(User $user, Survey $survey): bool
+    /** Absen kehadiran (selfie) — anggota tim, hanya selama survey berjalan. */
+    public function checkIn(User $user, Survey $survey): bool
     {
         return $this->viewAsSurveyor($user, $survey)
             && $survey->status === SurveyStatus::InProgress->value;
+    }
+
+    /** Anggota tim mengisi draft / unggah lampiran (hanya saat survey berjalan, wajib sudah absen). */
+    public function workReport(User $user, Survey $survey): bool
+    {
+        return $this->viewAsSurveyor($user, $survey)
+            && $survey->status === SurveyStatus::InProgress->value
+            && $survey->hasCheckedIn($user);
     }
 
     /** Hanya leader tim yang boleh mengirim laporan final ke Operasional. */
@@ -167,6 +175,7 @@ class SurveyPolicy
         return $user->role === 'technician'
             && $user->is_active
             && $survey->isLeader($user)
-            && $survey->status === SurveyStatus::InProgress->value;
+            && $survey->status === SurveyStatus::InProgress->value
+            && $survey->hasCheckedIn($user);
     }
 }

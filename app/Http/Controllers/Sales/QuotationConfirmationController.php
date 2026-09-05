@@ -45,6 +45,7 @@ class QuotationConfirmationController extends Controller
                 'purchase_order' => $request->file('purchase_order'),
             ],
             $request->validated('po_number'),
+            $request->validated('po_date'),
         );
 
         return redirect()->route('sales.sales-orders.show', $salesOrder)

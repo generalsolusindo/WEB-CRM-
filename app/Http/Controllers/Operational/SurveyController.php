@@ -59,9 +59,17 @@ class SurveyController extends Controller
             'report.items' => fn ($q) => $q->orderBy('id'),
             'report.submittedBy:id,name',
             'report.attachments:id,attachable_type,attachable_id,category,file_path,created_at',
+            'attachments' => fn ($q) => $q->where('category', 'checkin_selfie')->latest(),
+            'attachments.uploader:id,name',
         ]);
 
         $report = $survey->report;
+        $checkIns = $survey->attachments->map(fn ($a) => [
+            'id' => $a->id,
+            'surveyor' => $a->uploader?->name,
+            'at' => $a->created_at,
+            'url' => Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay()),
+        ]);
 
         return Inertia::render('Operational/Surveys/Show', [
             'survey' => [
@@ -102,6 +110,7 @@ class SurveyController extends Controller
                     'name' => basename($a->file_path),
                 ]),
             ] : null,
+            'checkIns' => $checkIns,
             'canBrief' => request()->user()->can('brief', $survey),
             'canVerify' => request()->user()->can('verifyReport', $survey),
             'canCancel' => request()->user()->can('cancel', $survey),

@@ -15,7 +15,7 @@ class RequirementController extends Controller
 {
     public function store(StoreRequirementRequest $request, Lead $lead): RedirectResponse
     {
-        Gate::authorize('update', $lead);
+        abort_unless($lead->sales_id === $request->user()->id, 403);
 
         if ($lead->type !== LeadType::Opportunity->value) {
             return back()->with('error', 'Lead harus dikonversi menjadi opportunity sebelum menambah requirement.');

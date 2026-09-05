@@ -27,6 +27,7 @@ class SalesOrder extends Model
         'agreed_dpp',
         'dp_percent',
         'po_number',
+        'po_date',
         'confirmed_at',
         'confirmed_by',
     ];
@@ -37,6 +38,7 @@ class SalesOrder extends Model
         return [
             'agreed_dpp' => 'decimal:2',
             'dp_percent' => 'decimal:2',
+            'po_date' => 'date:Y-m-d',
         ];
     }
 
@@ -68,6 +70,11 @@ class SalesOrder extends Model
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class);
+    }
+
+    public function deliveryNotes(): HasMany
+    {
+        return $this->hasMany(DeliveryNote::class);
     }
 
     public function attachments(): MorphMany

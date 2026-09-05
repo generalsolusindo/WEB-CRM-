@@ -1,11 +1,13 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
+import { pickFile, pickFiles } from '../../../utils/fileValidation';
 
-export default function Show({ task, project, photos, statusOptions, canWork }) {
+export default function Show({ task, project, photos, statusOptions, canWork, checkedIn, canCheckIn, selfieUrl }) {
     const before = photos.filter((p) => p.category === 'task_before');
     const after = photos.filter((p) => p.category === 'task_after');
 
-    const photoForm = useForm({ category: 'task_before', photo: null });
+    const photoForm = useForm({ category: 'task_before', photos: [] });
+    const checkInForm = useForm({ photo: null });
 
     function setStatus(status) {
         router.post(`/technician/tasks/${task.id}/status`, { status }, { preserveScroll: true });
@@ -13,7 +15,13 @@ export default function Show({ task, project, photos, statusOptions, canWork }) 
     function upload(e) {
         e.preventDefault();
         photoForm.post(`/technician/tasks/${task.id}/photos`, {
-            forceFormData: true, preserveScroll: true, onSuccess: () => photoForm.reset('photo'),
+            forceFormData: true, preserveScroll: true, onSuccess: () => photoForm.reset('photos'),
+        });
+    }
+    function checkIn(e) {
+        e.preventDefault();
+        checkInForm.post(`/technician/projects/${project.id}/checkin`, {
+            forceFormData: true, preserveScroll: true, onSuccess: () => checkInForm.reset('photo'),
         });
     }
 
@@ -33,6 +41,28 @@ export default function Show({ task, project, photos, statusOptions, canWork }) 
                     <div className="mt-3 text-xs text-text-muted">Jadwal: {task.scheduled_date || '—'}</div>
                 </section>
 
+                {checkedIn ? (
+                    <section className="flex items-center gap-4 rounded-xl border border-success/30 bg-success/5 p-4">
+                        {selfieUrl && <img src={selfieUrl} alt="Selfie absen" className="h-14 w-14 rounded-lg object-cover" />}
+                        <p className="text-sm text-success">Kamu sudah absen kehadiran di project ini.</p>
+                    </section>
+                ) : canCheckIn ? (
+                    <section className="rounded-xl border border-warning/30 bg-warning/5 p-6">
+                        <h2 className="font-semibold text-text">Absen Kehadiran</h2>
+                        <p className="mt-1 text-sm text-text-muted">Wajib absen selfie sebelum bisa mengerjakan task ini.</p>
+                        <form onSubmit={checkIn} className="mt-4 flex flex-wrap items-end gap-3">
+                            <input type="file" accept=".jpg,.jpeg,.png" capture="user" onChange={(e) => pickFile(checkInForm, 'photo', e.target.files[0], 5)} className="text-sm" />
+                            <button disabled={checkInForm.processing || !checkInForm.data.photo} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Kirim Absen</button>
+                            <span className="w-full text-[11px] text-text-muted">maks 5 MB</span>
+                            {checkInForm.errors.photo && <span className="w-full text-xs text-danger">{checkInForm.errors.photo}</span>}
+                        </form>
+                    </section>
+                ) : (
+                    <section className="rounded-xl border border-border bg-bg/50 p-4 text-sm text-text-muted">
+                        Absen kehadiran hanya bisa dilakukan saat project sedang berjalan.
+                    </section>
+                )}
+
                 <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
                     <h2 className="mb-3 font-semibold text-text">Status Kerja</h2>
                     <div className="flex flex-wrap gap-2">
@@ -47,7 +77,7 @@ export default function Show({ task, project, photos, statusOptions, canWork }) 
                             </button>
                         ))}
                     </div>
-                    {!canWork && <p className="mt-2 text-xs text-text-muted">Status hanya bisa diubah saat project berjalan.</p>}
+                    {!canWork && <p className="mt-2 text-xs text-text-muted">{checkedIn ? 'Status hanya bisa diubah saat project berjalan.' : 'Absen dulu sebelum mengubah status task.'}</p>}
                 </section>
 
                 <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
@@ -62,11 +92,13 @@ export default function Show({ task, project, photos, statusOptions, canWork }) 
                                 <option value="task_before">Before</option>
                                 <option value="task_after">After</option>
                             </select>
-                            <input type="file" accept=".jpg,.jpeg,.png" onChange={(e) => photoForm.setData('photo', e.target.files[0] ?? null)} className="text-sm" />
-                            <button disabled={photoForm.processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Upload</button>
-                            {photoForm.errors.photo && <span className="w-full text-xs text-danger">{photoForm.errors.photo}</span>}
+                            <input type="file" multiple accept=".jpg,.jpeg,.png" onChange={(e) => pickFiles(photoForm, 'photos', e.target.files, 5)} className="text-sm" />
+                            <button disabled={photoForm.processing || photoForm.data.photos.length === 0} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Upload</button>
+                            <span className="w-full text-[11px] text-text-muted">bisa pilih beberapa foto sekaligus, maks 5 MB per foto</span>
+                            {photoForm.errors.photos && <span className="w-full text-xs text-danger">{photoForm.errors.photos}</span>}
                         </form>
                     )}
+                    {!canWork && <p className="mt-2 text-xs text-text-muted">{checkedIn ? 'Upload foto hanya bisa saat project berjalan.' : 'Absen dulu sebelum upload foto.'}</p>}
                 </section>
             </div>
         </AppLayout>

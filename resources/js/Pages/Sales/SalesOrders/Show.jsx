@@ -2,15 +2,16 @@ import { Head, Link, router, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { Totals } from '../Quotations/Show';
 import CategoryBadge from '../../../Components/CategoryBadge';
+import { pickFile } from '../../../utils/fileValidation';
 
 export default function Show({ salesOrder, totals, approvalDocs = [], canManageDocs = false, orderTypeLabel, paymentRuleLabel, requiredSettlementPhase, canCloseAsWon }) {
-    const docForm = useForm({ signed_quotation: null, purchase_order: null, po_number: salesOrder.po_number ?? '' });
+    const docForm = useForm({ signed_quotation: null, purchase_order: null, po_number: salesOrder.po_number ?? '', po_date: salesOrder.po_date ?? '' });
     function saveDocs(e) {
         e.preventDefault();
         docForm.post(`/sales/sales-orders/${salesOrder.id}/documents`, {
             forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => docForm.setData({ signed_quotation: null, purchase_order: null, po_number: docForm.data.po_number }),
+            onSuccess: () => docForm.setData({ signed_quotation: null, purchase_order: null, po_number: docForm.data.po_number, po_date: docForm.data.po_date }),
         });
     }
     const number = salesOrder.number ?? `SO-${String(salesOrder.id).padStart(6, '0')}`;
@@ -33,6 +34,7 @@ export default function Show({ salesOrder, totals, approvalDocs = [], canManageD
             <h2 className="font-semibold text-text">Dokumen Persetujuan Customer</h2>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
                 <Info label="Nomor PO" value={salesOrder.po_number} />
+                <Info label="Tanggal PO" value={salesOrder.po_date} />
                 <div>
                     <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Lampiran</div>
                     <div className="mt-1 flex flex-wrap gap-2">
@@ -48,18 +50,26 @@ export default function Show({ salesOrder, totals, approvalDocs = [], canManageD
                     <p className="text-xs text-text-muted">Upload file baru untuk mengganti yang lama pada kategori yang sama. Kosongkan bila tidak diubah.</p>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <label className="block text-sm font-medium text-text">Dokumen Quotation (TTD &amp; stempel)
-                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => docForm.setData('signed_quotation', e.target.files[0] ?? null)} className="mt-1 block w-full text-sm" />
+                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile(docForm, 'signed_quotation', e.target.files[0], 1)} className="mt-1 block w-full text-sm" />
+                            <span className="mt-1 block text-xs text-text-muted">maks 1 MB</span>
                             {docForm.errors.signed_quotation && <span className="mt-1 block text-xs text-danger">{docForm.errors.signed_quotation}</span>}
                         </label>
                         <label className="block text-sm font-medium text-text">Purchase Order Customer
-                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => docForm.setData('purchase_order', e.target.files[0] ?? null)} className="mt-1 block w-full text-sm" />
+                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile(docForm, 'purchase_order', e.target.files[0], 1)} className="mt-1 block w-full text-sm" />
+                            <span className="mt-1 block text-xs text-text-muted">maks 1 MB</span>
                             {docForm.errors.purchase_order && <span className="mt-1 block text-xs text-danger">{docForm.errors.purchase_order}</span>}
                         </label>
                     </div>
-                    <label className="block text-sm font-medium text-text">Nomor PO
-                        <input value={docForm.data.po_number} onChange={(e) => docForm.setData('po_number', e.target.value)} className="input" placeholder="mis. PO/2026/00123" />
-                        {docForm.errors.po_number && <span className="mt-1 block text-xs text-danger">{docForm.errors.po_number}</span>}
-                    </label>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <label className="block text-sm font-medium text-text">Nomor PO
+                            <input value={docForm.data.po_number} onChange={(e) => docForm.setData('po_number', e.target.value)} className="input" placeholder="mis. PO/2026/00123" />
+                            {docForm.errors.po_number && <span className="mt-1 block text-xs text-danger">{docForm.errors.po_number}</span>}
+                        </label>
+                        <label className="block text-sm font-medium text-text">Tanggal PO
+                            <input type="date" value={docForm.data.po_date} onChange={(e) => docForm.setData('po_date', e.target.value)} className="input" />
+                            {docForm.errors.po_date && <span className="mt-1 block text-xs text-danger">{docForm.errors.po_date}</span>}
+                        </label>
+                    </div>
                     <div className="flex justify-end">
                         <button disabled={docForm.processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{docForm.processing ? 'Menyimpan...' : 'Simpan Dokumen'}</button>
                     </div>

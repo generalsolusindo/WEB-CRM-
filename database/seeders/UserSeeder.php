@@ -21,12 +21,13 @@ class UserSeeder extends Seeder
             'finance',
             'management',
             'administrator',
+            'project_manager',
         ];
 
         foreach ($roles as $role) {
             User::updateOrCreate(
                 ['email' => "{$role}@gscrm.test"],
-                [
+                [   
                     'name' => ucfirst($role).' User',
                     'password' => Hash::make('password'),
                     'role' => $role,

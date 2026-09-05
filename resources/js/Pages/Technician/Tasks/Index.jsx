@@ -28,16 +28,26 @@ export default function Index({ projects, statusOptions }) {
                                 <div>
                                     <h2 className="font-semibold text-text">{project.number}</h2>
                                     <p className="text-xs text-text-muted">{project.sales_order} · {project.customer} · status project: {project.status}{project.is_leader ? ' · Anda leader' : ''}</p>
+                                    {project.status === 'in_progress' && (
+                                        <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${project.checked_in ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+                                            {project.checked_in ? 'Sudah absen' : 'Belum absen'}
+                                        </span>
+                                    )}
                                 </div>
-                                {project.is_leader && project.status === 'in_progress' && (
-                                    <Link
-                                        href={`/technician/projects/${project.id}/bast/create`}
-                                        className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${allDone ? 'bg-navy' : 'pointer-events-none bg-navy/40'}`}
-                                        title={allDone ? '' : 'Semua task harus selesai dulu'}
-                                    >
-                                        Submit BAST
+                                <div className="flex items-center gap-2">
+                                    <Link href={`/technician/projects/${project.id}/delivery-notes`} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text">
+                                        Delivery Note
                                     </Link>
-                                )}
+                                    {project.is_leader && project.status === 'in_progress' && (
+                                        <Link
+                                            href={`/technician/projects/${project.id}/bast/create`}
+                                            className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${allDone ? 'bg-navy' : 'pointer-events-none bg-navy/40'}`}
+                                            title={allDone ? '' : 'Semua task harus selesai dulu'}
+                                        >
+                                            Submit BAST
+                                        </Link>
+                                    )}
+                                </div>
                             </div>
                             <table className="w-full text-left text-sm">
                                 <tbody className="divide-y divide-border">

@@ -2,7 +2,7 @@ import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
 
-export default function Show({ survey, report, canBrief, canVerify, canCancel, canManageTeam, surveyorOptions = [] }) {
+export default function Show({ survey, report, canBrief, canVerify, canCancel, canManageTeam, surveyorOptions = [], checkIns = [] }) {
     const currentTeam = survey.team ?? [];
     const currentLeader = currentTeam.find((t) => t.is_leader)?.id ?? currentTeam[0]?.id ?? null;
 
@@ -53,6 +53,25 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
                             : 'Belum ditugaskan'}
                     />
                     {survey.notes && <div className="sm:col-span-2"><Info label="Catatan Sales" value={survey.notes} /></div>}
+                </section>
+
+                <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+                    <h2 className="font-semibold text-text">Absensi Kehadiran</h2>
+                    {checkIns.length === 0 ? (
+                        <p className="mt-2 text-sm text-text-muted">Belum ada surveyor yang absen.</p>
+                    ) : (
+                        <div className="mt-3 flex flex-wrap gap-4">
+                            {checkIns.map((c) => (
+                                <a key={c.id} href={c.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-lg border border-border p-2 text-sm">
+                                    <img src={c.url} alt={c.surveyor} className="h-12 w-12 rounded-lg object-cover" />
+                                    <div>
+                                        <div className="font-medium text-text">{c.surveyor}</div>
+                                        <div className="text-xs text-text-muted">{new Date(c.at).toLocaleString('id-ID')}</div>
+                                    </div>
+                                </a>
+                            ))}
+                        </div>
+                    )}
                 </section>
 
                 {canBrief ? (

@@ -2,13 +2,15 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { Totals } from './Show';
 import CategoryBadge from '../../../Components/CategoryBadge';
+import { pickFile } from '../../../utils/fileValidation';
 
 export default function Confirm({ quotation, orderTypes, totals }) {
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, setError, clearErrors, post, processing, errors } = useForm({
         order_type: '',
         signed_quotation: null,
         purchase_order: null,
         po_number: '',
+        po_date: '',
     });
     const selected = orderTypes.find((type) => type.value === data.order_type);
     function submit(e) { e.preventDefault(); post(`/sales/quotations/${quotation.id}/confirm`, { forceFormData: true }); }
@@ -25,18 +27,23 @@ export default function Confirm({ quotation, orderTypes, totals }) {
                 <p className="mt-1 text-sm text-text-muted">Konfirmasi deal wajib disertai bukti asli dari customer, bukan sekadar klik tombol.</p>
                 <div className="mt-4 space-y-4">
                     <label className="block text-sm font-medium text-text">Dokumen Quotation (ditandatangani &amp; distempel) <span className="text-danger">*</span>
-                        <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setData('signed_quotation', e.target.files[0] ?? null)} className="mt-1 block w-full text-sm" />
+                        <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile({ setData, setError, clearErrors }, 'signed_quotation', e.target.files[0], 1)} className="mt-1 block w-full text-sm" />
                         <span className="mt-1 block text-xs text-text-muted">PDF/gambar, maks 1 MB. Stempel wajib bila customer berupa perusahaan/instansi.</span>
                         {errors.signed_quotation && <span className="mt-1 block text-xs text-danger">{errors.signed_quotation}</span>}
                     </label>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <label className="block text-sm font-medium text-text">Purchase Order dari Customer (opsional)
-                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setData('purchase_order', e.target.files[0] ?? null)} className="mt-1 block w-full text-sm" />
+                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile({ setData, setError, clearErrors }, 'purchase_order', e.target.files[0], 1)} className="mt-1 block w-full text-sm" />
+                            <span className="mt-1 block text-xs text-text-muted">maks 1 MB</span>
                             {errors.purchase_order && <span className="mt-1 block text-xs text-danger">{errors.purchase_order}</span>}
                         </label>
                         <label className="block text-sm font-medium text-text">Nomor PO (opsional)
                             <input value={data.po_number} onChange={(e) => setData('po_number', e.target.value)} className="input" placeholder="mis. PO/2026/00123" />
                             {errors.po_number && <span className="mt-1 block text-xs text-danger">{errors.po_number}</span>}
+                        </label>
+                        <label className="block text-sm font-medium text-text">Tanggal PO (opsional)
+                            <input type="date" value={data.po_date} onChange={(e) => setData('po_date', e.target.value)} className="input" />
+                            {errors.po_date && <span className="mt-1 block text-xs text-danger">{errors.po_date}</span>}
                         </label>
                     </div>
                 </div>

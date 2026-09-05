@@ -39,10 +39,21 @@ class SurveyExecutionTest extends TestCase
 
     private function brief(Survey $survey, User $surveyor, User $operational, string $briefing = 'b'): \Illuminate\Testing\TestResponse
     {
-        return $this->actingAs($operational)->post("/operational/surveys/{$survey->id}/brief", [
+        $response = $this->actingAs($operational)->post("/operational/surveys/{$survey->id}/brief", [
             'briefing' => $briefing,
             'surveyor_ids' => [$surveyor->id],
             'leader_id' => $surveyor->id,
+        ]);
+
+        $this->checkInSurveyor($survey, $surveyor);
+
+        return $response;
+    }
+
+    private function checkInSurveyor(Survey $survey, User $surveyor): void
+    {
+        $this->actingAs($surveyor)->post("/technician/surveys/{$survey->id}/checkin", [
+            'photo' => UploadedFile::fake()->image('selfie.jpg'),
         ]);
     }
 
@@ -224,6 +235,8 @@ class SurveyExecutionTest extends TestCase
             'surveyor_ids' => [$leader->id, $member->id],
             'leader_id' => $leader->id,
         ]);
+        $this->checkInSurveyor($survey, $leader);
+        $this->checkInSurveyor($survey, $member);
 
         // member boleh mengisi draft
         $this->actingAs($member)->put("/technician/surveys/{$survey->id}/report", [
@@ -257,5 +270,29 @@ class SurveyExecutionTest extends TestCase
         $this->assertEqualsCanonicalizing([$leader->id, $replacement->id], $survey->surveyors()->pluck('users.id')->all());
         $this->assertTrue($survey->isLeader($replacement));
         $this->assertSame(1, Notification::where('type', 'survey.assigned')->where('user_id', $replacement->id)->count());
+    }
+
+    public function test_surveyor_must_check_in_before_filling_or_submitting_report(): void
+    {
+        [$survey, $surveyor] = $this->briefingSurvey();
+        $operational = $this->operational();
+        $this->actingAs($operational)->post("/operational/surveys/{$survey->id}/brief", [
+            'briefing' => 'b', 'surveyor_ids' => [$surveyor->id], 'leader_id' => $surveyor->id,
+        ]);
+
+        $this->actingAs($surveyor)->put("/technician/surveys/{$survey->id}/report", [
+            'summary' => 'x', 'items' => [],
+        ])->assertForbidden();
+
+        $this->actingAs($surveyor)->post("/technician/surveys/{$survey->id}/checkin", [
+            'photo' => UploadedFile::fake()->image('selfie.jpg'),
+        ])->assertRedirect();
+
+        $selfie = \App\Models\Attachment::where('category', 'checkin_selfie')->firstOrFail();
+        $this->assertSame(Survey::class, $selfie->attachable_type);
+
+        $this->actingAs($surveyor)->put("/technician/surveys/{$survey->id}/report", [
+            'summary' => 'sudah absen', 'items' => [],
+        ])->assertRedirect();
     }
 }

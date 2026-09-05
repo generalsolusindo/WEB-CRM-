@@ -55,11 +55,13 @@ class ProjectController extends Controller
         $project->load([
             'salesOrder:id,number,order_type,payment_rule,contact_id,po_number',
             'salesOrder.contact:id,name,company_name,email,phone,address,npwp',
-            'salesOrder.lines:id,sales_order_id,item_name,description,qty,unit',
+            'salesOrder.lines:id,sales_order_id,item_name,description,qty,unit,category',
             'creator:id,name',
             'actualProcurements' => fn ($q) => $q->orderBy('id'),
             'actualProcurements.vendor:id,name',
             'technicians.technician:id,name',
+            'attachments' => fn ($q) => $q->where('category', 'checkin_selfie')->latest(),
+            'attachments.uploader:id,name',
             'tasks' => fn ($q) => $q->orderBy('scheduled_date')->orderBy('id'),
             'tasks.attachments:id,attachable_type,attachable_id,category,file_path,created_at',
             'bastRecords' => fn ($q) => $q->latest(),
@@ -91,6 +93,13 @@ class ProjectController extends Controller
                 ->values(),
         ]);
 
+        $checkIns = $project->attachments->map(fn ($a) => [
+            'id' => $a->id,
+            'technician' => $a->uploader?->name,
+            'at' => $a->created_at,
+            'url' => \Illuminate\Support\Facades\Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay()),
+        ]);
+
         $procurementItems = $project->actualProcurements;
         $received = $procurementItems->where('status', ActualProcurementStatus::Received->value)->count();
 
@@ -99,6 +108,8 @@ class ProjectController extends Controller
             'approvalDocs' => \App\Services\Sales\CustomerApprovalDocs::of($project->salesOrder),
             'bastRecords' => $bastRecords,
             'taskPhotos' => $taskPhotos,
+            'checkIns' => $checkIns,
+            'materialStatus' => \App\Services\Operational\MaterialDeliveryStatus::of($project->salesOrder),
             'procurementProgress' => ['received' => $received, 'total' => $procurementItems->count()],
             'statusOptions' => ProjectStatus::options(),
             'availabilityOptions' => ActualProcurementStatus::options(),

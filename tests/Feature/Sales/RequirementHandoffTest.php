@@ -163,6 +163,30 @@ class RequirementHandoffTest extends TestCase
                 ->where('procurementRequest.lines.0.cost_price', '1250000.00'));
     }
 
+    public function test_sales_can_add_requirement_after_procurement_rejects_the_request(): void
+    {
+        $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
+        [$sales, $lead] = $this->makeLead('opportunity');
+
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/requirements", $this->requirementData())
+            ->assertSessionHas('success');
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/submit-procurement");
+
+        $pr = ProcurementRequest::firstOrFail();
+        $this->actingAs($procurement)->post("/procurement/procurement-requests/{$pr->id}/reject", [
+            'rejection_reason' => 'Ada yang kurang, tolong lengkapi merk & jasanya.',
+        ])->assertRedirect();
+
+        $this->assertTrue($lead->fresh()->requirementsLocked() === false);
+
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/requirements", [
+            ...$this->requirementData(),
+            'item_name' => 'Kabel UTP tambahan',
+        ])->assertSessionHas('success');
+
+        $this->assertSame(2, Requirement::where('lead_id', $lead->id)->count());
+    }
+
     /** @return array{User, Lead} */
     private function makeLead(string $type): array
     {

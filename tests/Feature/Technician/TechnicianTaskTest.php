@@ -34,6 +34,7 @@ class TechnicianTaskTest extends TestCase
     public function test_member_updates_status_but_not_title(): void
     {
         [$project, , $member] = $this->inProgressProject();
+        $this->checkIn($project, $member);
         $task = $project->tasks()->first();
         $originalTitle = $task->title;
 
@@ -61,11 +62,12 @@ class TechnicianTaskTest extends TestCase
     {
         Storage::fake('local');
         [$project, , $member] = $this->inProgressProject();
+        $this->checkIn($project, $member);
         $task = $project->tasks()->first();
 
         $this->actingAs($member)->post("/technician/tasks/{$task->id}/photos", [
             'category' => 'task_before',
-            'photo' => UploadedFile::fake()->image('before.jpg'),
+            'photos' => [UploadedFile::fake()->image('before.jpg')],
         ])->assertSessionHas('success');
 
         $attachment = \App\Models\Attachment::where('category', 'task_before')->firstOrFail();
@@ -159,5 +161,13 @@ class TechnicianTaskTest extends TestCase
         $this->actingAs($ops)->post("/operational/projects/{$project->id}/start");
 
         return [$project->fresh(), $leader, $member];
+    }
+
+    private function checkIn(Project $project, User $technician): void
+    {
+        Storage::fake('local');
+        $this->actingAs($technician)->post("/technician/projects/{$project->id}/checkin", [
+            'photo' => UploadedFile::fake()->image('selfie.jpg'),
+        ]);
     }
 }

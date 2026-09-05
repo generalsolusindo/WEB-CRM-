@@ -6,6 +6,7 @@ use App\Actions\Technician\SubmitSurveyReport;
 use App\Enums\SurveyReportStatus;
 use App\Enums\SurveyStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Technician\CheckInSurveyRequest;
 use App\Http\Requests\Technician\SaveSurveyReportRequest;
 use App\Http\Requests\Technician\UploadSurveyAttachmentRequest;
 use App\Models\Attachment;
@@ -43,6 +44,7 @@ class SurveyController extends Controller
                 'status_label' => SurveyStatus::from($s->status)->label(),
                 'report_status' => $s->report?->status,
                 'revision' => $s->report?->revision,
+                'checked_in' => $s->hasCheckedIn($request->user()),
             ]);
 
         return Inertia::render('Technician/Surveys/Index', ['surveys' => $surveys]);
@@ -59,7 +61,16 @@ class SurveyController extends Controller
             'report.attachments:id,attachable_type,attachable_id,category,file_path,created_at',
         ]);
 
-        $userId = request()->user()->id;
+        $user = request()->user();
+        $userId = $user->id;
+        $checkedIn = $survey->hasCheckedIn($user);
+        $mySelfie = $checkedIn
+            ? $survey->attachments()
+                ->where('category', 'checkin_selfie')
+                ->where('uploaded_by', $userId)
+                ->latest()
+                ->first()
+            : null;
 
         return Inertia::render('Technician/Surveys/Show', [
             'survey' => [
@@ -81,7 +92,21 @@ class SurveyController extends Controller
             'report' => $this->reportPayload($survey),
             'canWork' => request()->user()->can('workReport', $survey),
             'canSubmit' => request()->user()->can('submitReport', $survey),
+            'checkedIn' => $checkedIn,
+            'canCheckIn' => $user->can('checkIn', $survey),
+            'selfieUrl' => $mySelfie ? Storage::disk('local')->temporaryUrl($mySelfie->file_path, now()->addDay()) : null,
         ]);
+    }
+
+    public function checkIn(CheckInSurveyRequest $request, Survey $survey): RedirectResponse
+    {
+        $survey->attachments()->create([
+            'category' => 'checkin_selfie',
+            'file_path' => $request->file('photo')->store('checkin-selfies'),
+            'uploaded_by' => $request->user()->id,
+        ]);
+
+        return back()->with('success', 'Absen kehadiran tersimpan.');
     }
 
     public function saveReport(SaveSurveyReportRequest $request, Survey $survey): RedirectResponse

@@ -1,16 +1,25 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
+import { pickFile } from '../../../utils/fileValidation';
 
 const emptyItem = { item_name: '', qty: 1, unit: '', notes: '' };
 
-export default function Show({ survey, report, canWork, canSubmit }) {
+export default function Show({ survey, report, canWork, canSubmit, checkedIn, canCheckIn, selfieUrl }) {
     const { data, setData, put, processing, errors } = useForm({
         summary: report?.summary ?? '',
         items: report?.items?.map((i) => ({ item_name: i.item_name, qty: i.qty, unit: i.unit ?? '', notes: i.notes ?? '' })) ?? [],
     });
     const uploadForm = useForm({ file: null });
+    const checkInForm = useForm({ photo: null });
     const [submitError, setSubmitError] = useState(null);
+
+    function checkIn(e) {
+        e.preventDefault();
+        checkInForm.post(`/technician/surveys/${survey.id}/checkin`, {
+            forceFormData: true, preserveScroll: true, onSuccess: () => checkInForm.reset('photo'),
+        });
+    }
 
     function save(e) { e?.preventDefault(); put(`/technician/surveys/${survey.id}/report`, { preserveScroll: true }); }
     function setItem(idx, patch) { setData('items', data.items.map((it, i) => (i === idx ? { ...it, ...patch } : it))); }
@@ -55,6 +64,24 @@ export default function Show({ survey, report, canWork, canSubmit }) {
                     )}
                 </div>
 
+                {checkedIn ? (
+                    <section className="flex items-center gap-4 rounded-xl border border-success/30 bg-success/5 p-4">
+                        {selfieUrl && <img src={selfieUrl} alt="Selfie absen" className="h-14 w-14 rounded-lg object-cover" />}
+                        <p className="text-sm text-success">Kamu sudah absen kehadiran di survey ini.</p>
+                    </section>
+                ) : canCheckIn ? (
+                    <section className="rounded-xl border border-warning/30 bg-warning/5 p-6">
+                        <h2 className="font-semibold text-text">Absen Kehadiran</h2>
+                        <p className="mt-1 text-sm text-text-muted">Wajib absen selfie sebelum bisa mengisi laporan survey.</p>
+                        <form onSubmit={checkIn} className="mt-4 flex flex-wrap items-end gap-3">
+                            <input type="file" accept=".jpg,.jpeg,.png" capture="user" onChange={(e) => pickFile(checkInForm, 'photo', e.target.files[0], 5)} className="text-sm" />
+                            <button disabled={checkInForm.processing || !checkInForm.data.photo} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Kirim Absen</button>
+                            <span className="w-full text-[11px] text-text-muted">maks 5 MB</span>
+                            {checkInForm.errors.photo && <span className="w-full text-xs text-danger">{checkInForm.errors.photo}</span>}
+                        </form>
+                    </section>
+                ) : null}
+
                 <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
                     <h2 className="font-semibold text-text">Arahan Operasional</h2>
                     <p className="mt-2 whitespace-pre-line text-sm text-text">{survey.briefing || 'Belum ada arahan.'}</p>
@@ -75,6 +102,7 @@ export default function Show({ survey, report, canWork, canSubmit }) {
 
                 <section className="space-y-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
                     <h2 className="font-semibold text-text">Laporan Hasil Survey</h2>
+                    {readOnly && !checkedIn && <p className="text-xs text-warning">Absen dulu sebelum bisa mengisi laporan.</p>}
 
                     <label className="block text-sm font-medium text-text">Ringkasan Hasil
                         <textarea rows="4" disabled={readOnly} value={data.summary} onChange={(e) => setData('summary', e.target.value)} className="input disabled:bg-bg" />
@@ -114,7 +142,8 @@ export default function Show({ survey, report, canWork, canSubmit }) {
                         </div>
                         {!readOnly && (
                             <form onSubmit={upload} className="mt-3 flex items-center gap-2">
-                                <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={(e) => uploadForm.setData('file', e.target.files[0] ?? null)} className="text-sm" />
+                                <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={(e) => pickFile(uploadForm, 'file', e.target.files[0], 5)} className="text-sm" />
+                                <span className="ml-2 text-[11px] text-text-muted">maks 5 MB</span>
                                 <button disabled={uploadForm.processing || !uploadForm.data.file} className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50">Upload</button>
                                 {uploadForm.errors.file && <span className="text-xs text-danger">{uploadForm.errors.file}</span>}
                             </form>

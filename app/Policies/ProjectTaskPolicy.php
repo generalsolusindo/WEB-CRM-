@@ -20,7 +20,8 @@ class ProjectTaskPolicy
     public function updateStatus(User $user, ProjectTask $task): bool
     {
         return $this->isProjectMember($user, $task)
-            && $task->project->status === ProjectStatus::InProgress->value;
+            && $task->project->status === ProjectStatus::InProgress->value
+            && $task->project->hasCheckedIn($user);
     }
 
     public function uploadPhoto(User $user, ProjectTask $task): bool

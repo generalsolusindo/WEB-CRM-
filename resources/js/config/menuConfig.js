@@ -59,6 +59,11 @@ const menuConfig = {
     ],
     management: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
+        { label: 'Semua Project', href: '/management/projects', icon: FiCalendar },
+        { label: 'Project Manager', href: '/management/project-managers', icon: FiUserCheck },
+    ],
+    project_manager: [
+        { label: 'Project Saya', href: '/project-manager/projects', icon: FiCalendar },
     ],
     administrator: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },

@@ -4,13 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Enums\InvoicePhase;
 use App\Enums\InvoiceStatus;
+use App\Enums\LeadStage;
 use App\Enums\OrderType;
+use App\Enums\ProcurementRequestStatus;
+use App\Enums\ProjectStatus;
+use App\Enums\QuotationStatus;
+use App\Enums\SurveyStatus;
 use App\Models\Bast;
 use App\Models\Invoice;
+use App\Models\Lead;
 use App\Models\ProcurementRequest;
 use App\Models\Project;
+use App\Models\ProjectTask;
 use App\Models\Quotation;
 use App\Models\SalesOrder;
+use App\Models\Survey;
+use App\Services\Sales\DocumentTotals;
 use App\Services\Sales\SalesOrderSettlement;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -35,7 +44,100 @@ class DashboardController extends Controller
             'operationalActions' => $user->role === 'operational'
                 ? $this->operationalActions($settlement)
                 : null,
+            'managementOverview' => $user->role === 'management'
+                ? $this->managementOverview()
+                : null,
         ]);
+    }
+
+    /**
+     * Ringkasan monitoring lintas-departemen untuk role Management — read-only,
+     * tidak ada aksi. Dipakai sebagai titik awal sebelum ada drill-through
+     * penuh ke halaman tiap departemen.
+     *
+     * @return array<string, mixed>
+     */
+    private function managementOverview(): array
+    {
+        $countByStatus = fn (string $model, string $column = 'status') => $model::query()
+            ->selectRaw("{$column}, count(*) as total")
+            ->groupBy($column)
+            ->pluck('total', $column);
+
+        $leadCounts = $countByStatus(Lead::class, 'stage');
+        $leadsByStage = collect(LeadStage::options())->map(fn ($o) => [
+            'label' => $o['label'],
+            'count' => (int) ($leadCounts[$o['value']] ?? 0),
+        ])->values();
+
+        $openQuotations = Quotation::query()
+            ->whereIn('status', [QuotationStatus::Draft->value, QuotationStatus::Sent->value])
+            ->with('lines')
+            ->get();
+        $pipelineValue = $openQuotations->sum(fn ($q) => DocumentTotals::of($q->lines)['grand_total']);
+
+        $prCounts = $countByStatus(ProcurementRequest::class);
+        $prByStatus = collect(ProcurementRequestStatus::options())->map(fn ($o) => [
+            'label' => $o['label'],
+            'count' => (int) ($prCounts[$o['value']] ?? 0),
+        ])->values();
+
+        $saleInvoices = Invoice::query()
+            ->where('invoice_type', 'sale')
+            ->whereNotIn('status', [InvoiceStatus::Paid->value, InvoiceStatus::Cancelled->value])
+            ->withSum('payments as paid_total', 'amount_paid')
+            ->get(['id', 'amount', 'tax_amount', 'pph23_amount', 'due_date', 'status']);
+        $outstandingTotal = $saleInvoices->sum(fn ($inv) => max(
+            (float) $inv->amount + (float) $inv->tax_amount - (float) $inv->pph23_amount - (float) ($inv->paid_total ?? 0),
+            0,
+        ));
+        $overdueCount = $saleInvoices->filter(fn ($inv) => $inv->due_date
+            && \Illuminate\Support\Carbon::parse($inv->due_date)->isPast())->count();
+
+        $projectCounts = $countByStatus(Project::class);
+        $projectsByStatus = collect(ProjectStatus::options())->map(fn ($o) => [
+            'label' => $o['label'],
+            'count' => (int) ($projectCounts[$o['value']] ?? 0),
+        ])->values();
+
+        $tasksOverdue = ProjectTask::query()
+            ->where('status', '!=', 'done')
+            ->whereNotNull('scheduled_date')
+            ->whereDate('scheduled_date', '<', now()->toDateString())
+            ->count();
+
+        $bastPending = Bast::query()->where('status', 'submitted')->count();
+
+        $surveyCounts = $countByStatus(Survey::class);
+        $surveysByStatus = collect(SurveyStatus::options())
+            ->filter(fn ($o) => ! in_array($o['value'], ['closed', 'cancelled'], true))
+            ->map(fn ($o) => [
+                'label' => $o['label'],
+                'count' => (int) ($surveyCounts[$o['value']] ?? 0),
+            ])->values();
+
+        return [
+            'sales' => [
+                'leads_by_stage' => $leadsByStage,
+                'open_quotations' => $openQuotations->count(),
+                'pipeline_value' => round($pipelineValue, 2),
+            ],
+            'procurement' => [
+                'by_status' => $prByStatus,
+            ],
+            'finance' => [
+                'outstanding_total' => round($outstandingTotal, 2),
+                'overdue_count' => $overdueCount,
+            ],
+            'operational' => [
+                'projects_by_status' => $projectsByStatus,
+                'tasks_overdue' => $tasksOverdue,
+                'bast_pending' => $bastPending,
+            ],
+            'survey' => [
+                'by_status' => $surveysByStatus,
+            ],
+        ];
     }
 
     /**

@@ -31,8 +31,9 @@ class CreateSalesOrder
         OrderType $orderType,
         array $documents = [],
         ?string $poNumber = null,
+        ?string $poDate = null,
     ): SalesOrder {
-        return DB::transaction(function () use ($quotation, $user, $orderType, $documents, $poNumber) {
+        return DB::transaction(function () use ($quotation, $user, $orderType, $documents, $poNumber, $poDate) {
             $source = Quotation::query()
                 ->with(['lines', 'lead'])
                 ->whereKey($quotation->id)
@@ -70,6 +71,7 @@ class CreateSalesOrder
                 'status' => SalesOrderStatus::Confirmed->value,
                 'agreed_dpp' => $source->agreed_dpp,
                 'po_number' => $poNumber,
+                'po_date' => $poDate,
                 'confirmed_at' => now(),
                 'confirmed_by' => $user->id,
             ]);

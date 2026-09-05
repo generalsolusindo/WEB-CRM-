@@ -19,7 +19,8 @@ class UploadTaskPhotoRequest extends FormRequest
     {
         return [
             'category' => ['required', Rule::in(['task_before', 'task_after'])],
-            'photo' => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:5120'],
+            'photos' => ['required', 'array', 'min:1'],
+            'photos.*' => ['file', 'image', 'mimes:jpg,jpeg,png', 'max:5120'],
         ];
     }
 }

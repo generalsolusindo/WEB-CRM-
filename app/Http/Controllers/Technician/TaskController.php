@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Technician;
 
 use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Technician\CheckInProjectRequest;
 use App\Http\Requests\Technician\UploadTaskPhotoRequest;
+use App\Models\Project;
 use App\Models\ProjectTask;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,6 +21,7 @@ class TaskController extends Controller
     public function index(Request $request): Response
     {
         $userId = $request->user()->id;
+        $user = $request->user();
 
         $projects = \App\Models\Project::query()
             ->whereHas('technicians', fn ($q) => $q->where('technician_id', $userId))
@@ -37,6 +40,7 @@ class TaskController extends Controller
                 'customer' => $project->salesOrder->contact->name ?? '—',
                 'sales_order' => $project->salesOrder->number,
                 'is_leader' => (bool) optional($project->technicians->first())->is_leader,
+                'checked_in' => $project->hasCheckedIn($user),
                 'tasks' => $project->tasks->map(fn ($t) => [
                     'id' => $t->id, 'title' => $t->title, 'status' => $t->status,
                     'scheduled_date' => $t->scheduled_date,
@@ -53,6 +57,8 @@ class TaskController extends Controller
     {
         Gate::authorize('view', $task);
 
+        $user = request()->user();
+
         $task->load([
             'project:id,status,sales_order_id',
             'project.salesOrder:id,number',
@@ -68,6 +74,15 @@ class TaskController extends Controller
             ])
             ->values();
 
+        $checkedIn = $task->project->hasCheckedIn($user);
+        $mySelfie = $checkedIn
+            ? $task->project->attachments()
+                ->where('category', 'checkin_selfie')
+                ->where('uploaded_by', $user->id)
+                ->latest()
+                ->first()
+            : null;
+
         return Inertia::render('Technician/Tasks/Show', [
             'task' => $task->only('id', 'title', 'description', 'scheduled_date', 'status'),
             'project' => [
@@ -78,7 +93,21 @@ class TaskController extends Controller
             'photos' => $photos,
             'statusOptions' => TaskStatus::options(),
             'canWork' => request()->user()->can('updateStatus', $task),
+            'checkedIn' => $checkedIn,
+            'canCheckIn' => $user->can('checkIn', $task->project),
+            'selfieUrl' => $mySelfie ? Storage::disk('local')->temporaryUrl($mySelfie->file_path, now()->addDay()) : null,
         ]);
+    }
+
+    public function checkIn(CheckInProjectRequest $request, Project $project): RedirectResponse
+    {
+        $project->attachments()->create([
+            'category' => 'checkin_selfie',
+            'file_path' => $request->file('photo')->store('checkin-selfies'),
+            'uploaded_by' => $request->user()->id,
+        ]);
+
+        return back()->with('success', 'Absen kehadiran tersimpan.');
     }
 
     public function updateStatus(Request $request, ProjectTask $task): RedirectResponse
@@ -99,13 +128,13 @@ class TaskController extends Controller
     {
         Gate::authorize('uploadPhoto', $task);
 
-        $path = $request->file('photo')->store('task-photos');
-
-        $task->attachments()->create([
-            'category' => $request->validated('category'),
-            'file_path' => $path,
-            'uploaded_by' => $request->user()->id,
-        ]);
+        foreach ($request->file('photos', []) as $photo) {
+            $task->attachments()->create([
+                'category' => $request->validated('category'),
+                'file_path' => $photo->store('task-photos'),
+                'uploaded_by' => $request->user()->id,
+            ]);
+        }
 
         return back()->with('success', 'Foto tersimpan.');
     }

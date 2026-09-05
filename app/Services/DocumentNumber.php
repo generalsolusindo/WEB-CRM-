@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\DeliveryNote;
 use App\Models\Invoice;
 use App\Models\Quotation;
 use App\Models\SalesOrder;
@@ -35,18 +36,7 @@ class DocumentNumber
     /** Format: {urutan}/GS-INV/{MM}/{YYYY} — nomor urut reset tiap tahun. */
     public function nextInvoiceNumber(): string
     {
-        $now = now();
-        $year = $now->year;
-        $month = $now->format('m');
-
-        $lastSequence = Invoice::query()
-            ->where('number', 'like', "%/GS-INV/%/{$year}")
-            ->lockForUpdate()
-            ->pluck('number')
-            ->map(fn (string $number) => (int) explode('/', $number)[0])
-            ->max() ?? 0;
-
-        return ($lastSequence + 1)."/GS-INV/{$month}/{$year}";
+        return $this->nextSlashSequential(Invoice::query(), 'GS-INV');
     }
 
     public function nextSurveyInvoiceNumber(): string
@@ -54,11 +44,33 @@ class DocumentNumber
         return $this->nextSequential(Invoice::query(), 'SRV');
     }
 
+    /** Format: {urutan}/GS-DO/{MM}/{YYYY} — nomor urut reset tiap tahun. */
+    public function nextDeliveryNoteNumber(): string
+    {
+        return $this->nextSlashSequential(DeliveryNote::query(), 'GS-DO');
+    }
+
     public function revisionNumber(string $parentNumber, int $revisionNumber): string
     {
         return $revisionNumber <= 1
             ? $parentNumber
             : "{$parentNumber}-R{$revisionNumber}";
+    }
+
+    private function nextSlashSequential(Builder $query, string $middle): string
+    {
+        $now = now();
+        $year = $now->year;
+        $month = $now->format('m');
+
+        $lastSequence = $query
+            ->where('number', 'like', "%/{$middle}/%/{$year}")
+            ->lockForUpdate()
+            ->pluck('number')
+            ->map(fn (string $number) => (int) explode('/', $number)[0])
+            ->max() ?? 0;
+
+        return ($lastSequence + 1)."/{$middle}/{$month}/{$year}";
     }
 
     private function nextSequential(Builder $query, string $prefix): string
