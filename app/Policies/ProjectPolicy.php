@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Enums\ProjectStatus;
+use App\Enums\SowStatus;
 use App\Models\Project;
 use App\Models\User;
 
@@ -116,6 +117,46 @@ class ProjectPolicy
     public function delegate(User $user, Project $project): bool
     {
         return $this->isManagement($user);
+    }
+
+    /** Generate/edit draft cetakan BAST — hanya setelah tim technician ditugaskan. */
+    public function manageBastDraft(User $user, Project $project): bool
+    {
+        return $this->isOperational($user) && $project->technicians()->exists();
+    }
+
+    /**
+     * Tandai project ini dikerjakan lewat vendor teknisi luar (atau batalkan).
+     * Tidak boleh diubah lagi setelah SOW-nya mulai diproses (submit ke HR atau
+     * lebih jauh) — supaya tidak memutus rantai tanda tangan yang sedang berjalan.
+     */
+    public function assignVendor(User $user, Project $project): bool
+    {
+        if (! $this->isOperational($user)) {
+            return false;
+        }
+
+        $sow = $project->sow;
+
+        return $sow === null || in_array($sow->status, [SowStatus::Draft->value, SowStatus::RejectedByHr->value], true);
+    }
+
+    /** Lihat SOW — Operational, kapan saja selama project pakai vendor luar. */
+    public function viewSow(User $user, Project $project): bool
+    {
+        return $this->isOperational($user) && $project->vendor_id !== null;
+    }
+
+    /** Buat/edit SOW — hanya Operational, project harus sudah ditandai pakai vendor, dan SOW belum dikirim ke HR (atau sedang dikembalikan). */
+    public function manageSow(User $user, Project $project): bool
+    {
+        if (! $this->isOperational($user) || $project->vendor_id === null) {
+            return false;
+        }
+
+        $sow = $project->sow;
+
+        return $sow === null || in_array($sow->status, [SowStatus::Draft->value, SowStatus::RejectedByHr->value], true);
     }
 
     private function isOperational(User $user): bool

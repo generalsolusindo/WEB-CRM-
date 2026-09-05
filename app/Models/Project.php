@@ -22,6 +22,7 @@ class Project extends Model
         'delegated_to',
         'delegated_by',
         'delegated_at',
+        'vendor_id',
     ];
 
     /**
@@ -59,6 +60,21 @@ class Project extends Model
     public function technicians(): HasMany
     {
         return $this->hasMany(ProjectTechnician::class);
+    }
+
+    public function bastDraft(): HasOne
+    {
+        return $this->hasOne(BastDraft::class);
+    }
+
+    public function vendor(): BelongsTo
+    {
+        return $this->belongsTo(Vendor::class);
+    }
+
+    public function sow(): HasOne
+    {
+        return $this->hasOne(Sow::class);
     }
 
     public function attachments(): MorphMany

@@ -6,6 +6,7 @@ use App\Actions\Operational\MarkProjectReady;
 use App\Enums\ActualProcurementStatus;
 use App\Enums\ProjectStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Operational\AssignProjectVendorRequest;
 use App\Http\Requests\Operational\PlanningRequest;
 use App\Models\Project;
 use App\Models\User;
@@ -70,6 +71,7 @@ class ProjectController extends Controller
             'bastRecords.attachments:id,attachable_type,attachable_id,category,file_path,created_at',
             'changeRequests' => fn ($q) => $q->latest(),
             'changeRequests.requestedBy:id,name',
+            'vendor:id,name,contact_person,phone',
         ]);
 
         $user = request()->user();
@@ -116,6 +118,9 @@ class ProjectController extends Controller
             'technicianOptions' => User::query()
                 ->where('role', 'technician')->where('is_active', true)
                 ->orderBy('name')->get(['id', 'name']),
+            'vendorOptions' => \App\Models\Vendor::query()
+                ->where('provides_technical', true)
+                ->orderBy('name')->get(['id', 'name']),
             'changeRequestTypes' => \App\Enums\ChangeRequestType::options(),
             'permissions' => [
                 'plan' => $user->can('update', $project),
@@ -126,8 +131,26 @@ class ProjectController extends Controller
                 'verifyBast' => $user->can('verifyBast', $project),
                 'completeDirect' => $user->can('completeDirect', $project->loadMissing('salesOrder')),
                 'manageChangeRequests' => $user->can('manageChangeRequests', $project),
+                'manageBastDraft' => $user->can('manageBastDraft', $project),
+                'assignVendor' => $user->can('assignVendor', $project),
+                'viewSow' => $user->can('viewSow', $project),
             ],
         ]);
+    }
+
+    public function assignVendor(AssignProjectVendorRequest $request, Project $project): RedirectResponse
+    {
+        $vendorId = $request->validated('vendor_id');
+        $project->update(['vendor_id' => $vendorId]);
+
+        // Draft SOW yang sudah menunjuk teknisi dari vendor lama jadi tidak valid lagi
+        // begitu vendor project diganti — kosongkan supaya Operational memilih ulang.
+        $sow = $project->sow;
+        if ($sow && $sow->technician_id && $sow->technician?->vendor_id !== $vendorId) {
+            $sow->update(['technician_id' => null]);
+        }
+
+        return back()->with('success', $vendorId ? 'Project ditandai dikerjakan lewat vendor.' : 'Penandaan vendor luar dibatalkan.');
     }
 
     public function planning(PlanningRequest $request, Project $project): RedirectResponse

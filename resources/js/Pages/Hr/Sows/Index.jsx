@@ -1,0 +1,46 @@
+import { Head, Link } from '@inertiajs/react';
+import AppLayout from '../../../Layouts/AppLayout';
+import Pagination from '../../../Components/Pagination';
+
+export default function Index({ sows }) {
+    return (
+        <AppLayout>
+            <Head title="Review SOW" />
+            <div className="mx-auto max-w-4xl space-y-5">
+                <div>
+                    <h1 className="text-2xl font-bold text-text">Review SOW</h1>
+                    <p className="text-sm text-text-muted">SOW yang dikirim Operasional, menunggu review Anda sebelum diteruskan ke Teknisi.</p>
+                </div>
+
+                <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-bg text-text-muted">
+                            <tr>
+                                <th className="px-4 py-3">Nomor</th>
+                                <th className="px-4 py-3">Nama Proyek</th>
+                                <th className="px-4 py-3">Customer</th>
+                                <th className="px-4 py-3">Dikirim</th>
+                                <th className="px-4 py-3 text-right">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                            {sows.data.map((s) => (
+                                <tr key={s.id} className="hover:bg-bg/70">
+                                    <td className="px-4 py-3 font-medium text-text">{s.number}</td>
+                                    <td className="px-4 py-3 text-text-muted">{s.project_name}</td>
+                                    <td className="px-4 py-3 text-text-muted">{s.customer || '—'}</td>
+                                    <td className="px-4 py-3 text-text-muted">{s.submitted_at ? new Date(s.submitted_at).toLocaleString('id-ID') : '—'}</td>
+                                    <td className="px-4 py-3 text-right"><Link href={`/hr/sows/${s.id}`} className="font-medium text-info hover:underline">Lihat</Link></td>
+                                </tr>
+                            ))}
+                            {sows.data.length === 0 && (
+                                <tr><td colSpan={5} className="px-4 py-12 text-center text-text-muted">Tidak ada SOW yang menunggu review.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                    <div className="border-t border-border p-4"><Pagination links={sows.links} /></div>
+                </div>
+            </div>
+        </AppLayout>
+    );
+}

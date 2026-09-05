@@ -9,6 +9,7 @@ use App\Models\Quotation;
 use App\Models\Tax;
 use App\Models\User;
 use App\Services\DocumentNumber;
+use App\Services\Notifications\Notify;
 use App\Services\Sales\AgreedDpp;
 use App\Services\Sales\LinePricing;
 use Illuminate\Support\Facades\DB;
@@ -16,14 +17,14 @@ use Illuminate\Validation\ValidationException;
 
 class CreateQuotation
 {
-    public function __construct(private DocumentNumber $documentNumber) {}
+    public function __construct(private DocumentNumber $documentNumber, private Notify $notify) {}
 
     /** @param array<string, mixed> $data */
     public function handle(ProcurementRequest $procurementRequest, User $user, array $data): Quotation
     {
         return DB::transaction(function () use ($procurementRequest, $user, $data) {
             $request = ProcurementRequest::query()
-                ->with(['lead', 'lines', 'lines.vendorProduct:id,category'])
+                ->with(['lead.delegatedTo', 'lines', 'lines.vendorProduct:id,category'])
                 ->whereKey($procurementRequest->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -73,6 +74,11 @@ class CreateQuotation
             }
 
             $request->lead->update(['stage' => LeadStage::Quotation->value]);
+
+            $pm = $request->lead->delegatedTo;
+            if ($pm) {
+                $this->notify->once($pm, 'quotation.pending_pm_review', "Quotation {$quotation->number} perlu diverifikasi oleh Anda sebelum dikirim ke customer.", $quotation);
+            }
 
             return $quotation;
         });

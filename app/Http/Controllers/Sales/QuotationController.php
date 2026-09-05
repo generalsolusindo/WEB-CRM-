@@ -93,10 +93,13 @@ class QuotationController extends Controller
 
         $quotation->load([
             'contact:id,name,company_name,email,phone,address,npwp',
-            'lead:id,type,stage',
+            'lead:id,type,stage,delegated_to',
+            'lead.delegatedTo:id,name',
             'procurementRequest:id,status',
             'lines.tax:id,name,rate',
             'parent:id,revision_number,status',
+            'pmReviewedBy:id,name',
+            'managerReviewedBy:id,name',
         ]);
 
         $history = Quotation::query()

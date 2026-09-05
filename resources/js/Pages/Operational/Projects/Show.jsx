@@ -16,7 +16,7 @@ function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
 }
 
-export default function Show({ project, approvalDocs = [], bastRecords, taskPhotos, checkIns = [], materialStatus, procurementProgress, statusOptions, availabilityOptions, technicianOptions, changeRequestTypes, permissions }) {
+export default function Show({ project, approvalDocs = [], bastRecords, taskPhotos, checkIns = [], materialStatus, procurementProgress, statusOptions, availabilityOptions, technicianOptions, vendorOptions = [], changeRequestTypes, permissions }) {
     const number = `PRJ-${String(project.id).padStart(6, '0')}`;
     const so = project.sales_order;
 
@@ -74,8 +74,20 @@ export default function Show({ project, approvalDocs = [], bastRecords, taskPhot
                 </section>
 
                 <Planning project={project} canPlan={permissions.plan} />
+                <VendorAssignment project={project} options={vendorOptions} editable={permissions.assignVendor} canViewSow={permissions.viewSow} />
                 <ActualProcurement project={project} availabilityOptions={availabilityOptions} progress={procurementProgress} editable={permissions.manageResources} />
                 <TechnicianTeam project={project} options={technicianOptions} editable={permissions.manageResources} />
+                {permissions.manageBastDraft && (
+                    <section className="flex items-center justify-between rounded-xl border border-border bg-surface p-6 shadow-sm">
+                        <div>
+                            <h2 className="font-semibold text-text">Generate BAST</h2>
+                            <p className="text-sm text-text-muted">Siapkan draft cetakan BAST untuk dibawa teknisi ke lapangan.</p>
+                        </div>
+                        <Link href={`/operational/projects/${project.id}/bast-draft`} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text">
+                            Buka Form BAST
+                        </Link>
+                    </section>
+                )}
                 <CheckIns items={checkIns} />
                 <Tasks project={project} photos={taskPhotos} editable={permissions.manageTasks} />
                 <BastSection project={project} records={bastRecords} canVerify={permissions.verifyBast} />
@@ -271,6 +283,42 @@ function ActualProcurement({ project, availabilityOptions, progress, editable })
                     <button disabled={form.processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white md:col-span-5">Tambah Item Ekstra</button>
                     {Object.keys(form.errors).length > 0 && <span className="text-xs text-danger md:col-span-5">{Object.values(form.errors)[0]}</span>}
                 </form>
+            )}
+        </section>
+    );
+}
+
+function VendorAssignment({ project, options, editable, canViewSow }) {
+    const form = useForm({ vendor_id: project.vendor_id ?? '' });
+
+    function save() {
+        form.put(`/operational/projects/${project.id}/vendor`, { preserveScroll: true });
+    }
+
+    return (
+        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 className="mb-1 font-semibold text-text">Vendor Teknisi Luar</h2>
+                    <p className="text-sm text-text-muted">Tandai kalau project ini dikerjakan lewat vendor teknisi luar (di luar jangkauan tim internal) — dibutuhkan sebelum membuat SOW.</p>
+                </div>
+                {canViewSow && (
+                    <Link href={`/operational/projects/${project.id}/sow`} className="whitespace-nowrap rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text">
+                        Generate SOW
+                    </Link>
+                )}
+            </div>
+            {!editable ? (
+                <p className="mt-4 text-sm text-text">{project.vendor?.name ?? 'Tidak pakai vendor luar.'}</p>
+            ) : (
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <select value={form.data.vendor_id} onChange={(e) => form.setData('vendor_id', e.target.value)} className="rounded-lg border border-border px-3 py-2 text-sm">
+                        <option value="">Tidak pakai vendor luar</option>
+                        {options.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                    </select>
+                    <button onClick={save} disabled={form.processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Simpan</button>
+                    {form.errors.vendor_id && <span className="text-xs text-danger">{form.errors.vendor_id}</span>}
+                </div>
             )}
         </section>
     );

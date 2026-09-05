@@ -3,6 +3,7 @@
 namespace App\Actions\Sales;
 
 use App\Enums\QuotationStatus;
+use App\Models\Notification;
 use App\Models\Quotation;
 use App\Models\User;
 use App\Services\DocumentNumber;
@@ -16,7 +17,7 @@ class CreateQuotationRevision
     public function handle(Quotation $quotation, User $user): Quotation
     {
         return DB::transaction(function () use ($quotation, $user) {
-            $source = Quotation::query()->with('lines')->whereKey($quotation->id)->lockForUpdate()->firstOrFail();
+            $source = Quotation::query()->with(['lines', 'lead.delegatedTo'])->whereKey($quotation->id)->lockForUpdate()->firstOrFail();
 
             if (! in_array($source->status, ['sent', 'rejected'], true) || $source->revisions()->exists()) {
                 throw ValidationException::withMessages([
@@ -50,6 +51,23 @@ class CreateQuotationRevision
             }
 
             $source->update(['status' => QuotationStatus::Revised->value]);
+
+            $pm = $source->lead?->delegatedTo;
+            if ($pm) {
+                Notification::updateOrCreate(
+                    [
+                        'user_id' => $pm->id,
+                        'type' => 'quotation.pending_pm_review',
+                        'related_type' => $revision->getMorphClass(),
+                        'related_id' => $revision->id,
+                    ],
+                    [
+                        'message' => "Quotation revisi {$revision->number} perlu diverifikasi oleh Anda sebelum dikirim ke customer.",
+                        'is_sent' => true,
+                        'read_at' => null,
+                    ],
+                );
+            }
 
             return $revision;
         });

@@ -6,28 +6,39 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Finance\InvoiceController;
 use App\Http\Controllers\Finance\PaymentController;
 use App\Http\Controllers\Finance\SurveyController as FinanceSurveyController;
+use App\Http\Controllers\Hr\SowController as HrSowController;
+use App\Http\Controllers\Management\OpportunityController as ManagementOpportunityController;
 use App\Http\Controllers\Management\ProjectController as ManagementProjectController;
 use App\Http\Controllers\Management\ProjectManagerAccountController;
+use App\Http\Controllers\Management\QuotationController as ManagementQuotationController;
+use App\Http\Controllers\Management\SowController as ManagementSowController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ProjectManager\OpportunityController as ProjectManagerOpportunityController;
 use App\Http\Controllers\ProjectManager\ProjectController as ProjectManagerProjectController;
+use App\Http\Controllers\ProjectManager\QuotationController as ProjectManagerQuotationController;
 use App\Http\Controllers\Operational\ActualProcurementController;
+use App\Http\Controllers\Operational\BastDraftController;
 use App\Http\Controllers\Operational\BastVerificationController;
 use App\Http\Controllers\Operational\DeliveryNoteController;
 use App\Http\Controllers\Operational\ProjectChangeRequestController;
 use App\Http\Controllers\Operational\ProjectController;
 use App\Http\Controllers\Operational\ProjectTaskController;
 use App\Http\Controllers\Operational\ProjectTechnicianController;
+use App\Http\Controllers\Operational\SowController;
 use App\Http\Controllers\Operational\SurveyController as OperationalSurveyController;
 use App\Http\Controllers\Procurement\ProcurementRequestController;
 use App\Http\Controllers\Procurement\ProjectProcurementController;
 use App\Http\Controllers\Procurement\SurveyController as ProcurementSurveyController;
 use App\Http\Controllers\Procurement\TechnicianAccountController;
+use App\Http\Controllers\Procurement\VendorAccountController;
 use App\Http\Controllers\Technician\BastController as TechnicianBastController;
 use App\Http\Controllers\Technician\DeliveryNoteController as TechnicianDeliveryNoteController;
+use App\Http\Controllers\Technician\SowController as TechnicianSowController;
 use App\Http\Controllers\Technician\SurveyController as TechnicianSurveyController;
 use App\Http\Controllers\Technician\TaskController as TechnicianTaskController;
 use App\Http\Controllers\Procurement\VendorController;
 use App\Http\Controllers\Procurement\VendorProductController;
+use App\Http\Controllers\Vendor\SowController as VendorSowController;
 use App\Http\Controllers\Sales\ContactController;
 use App\Http\Controllers\Sales\LeadController;
 use App\Http\Controllers\Sales\LeadReportController;
@@ -77,16 +88,46 @@ Route::middleware('auth')->group(function () {
         Route::get('projects', [ManagementProjectController::class, 'index'])->name('projects.index');
         Route::get('projects/{project}', [ManagementProjectController::class, 'show'])->name('projects.show');
         Route::put('projects/{project}/delegate', [ManagementProjectController::class, 'delegate'])->name('projects.delegate');
+        Route::get('opportunities', [ManagementOpportunityController::class, 'index'])->name('opportunities.index');
+        Route::get('opportunities/{lead}', [ManagementOpportunityController::class, 'show'])->name('opportunities.show');
+        Route::put('opportunities/{lead}/delegate', [ManagementOpportunityController::class, 'delegate'])->name('opportunities.delegate');
+        Route::get('quotations', [ManagementQuotationController::class, 'index'])->name('quotations.index');
+        Route::get('quotations/{quotation}', [ManagementQuotationController::class, 'show'])->name('quotations.show');
+        Route::post('quotations/{quotation}/review', [ManagementQuotationController::class, 'review'])->name('quotations.review');
+        Route::get('sows', [ManagementSowController::class, 'index'])->name('sows.index');
+        Route::get('sows/{sow}', [ManagementSowController::class, 'show'])->name('sows.show');
+        Route::post('sows/{sow}/sign', [ManagementSowController::class, 'sign'])->name('sows.sign');
     });
 
     Route::prefix('project-manager')->name('project-manager.')->middleware('role:project_manager')->group(function () {
+        Route::get('opportunities', [ProjectManagerOpportunityController::class, 'index'])->name('opportunities.index');
+        Route::get('opportunities/{lead}', [ProjectManagerOpportunityController::class, 'show'])->name('opportunities.show');
         Route::get('projects', [ProjectManagerProjectController::class, 'index'])->name('projects.index');
         Route::get('projects/{project}', [ProjectManagerProjectController::class, 'show'])->name('projects.show');
+        Route::get('quotations', [ProjectManagerQuotationController::class, 'index'])->name('quotations.index');
+        Route::get('quotations/{quotation}', [ProjectManagerQuotationController::class, 'show'])->name('quotations.show');
+        Route::post('quotations/{quotation}/review', [ProjectManagerQuotationController::class, 'review'])->name('quotations.review');
+    });
+
+    Route::prefix('hr')->name('hr.')->middleware('role:hr')->group(function () {
+        Route::get('sows', [HrSowController::class, 'index'])->name('sows.index');
+        Route::get('sows/{sow}', [HrSowController::class, 'show'])->name('sows.show');
+        Route::post('sows/{sow}/review', [HrSowController::class, 'review'])->name('sows.review');
+        Route::post('sows/{sow}/verify-signatures', [HrSowController::class, 'verifySignatures'])->name('sows.verify-signatures');
+    });
+
+    Route::prefix('vendor')->name('vendor.')->middleware('role:vendor')->group(function () {
+        Route::get('sows', [VendorSowController::class, 'index'])->name('sows.index');
+        Route::get('sows/{sow}', [VendorSowController::class, 'show'])->name('sows.show');
+        Route::post('sows/{sow}/sign', [VendorSowController::class, 'sign'])->name('sows.sign');
     });
 
     Route::prefix('procurement')->name('procurement.')->middleware('role:procurement')->group(function () {
         Route::resource('vendors', VendorController::class);
         Route::resource('technicians', TechnicianAccountController::class)
+            ->only(['index', 'create', 'store', 'edit', 'update']);
+        Route::resource('vendor-accounts', VendorAccountController::class)
+            ->parameters(['vendor-accounts' => 'vendorAccount'])
             ->only(['index', 'create', 'store', 'edit', 'update']);
         Route::get('surveys', [ProcurementSurveyController::class, 'index'])->name('surveys.index');
         Route::get('surveys/{survey}', [ProcurementSurveyController::class, 'show'])->name('surveys.show');
@@ -149,11 +190,16 @@ Route::middleware('auth')->group(function () {
             ->name('delivery-notes.show');
         Route::post('delivery-notes/{deliveryNote}/receive', [TechnicianDeliveryNoteController::class, 'receive'])
             ->name('delivery-notes.receive');
+        Route::get('sows', [TechnicianSowController::class, 'index'])->name('sows.index');
+        Route::get('sows/{sow}', [TechnicianSowController::class, 'show'])->name('sows.show');
+        Route::post('sows/{sow}/sign', [TechnicianSowController::class, 'sign'])->name('sows.sign');
     });
 
     Route::prefix('operational')->name('operational.')->middleware('role:operational')->group(function () {
         Route::put('projects/{project}/planning', [ProjectController::class, 'planning'])
             ->name('projects.planning');
+        Route::put('projects/{project}/vendor', [ProjectController::class, 'assignVendor'])
+            ->name('projects.vendor');
         Route::post('projects/{project}/ready', [ProjectController::class, 'markReady'])
             ->name('projects.ready');
         Route::post('projects/{project}/start', [ProjectController::class, 'start'])
@@ -168,6 +214,28 @@ Route::middleware('auth')->group(function () {
             ->name('projects.change-requests.update');
         Route::put('projects/{project}/technicians', [ProjectTechnicianController::class, 'update'])
             ->name('projects.technicians');
+        Route::get('projects/{project}/bast-draft', [BastDraftController::class, 'edit'])
+            ->name('projects.bast-draft.edit');
+        Route::put('projects/{project}/bast-draft', [BastDraftController::class, 'update'])
+            ->name('projects.bast-draft.update');
+        Route::get('projects/{project}/bast-draft/print', [BastDraftController::class, 'print'])
+            ->name('projects.bast-draft.print');
+        Route::get('projects/{project}/sow', [SowController::class, 'edit'])
+            ->name('projects.sow.edit');
+        Route::put('projects/{project}/sow', [SowController::class, 'update'])
+            ->name('projects.sow.update');
+        Route::post('projects/{project}/sow/images', [SowController::class, 'storeImage'])
+            ->name('projects.sow.images.store');
+        Route::delete('projects/{project}/sow/images/{image}', [SowController::class, 'destroyImage'])
+            ->name('projects.sow.images.destroy');
+        Route::post('projects/{project}/sow/submit', [SowController::class, 'submit'])
+            ->name('projects.sow.submit');
+        Route::get('projects/{project}/sow/print', [SowController::class, 'print'])
+            ->name('projects.sow.print');
+        Route::post('sows/{sow}/sign-admin', [SowController::class, 'signAdmin'])
+            ->name('sows.sign-admin');
+        Route::post('sows/{sow}/restart-signatures', [SowController::class, 'restartSignatures'])
+            ->name('sows.restart-signatures');
         Route::post('projects/{project}/actual-procurements', [ActualProcurementController::class, 'store'])
             ->name('projects.actual-procurements.store');
         Route::delete('projects/{project}/actual-procurements/{actualProcurement}', [ActualProcurementController::class, 'destroy'])

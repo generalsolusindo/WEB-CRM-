@@ -2,6 +2,7 @@
 
 namespace App\Actions\Sales;
 
+use App\Models\Notification;
 use App\Models\Quotation;
 use App\Models\Tax;
 use App\Services\Sales\AgreedDpp;
@@ -15,7 +16,7 @@ class UpdateQuotation
     public function handle(Quotation $quotation, array $data): Quotation
     {
         return DB::transaction(function () use ($quotation, $data) {
-            $locked = Quotation::query()->with('lines')->whereKey($quotation->id)->lockForUpdate()->firstOrFail();
+            $locked = Quotation::query()->with(['lines', 'lead.delegatedTo'])->whereKey($quotation->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->status !== 'draft') {
                 throw ValidationException::withMessages(['quotation' => 'Hanya quotation Draft yang dapat diubah.']);
@@ -34,6 +35,14 @@ class UpdateQuotation
                 'agreed_dpp' => isset($data['agreed_dpp']) && $data['agreed_dpp'] !== null && $data['agreed_dpp'] !== ''
                     ? (float) $data['agreed_dpp']
                     : null,
+                'pm_review_status' => null,
+                'pm_reviewed_by' => null,
+                'pm_reviewed_at' => null,
+                'pm_review_notes' => null,
+                'manager_review_status' => null,
+                'manager_reviewed_by' => null,
+                'manager_reviewed_at' => null,
+                'manager_review_notes' => null,
             ]);
 
             $taxRates = Tax::pluck('rate', 'id');
@@ -71,6 +80,23 @@ class UpdateQuotation
 
             if ($locked->agreed_dpp !== null) {
                 AgreedDpp::distribute($locked->lines()->get(), (float) $locked->agreed_dpp);
+            }
+
+            $pm = $locked->lead?->delegatedTo;
+            if ($pm) {
+                Notification::updateOrCreate(
+                    [
+                        'user_id' => $pm->id,
+                        'type' => 'quotation.pending_pm_review',
+                        'related_type' => $locked->getMorphClass(),
+                        'related_id' => $locked->id,
+                    ],
+                    [
+                        'message' => "Quotation {$locked->number} diubah dan perlu diverifikasi ulang oleh Anda.",
+                        'is_sent' => true,
+                        'read_at' => null,
+                    ],
+                );
             }
 
             return $locked->refresh();

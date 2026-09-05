@@ -38,6 +38,7 @@ const menuConfig = {
         { label: 'Vendor & Katalog Produk', href: '/procurement/vendors', icon: FiPackage },
         { label: 'Survey', href: '/procurement/surveys', icon: FiClipboard },
         { label: 'Surveyor & Teknisi', href: '/procurement/technicians', icon: FiTool },
+        { label: 'Akun PIC Vendor', href: '/procurement/vendor-accounts', icon: FiUserCheck },
     ],
     operational: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
@@ -50,6 +51,7 @@ const menuConfig = {
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
         { label: 'Tugas Saya', href: '/technician/tasks', icon: FiTool },
         { label: 'Survey', href: '/technician/surveys', icon: FiClipboard },
+        { label: 'SOW Saya', href: '/technician/sows', icon: FiFileText },
     ],
     finance: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
@@ -59,10 +61,15 @@ const menuConfig = {
     ],
     management: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
+        { label: 'Opportunity', href: '/management/opportunities', icon: FiUsers },
+        { label: 'Verifikasi Quotation', href: '/management/quotations', icon: FiFileText },
         { label: 'Semua Project', href: '/management/projects', icon: FiCalendar },
         { label: 'Project Manager', href: '/management/project-managers', icon: FiUserCheck },
+        { label: 'SOW Menunggu TTD', href: '/management/sows', icon: FiFileText },
     ],
     project_manager: [
+        { label: 'Opportunity Saya', href: '/project-manager/opportunities', icon: FiUsers },
+        { label: 'Verifikasi Quotation', href: '/project-manager/quotations', icon: FiFileText },
         { label: 'Project Saya', href: '/project-manager/projects', icon: FiCalendar },
     ],
     administrator: [
@@ -70,6 +77,14 @@ const menuConfig = {
         { label: 'Manajemen User', href: '#', icon: FiUserCheck },
         { label: 'Master Data', href: '#', icon: FiDatabase },
         { label: 'Master Data · Pajak', href: '/admin/taxes', icon: FiPercent },
+    ],
+    hr: [
+        { label: 'Dashboard', href: '/dashboard', icon: FiHome },
+        { label: 'Review SOW', href: '/hr/sows', icon: FiFileText },
+    ],
+    vendor: [
+        { label: 'Dashboard', href: '/dashboard', icon: FiHome },
+        { label: 'SOW', href: '/vendor/sows', icon: FiFileText },
     ],
 };
 

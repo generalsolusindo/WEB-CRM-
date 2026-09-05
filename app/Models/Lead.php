@@ -24,7 +24,20 @@ class Lead extends Model
         'stage',
         'source',
         'notes',
+        'pic_name',
+        'pic_position',
+        'pic_phone',
+        'delegated_to',
+        'delegated_by',
+        'delegated_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'delegated_at' => 'datetime',
+        ];
+    }
 
     public function contact(): BelongsTo
     {
@@ -34,6 +47,16 @@ class Lead extends Model
     public function sales(): BelongsTo
     {
         return $this->belongsTo(User::class, 'sales_id');
+    }
+
+    public function delegatedTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'delegated_to');
+    }
+
+    public function delegatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'delegated_by');
     }
 
     public function requirements(): HasMany

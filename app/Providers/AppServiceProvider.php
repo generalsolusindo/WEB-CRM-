@@ -36,5 +36,8 @@ class AppServiceProvider extends ServiceProvider
 
         // Manager mengelola akun Project Manager (bawahannya) — PM sendiri tidak boleh.
         Gate::define('manage-project-managers', fn (User $user): bool => $user->role === 'management' && $user->is_active);
+
+        // Procurement mengelola akun PIC vendor (dipakai vendor untuk tanda tangan SOW).
+        Gate::define('manage-vendor-accounts', fn (User $user): bool => $user->role === 'procurement' && $user->is_active);
     }
 }

@@ -29,6 +29,14 @@ class Quotation extends Model
         'valid_until',
         'notes',
         'agreed_dpp',
+        'pm_review_status',
+        'pm_reviewed_by',
+        'pm_reviewed_at',
+        'pm_review_notes',
+        'manager_review_status',
+        'manager_reviewed_by',
+        'manager_reviewed_at',
+        'manager_review_notes',
     ];
 
     /** @return array<string, string> */
@@ -36,7 +44,24 @@ class Quotation extends Model
     {
         return [
             'agreed_dpp' => 'decimal:2',
+            'pm_reviewed_at' => 'datetime',
+            'manager_reviewed_at' => 'datetime',
         ];
+    }
+
+    public function isFullyApproved(): bool
+    {
+        return $this->pm_review_status === 'approved' && $this->manager_review_status === 'approved';
+    }
+
+    public function pmReviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'pm_reviewed_by');
+    }
+
+    public function managerReviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manager_reviewed_by');
     }
 
     public function procurementRequest(): BelongsTo

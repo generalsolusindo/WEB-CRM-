@@ -29,6 +29,9 @@ class StoreLeadRequest extends FormRequest
             'stage' => ['required', Rule::in([LeadStage::New->value])],
             'source' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string'],
+            'pic_name' => ['nullable', 'string', 'max:255'],
+            'pic_position' => ['nullable', 'string', 'max:255'],
+            'pic_phone' => ['nullable', 'string', 'max:50'],
         ];
     }
 }

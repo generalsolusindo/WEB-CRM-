@@ -29,6 +29,34 @@ class LeadManagementTest extends TestCase
         $this->assertSame('lead', $lead->type);
     }
 
+    public function test_sales_can_set_and_update_customer_pic(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
+
+        $this->actingAs($sales)->post('/sales/leads', [
+            'contact_id' => $contact->id,
+            'stage' => 'new',
+            'pic_name' => 'Budi Santoso',
+            'pic_position' => 'Manager Operasional',
+        ]);
+
+        $lead = Lead::firstOrFail();
+        $this->assertSame('Budi Santoso', $lead->pic_name);
+        $this->assertSame('Manager Operasional', $lead->pic_position);
+
+        $this->actingAs($sales)->put("/sales/leads/{$lead->id}", [
+            'contact_id' => $contact->id,
+            'stage' => 'new',
+            'pic_name' => 'Siti Aminah',
+            'pic_position' => 'Site Supervisor',
+        ]);
+
+        $lead->refresh();
+        $this->assertSame('Siti Aminah', $lead->pic_name);
+        $this->assertSame('Site Supervisor', $lead->pic_position);
+    }
+
     public function test_sales_cannot_create_lead_from_another_sales_contact(): void
     {
         $sales = User::factory()->create(['role' => 'sales']);

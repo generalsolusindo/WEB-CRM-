@@ -23,7 +23,11 @@ class InitializeProject
     {
         return DB::transaction(function () use ($salesOrder) {
             $order = SalesOrder::query()
-                ->with(['contact:id,name', 'quotation.procurementRequest.lines.vendorProduct:id,vendor_id'])
+                ->with([
+                    'contact:id,name',
+                    'quotation.procurementRequest.lines.vendorProduct:id,vendor_id',
+                    'quotation.lead:id,delegated_to,delegated_by,delegated_at',
+                ])
                 ->whereKey($salesOrder->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -31,9 +35,16 @@ class InitializeProject
             $project = $order->projects()->first();
 
             if (! $project) {
+                // Delegasi Project Manager mengikuti delegasi Opportunity — satu delegasi
+                // yang sama sejak awal, bukan ditentukan ulang di tahap Project.
+                $lead = $order->quotation?->lead;
+
                 $project = $order->projects()->create([
                     'status' => ProjectStatus::Draft->value,
                     'created_by' => null,
+                    'delegated_to' => $lead?->delegated_to,
+                    'delegated_by' => $lead?->delegated_by,
+                    'delegated_at' => $lead?->delegated_at,
                 ]);
             }
 
