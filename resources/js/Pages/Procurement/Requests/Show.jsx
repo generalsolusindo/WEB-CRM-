@@ -123,7 +123,7 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
                                             <label className="mt-2 block text-[11px] font-medium text-text-muted">Kategori
                                                 <select disabled={!editable} value={data.lines[i].category} onChange={(e) => setLine(i, { category: e.target.value })} className="mt-1 w-full rounded-lg border border-border px-2 py-1.5 text-xs outline-none focus:border-navy disabled:bg-bg">
                                                     <option value="material">Material</option>
-                                                    <option value="service">Jasa (kena PPh 23)</option>
+                                                    <option value="service">Jasa</option>
                                                     <option value="reimburse">Biaya Reimburse</option>
                                                 </select>
                                             </label>

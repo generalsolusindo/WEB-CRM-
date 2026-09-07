@@ -89,6 +89,38 @@ export default function Sow({ project, vendor, materials = [], technicianOptions
                     </div>
                 )}
 
+                {canRestartSignatures && (
+                    <section className="rounded-xl border-2 border-danger/40 bg-danger/5 p-6 shadow-sm">
+                        <h2 className="mb-1 font-semibold text-danger">Tanda Tangan Ditolak HR</h2>
+                        <p className="mb-3 text-sm text-danger">HR menolak tanda tangan Teknisi/PIC Vendor. Ulangi proses tanda tangan dari awal.</p>
+                        <button onClick={restartSignatures} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white">Ulangi Proses Tanda Tangan</button>
+                    </section>
+                )}
+
+                {canSignAdmin && (
+                    <section className="rounded-xl border-2 border-navy/40 bg-navy/5 p-6 shadow-sm">
+                        <h2 className="mb-1 font-semibold text-text">Perlu Tanda Tangan Anda — Admin Project</h2>
+                        <p className="mb-3 text-sm text-text-muted">Teknisi & PIC Vendor sudah tanda tangan dan diverifikasi HR. Tanda tangani di bawah ini untuk meneruskan ke Direktur.</p>
+                        <SignaturePad onChange={setAdminSignature} />
+                        <div className="mt-3 flex justify-end">
+                            <button onClick={signAsAdmin} disabled={!adminSignature || signing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                                {signing ? 'Menyimpan…' : 'Tanda Tangani & Kirim ke Direktur'}
+                            </button>
+                        </div>
+                    </section>
+                )}
+
+                {signatures && (signatures.technician || signatures.vendor || signatures.admin || signatures.director) && (
+                    <Section title="Tanda Tangan">
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <SignaturePreview label="Teknisi" image={signatures.technician} />
+                            <SignaturePreview label="PIC Vendor" image={signatures.vendor} />
+                            <SignaturePreview label="Admin Project" image={signatures.admin} />
+                            <SignaturePreview label="Direktur" image={signatures.director} />
+                        </div>
+                    </Section>
+                )}
+
                 <form onSubmit={submit} className="space-y-6">
                     <Section title="1. Informasi Umum">
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -217,35 +249,6 @@ export default function Sow({ project, vendor, materials = [], technicianOptions
                         </div>
                     )}
                 </form>
-
-                {signatures && (signatures.technician || signatures.vendor || signatures.admin || signatures.director) && (
-                    <Section title="Tanda Tangan">
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <SignaturePreview label="Teknisi" image={signatures.technician} />
-                            <SignaturePreview label="PIC Vendor" image={signatures.vendor} />
-                            <SignaturePreview label="Admin Project" image={signatures.admin} />
-                            <SignaturePreview label="Direktur" image={signatures.director} />
-                        </div>
-                    </Section>
-                )}
-
-                {canRestartSignatures && (
-                    <Section title="Tanda Tangan Ditolak HR">
-                        <p className="mb-3 text-sm text-danger">HR menolak tanda tangan Teknisi/PIC Vendor. Ulangi proses tanda tangan dari awal.</p>
-                        <button onClick={restartSignatures} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white">Ulangi Proses Tanda Tangan</button>
-                    </Section>
-                )}
-
-                {canSignAdmin && (
-                    <Section title="Tanda Tangan Admin Project">
-                        <SignaturePad onChange={setAdminSignature} />
-                        <div className="mt-3 flex justify-end">
-                            <button onClick={signAsAdmin} disabled={!adminSignature || signing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
-                                {signing ? 'Menyimpan…' : 'Tanda Tangani & Kirim ke Direktur'}
-                            </button>
-                        </div>
-                    </Section>
-                )}
             </div>
         </AppLayout>
     );

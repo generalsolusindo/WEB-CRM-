@@ -92,7 +92,7 @@ export default function RequirementsPanel({ leadId, requirements, editable }) {
                         <Field label="Kategori" error={errors.category}>
                             <select value={data.category} onChange={(e) => setData('category', e.target.value)} className="input">
                                 <option value="material">Material</option>
-                                <option value="service">Jasa (kena PPh 23)</option>
+                                <option value="service">Jasa</option>
                                 <option value="reimburse">Biaya Reimburse (transport, akomodasi)</option>
                             </select>
                         </Field>

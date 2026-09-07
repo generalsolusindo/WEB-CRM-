@@ -23,6 +23,7 @@ class SowController extends Controller
 
         $sows = Sow::query()
             ->whereHas('project', fn ($q) => $q->where('vendor_id', $request->user()->vendor_id))
+            ->whereIn('status', \App\Enums\SowStatus::visibleToVendorValues())
             ->with('project.salesOrder.contact:id,name')
             ->latest()
             ->paginate(15)

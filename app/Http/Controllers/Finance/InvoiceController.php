@@ -321,13 +321,19 @@ class InvoiceController extends Controller
                 'bank' => 'BANK MANDIRI CAB. SIDOARJO',
                 'account' => '141-00-1353843-4',
             ],
-            'terms' => [
-                'Price Include Tax',
-                'Payment DP 50%',
-                'Payment 50% After BAST',
-                'Warranty 1 Month',
-                'No Cancellation',
-            ],
+            'terms' => $invoice->isSurvey()
+                ? [
+                    'Harga sudah termasuk pajak',
+                    'Dibayar penuh saat invoice diterima',
+                    'Biaya survey tidak dapat dikembalikan',
+                ]
+                : [
+                    'Harga sudah termasuk pajak',
+                    'Pembayaran DP di muka',
+                    'Pelunasan 50% setelah BAST',
+                    'Garansi 1 bulan',
+                    'Tidak dapat dibatalkan',
+                ],
         ];
     }
 

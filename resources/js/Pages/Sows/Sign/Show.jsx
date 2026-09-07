@@ -64,15 +64,21 @@ export default function Show({ sow, canSign, signUrl, roleLabel, backHref }) {
                     </div>
                 </Section>
 
-                {canSign && (
-                    <div className="space-y-3 rounded-xl border border-border bg-surface p-6 shadow-sm">
-                        <h2 className="font-semibold text-text">Tanda Tangan {roleLabel}</h2>
+                {canSign ? (
+                    <div className="space-y-3 rounded-xl border-2 border-navy/40 bg-navy/5 p-6 shadow-sm">
+                        <h2 className="font-semibold text-text">Perlu Tanda Tangan Anda — {roleLabel}</h2>
                         <SignaturePad onChange={setSignature} />
                         <div className="flex justify-end">
                             <button onClick={submit} disabled={!signature || processing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
                                 {processing ? 'Menyimpan…' : 'Tanda Tangani & Kirim'}
                             </button>
                         </div>
+                    </div>
+                ) : (
+                    <div className="rounded-xl border border-border bg-surface p-4 text-sm text-text-muted">
+                        {sow.status === 'completed'
+                            ? 'SOW ini sudah selesai — semua pihak sudah tanda tangan.'
+                            : `Belum giliran Anda. Status saat ini: ${sow.status_label}.`}
                     </div>
                 )}
             </div>

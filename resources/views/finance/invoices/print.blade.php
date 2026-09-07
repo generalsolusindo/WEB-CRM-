@@ -31,7 +31,7 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'DejaVu Sans', Arial, sans-serif; color: #111827; font-size: 11px; background: {{ $forPdf ? '#fff' : '#f1f5f9' }}; }
-        .sheet { background: #fff; {{ $forPdf ? '' : 'width: 210mm; min-height: 297mm; margin: 12px auto; padding: 16mm;' }} }
+        .sheet { background: #fff; {{ $forPdf ? 'padding: 16mm 18mm;' : 'width: 210mm; min-height: 297mm; margin: 12px auto; padding: 20mm;' }} }
         .toolbar { width: 210mm; margin: 12px auto 0; text-align: right; }
         .toolbar button { padding: 8px 16px; border: 0; border-radius: 6px; background: #001B3A; color: #fff; font-size: 12px; cursor: pointer; }
         table { border-collapse: collapse; width: 100%; }
@@ -42,8 +42,11 @@
         .brand-sub { font-size: 10px; font-style: italic; color: #374151; margin: 2px 0 6px; }
         .muted { color: #6B7280; }
         .doc-title { font-size: 22px; font-weight: 700; color: #9CA3AF; letter-spacing: 2px; text-align: right; }
-        .meta { text-align: right; margin-top: 6px; }
-        .meta span { display: inline-block; min-width: 110px; text-align: left; }
+        .doc-sub { text-align: right; font-size: 11px; font-weight: 700; color: #374151; margin-top: 1px; }
+        .meta { margin-top: 8px; text-align: right; }
+        .meta div { font-size: 10px; line-height: 1.6; white-space: nowrap; }
+        .meta .k { display: inline-block; width: 84px; text-align: right; color: #6B7280; margin-right: 10px; }
+        .meta .v { display: inline-block; min-width: 96px; text-align: right; }
 
         .bill { margin-top: 14px; }
         .bill td { border: 0; padding: 0; width: 50%; }
@@ -54,17 +57,19 @@
         .terms-tbl td { border: 1px solid #D1D5DB; padding: 5px 7px; }
 
         .items { margin-top: 12px; }
-        .items th { background: #F3F4F6; border: 1px solid #D1D5DB; padding: 6px 7px; font-size: 9px; text-transform: uppercase; letter-spacing: .5px; text-align: left; }
+        .items th { background: #F3F4F6; border: 1px solid #D1D5DB; padding: 6px 7px; font-size: 9px; text-transform: uppercase; letter-spacing: .5px; text-align: left; white-space: nowrap; }
         .items td { border: 1px solid #D1D5DB; padding: 6px 7px; }
+        .items td.num { white-space: nowrap; }
         .items .grp td { background: #E5E7EB; font-weight: 700; }
         .num { text-align: right; }
 
         .foot { margin-top: 10px; }
         .foot td { border: 0; padding: 0; }
-        .pay-box { width: 55%; font-size: 10px; }
+        .pay-box { width: 52%; font-size: 10px; }
         .pay-box .bank { font-weight: 700; }
-        .sum { width: 45%; }
+        .sum { width: 48%; }
         .sum td { padding: 3px 7px; border: 0; }
+        .sum td.num { white-space: nowrap; }
         .sum tr.rule td { border-top: 1px solid #9CA3AF; }
         .sum tr.grand td { border-top: 2px solid #001B3A; font-weight: 700; font-size: 12px; }
 
@@ -76,7 +81,7 @@
         .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
         .badge.paid { background: #dcfce7; color: #166534; }
         .badge.unpaid { background: #fef9c3; color: #854d0e; }
-        @page { size: A4; margin: 14mm; }
+        @page { size: A4; margin: 16mm 18mm; }
         @media print { body { background: #fff; } .toolbar { display: none; } .sheet { margin: 0; width: auto; min-height: auto; padding: 0; } }
     </style>
 </head>
@@ -98,17 +103,19 @@
                 </td>
                 <td>
                     <div class="doc-title">INVOICE</div>
+                    @if (($docTitle ?? null) && $docTitle !== 'Invoice')<div class="doc-sub">{{ $docTitle }}</div>@endif
                     <div class="meta">
-                        <div><span class="muted">Date</span> {{ $invoice->created_at?->format('d/m/Y') }}</div>
-                        <div><span class="muted">Invoice No.</span> {{ $invoice->number }}</div>
-                        <div><span class="muted">Valid Until</span>
-                            {{ $invoice->due_date ? \Illuminate\Support\Carbon::parse($invoice->due_date)->format('d/m/Y') : '-' }}</div>
-                        <div><span class="muted">Prepared By</span> {{ $preparedBy ?? '-' }}</div>
-                        <div style="margin-top:4px">
-                            <span class="badge {{ $invoice->status === 'paid' ? 'paid' : 'unpaid' }}">
-                                {{ $invoice->status === 'paid' ? 'Lunas' : ($invoice->status === 'partially_paid' ? 'Dibayar Sebagian' : 'Belum Lunas') }}
-                            </span>
-                        </div>
+                        <div><span class="k">Tanggal</span><span class="v">{{ $invoice->created_at?->format('d/m/Y') }}</span></div>
+                        <div><span class="k">No. Invoice</span><span class="v">{{ $invoice->number }}</span></div>
+                        @if ($invoice->due_date)
+                            <div><span class="k">Jatuh Tempo</span><span class="v">{{ \Illuminate\Support\Carbon::parse($invoice->due_date)->format('d/m/Y') }}</span></div>
+                        @endif
+                        <div><span class="k">Dibuat oleh</span><span class="v">{{ $preparedBy ?? '-' }}</span></div>
+                    </div>
+                    <div style="margin-top:6px; text-align:right">
+                        <span class="badge {{ $invoice->status === 'paid' ? 'paid' : 'unpaid' }}">
+                            {{ $invoice->status === 'paid' ? 'Lunas' : ($invoice->status === 'partially_paid' ? 'Dibayar Sebagian' : 'Belum Lunas') }}
+                        </span>
                     </div>
                 </td>
             </tr>
@@ -132,26 +139,32 @@
             </tr>
         </table>
 
+        @php
+            $termLabel = match ($invoice->invoice_phase) {
+                'dp' => 'DP di muka, pelunasan setelah BAST',
+                'final' => 'Pelunasan setelah BAST',
+                default => $invoice->isSurvey() ? 'Dibayar penuh' : 'Pembayaran penuh',
+            };
+        @endphp
         <table class="terms-tbl">
-            <tr><th>Prepared By</th><th>P.O. Number</th><th>Terms</th></tr>
+            <tr><th style="width:50%">P.O. Number Customer</th><th>Termin Pembayaran</th></tr>
             <tr>
-                <td>{{ $preparedBy ?? '-' }}</td>
-                <td>{{ $invoice->salesOrder?->po_number ?: '-' }}</td>
-                <td>Due on receipt</td>
+                <td>{{ $invoice->salesOrder?->po_number ?: '—' }}</td>
+                <td>{{ $termLabel }}</td>
             </tr>
         </table>
 
         <table class="items">
             <thead>
                 <tr>
-                    <th style="width:26px">No</th>
+                    <th style="width:24px">No</th>
                     <th>Deskripsi</th>
-                    <th class="num" style="width:44px">Qty</th>
-                    <th style="width:52px">Satuan</th>
-                    <th class="num" style="width:90px">Harga Satuan</th>
-                    @if ($showLineDiscount)<th class="num" style="width:80px">Diskon</th>@endif
-                    @if ($hasTax)<th style="width:52px">Pajak</th>@endif
-                    <th class="num" style="width:100px">Amount</th>
+                    <th class="num" style="width:36px">Qty</th>
+                    <th style="width:42px">Satuan</th>
+                    <th class="num" style="width:82px">Harga Satuan</th>
+                    @if ($showLineDiscount)<th class="num" style="width:66px">Diskon</th>@endif
+                    @if ($hasTax)<th style="width:40px">Pajak</th>@endif
+                    <th class="num" style="width:88px">Amount</th>
                 </tr>
             </thead>
             <tbody>
@@ -180,6 +193,18 @@
                     <div>No. Rek {{ $bank['account'] }}</div>
                     <div>a.n. {{ $bank['holder'] }}</div>
                     <div class="muted" style="margin-top:4px">Cantumkan nomor invoice pada berita transfer.</div>
+
+                    <div class="label" style="margin-top:12px">Syarat &amp; Ketentuan</div>
+                    <ul style="margin:0; padding-left:16px">
+                        @foreach ($terms as $t)<li>{{ $t }}</li>@endforeach
+                    </ul>
+
+                    @if ($invoice->payments->isNotEmpty())
+                        <div class="label" style="margin-top:12px">Riwayat Pembayaran</div>
+                        @foreach ($invoice->payments as $payment)
+                            <div>{{ \Illuminate\Support\Carbon::parse($payment->paid_at)->format('d M Y H:i') }} — {{ $rupiah($payment->amount_paid) }}{{ $payment->notes ? ' ('.$payment->notes.')' : '' }}</div>
+                        @endforeach
+                    @endif
                 </td>
                 <td class="sum">
                     <table>
@@ -189,38 +214,32 @@
                         @endif
                         <tr class="rule"><td><strong>DPP</strong></td><td class="num"><strong>{{ $rupiah($totals['subtotal']) }}</strong></td></tr>
                         <tr><td class="muted">{{ $ppnLabel }}</td><td class="num">{{ $rupiah($totals['tax']) }}</td></tr>
-                        <tr class="rule"><td><strong>Total Tagihan</strong></td><td class="num"><strong>{{ $rupiah($totals['grand_total']) }}</strong></td></tr>
                         @if ($pph23On && $pph23 > 0)
+                            <tr class="rule"><td><strong>Total Tagihan</strong></td><td class="num"><strong>{{ $rupiah($totals['grand_total']) }}</strong></td></tr>
                             <tr><td class="muted">PPh 23 ({{ $pct($totals['pph23_rate']) }})</td><td class="num">− {{ $rupiah($pph23) }}</td></tr>
                             <tr class="grand"><td>Total Pembayaran</td><td class="num">{{ $rupiah($totals['payable']) }}</td></tr>
                         @else
                             <tr class="grand"><td>Total Pembayaran</td><td class="num">{{ $rupiah($totals['grand_total']) }}</td></tr>
                         @endif
                         @if ($totalPaid > 0)
+                            @php $sisa = ($totals['payable'] ?? $totals['grand_total']) - $totalPaid; @endphp
                             <tr><td class="muted">Sudah dibayar</td><td class="num">{{ $rupiah($totalPaid) }}</td></tr>
-                            <tr><td class="muted">Sisa</td><td class="num">{{ $rupiah(($totals['payable'] ?? $totals['grand_total']) - $totalPaid) }}</td></tr>
+                            <tr><td class="muted">{{ $sisa < -0.5 ? 'Lebih bayar' : 'Sisa tagihan' }}</td><td class="num">{{ $rupiah(abs($sisa)) }}</td></tr>
                         @endif
                         @if ($pph23BuktiPotong ?? null)
                             <tr><td class="muted" colspan="2" style="padding-top:5px">Bukti Potong PPh 23: {{ $pph23BuktiPotong }}</td></tr>
                         @endif
 
                         @if ($settlement ?? null)
-                            <tr><td colspan="2" style="padding-top:8px"></td></tr>
+                            <tr><td colspan="2" style="padding-top:10px"><span class="label">Rekap Nilai Kontrak</span></td></tr>
                             <tr><td class="muted">Nilai Kontrak (100%)</td><td class="num">{{ $rupiah($settlement['contract_payable']) }}</td></tr>
-                            <tr><td class="muted">Ditagih sekarang (DP {{ $settlement['dp_percent'] }}%)</td><td class="num">{{ $rupiah($settlement['dp_payable']) }}</td></tr>
-                            <tr class="rule"><td><strong>Sisa — pelunasan setelah BAST</strong></td><td class="num"><strong>{{ $rupiah($settlement['remaining']) }}</strong></td></tr>
+                            <tr><td class="muted">Ditagih pada invoice ini (DP {{ $settlement['dp_percent'] }}%)</td><td class="num">{{ $rupiah($settlement['dp_payable']) }}</td></tr>
+                            <tr class="rule"><td><strong>Sisa (dilunasi setelah BAST)</strong></td><td class="num"><strong>{{ $rupiah($settlement['remaining']) }}</strong></td></tr>
                         @endif
                     </table>
                 </td>
             </tr>
         </table>
-
-        <div class="tc">
-            <div class="label">Invoice Terms &amp; Conditions</div>
-            <ul>
-                @foreach ($terms as $t)<li>{{ $t }}</li>@endforeach
-            </ul>
-        </div>
 
         <table class="sign"><tr><td>
             <div class="muted">Hormat kami,</div>
@@ -228,15 +247,6 @@
             <div class="space"></div>
             <div class="name">{{ $preparedBy ?? '' }}</div>
         </td></tr></table>
-
-        @if ($invoice->payments->isNotEmpty())
-            <div class="tc">
-                <div class="label">Riwayat Pembayaran</div>
-                @foreach ($invoice->payments as $payment)
-                    <div>{{ \Illuminate\Support\Carbon::parse($payment->paid_at)->format('d M Y H:i') }} — {{ $rupiah($payment->amount_paid) }}{{ $payment->notes ? ' ('.$payment->notes.')' : '' }}</div>
-                @endforeach
-            </div>
-        @endif
     </div>
 </body>
 </html>

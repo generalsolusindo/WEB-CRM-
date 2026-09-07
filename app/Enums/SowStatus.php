@@ -39,4 +39,41 @@ enum SowStatus: string
             self::cases(),
         );
     }
+
+    /**
+     * Status di mana isi SOW masih bisa berubah / belum disetujui HR —
+     * belum boleh dilihat pihak luar (Teknisi vendor & PIC Vendor).
+     *
+     * @return array<int, string>
+     */
+    public static function preTechnicianValues(): array
+    {
+        return [self::Draft->value, self::PendingHrReview->value, self::RejectedByHr->value];
+    }
+
+    /**
+     * Status yang boleh dilihat Teknisi yang ditunjuk (sejak gilirannya sampai selesai).
+     *
+     * @return array<int, string>
+     */
+    public static function visibleToTechnicianValues(): array
+    {
+        return array_values(array_diff(
+            array_map(fn (self $s) => $s->value, self::cases()),
+            self::preTechnicianValues(),
+        ));
+    }
+
+    /**
+     * Status yang boleh dilihat PIC Vendor (sejak Teknisi selesai TTD sampai selesai).
+     *
+     * @return array<int, string>
+     */
+    public static function visibleToVendorValues(): array
+    {
+        return array_values(array_diff(
+            self::visibleToTechnicianValues(),
+            [self::PendingTechnicianSignature->value],
+        ));
+    }
 }

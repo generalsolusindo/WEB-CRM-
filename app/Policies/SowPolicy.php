@@ -21,11 +21,13 @@ class SowPolicy
         }
 
         if ($this->isTechnician($user)) {
-            return $sow->technician_id === $user->id;
+            return $sow->technician_id === $user->id
+                && in_array($sow->status, SowStatus::visibleToTechnicianValues(), true);
         }
 
         if ($this->isVendor($user)) {
-            return $sow->project->vendor_id === $user->vendor_id;
+            return $sow->project->vendor_id === $user->vendor_id
+                && in_array($sow->status, SowStatus::visibleToVendorValues(), true);
         }
 
         return false;

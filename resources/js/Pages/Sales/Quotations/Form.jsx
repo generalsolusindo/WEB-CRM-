@@ -193,7 +193,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                                     <div className="text-xs text-text-muted">{line.description || '—'}</div>
                                                     <select value={data.lines[i].category} onChange={(e) => setLine(i, { category: e.target.value })} className="mt-1 rounded border border-border px-1 py-0.5 text-[11px]">
                                                         <option value="material">Material</option>
-                                                        <option value="service">Jasa (kena PPh 23)</option>
+                                                        <option value="service">Jasa</option>
                                                         <option value="reimburse">Biaya Reimburse</option>
                                                     </select>
                                                     <textarea rows="2" value={data.lines[i].sourcing_note} onChange={(e) => setLine(i, { sourcing_note: e.target.value })} placeholder="Catatan opsi merk (dari Procurement). Kosongkan bila tak perlu ditampilkan ke customer." className="mt-1 w-full rounded border border-border px-1.5 py-1 text-[11px]" />

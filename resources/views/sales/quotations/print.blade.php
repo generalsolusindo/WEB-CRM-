@@ -1,6 +1,6 @@
 @php
     $number = $quotation->number ?? ('QT-'.str_pad($quotation->id, 6, '0', STR_PAD_LEFT).' / R'.$quotation->revision_number);
-    $rupiah = fn ($v) => 'Rp '.number_format((float) $v, 2, ',', '.');
+    $rupiah = fn ($v) => 'Rp '.number_format(round((float) $v), 0, ',', '.');
     $pct = fn ($v) => rtrim(rtrim(number_format((float) $v, 2), '0'), '.').'%';
     $hasDiscount = ($totals['discount'] ?? 0) > 0;
     $hasTax = $quotation->lines->contains(fn ($l) => (float) $l->tax_rate > 0);
@@ -28,10 +28,12 @@
         .parties .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #64748B; margin-bottom: 4px; }
         table { width: 100%; border-collapse: collapse; margin-top: 8px; }
         th, td { padding: 8px 10px; border-bottom: 1px solid #E2E8F0; text-align: left; }
-        th { background: #F8FAFC; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: #64748B; }
+        th { background: #F8FAFC; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: #64748B; white-space: nowrap; }
         td.num, th.num { text-align: right; }
+        td.num { white-space: nowrap; }
         tfoot td { border-bottom: 0; }
-        tfoot tr.grand td { border-top: 2px solid #001B3A; font-size: 14px; font-weight: 700; }
+        tfoot tr td { padding-top: 4px; padding-bottom: 4px; }
+        tfoot tr.grand td { border-top: 2px solid #001B3A; font-size: 14px; font-weight: 700; padding-top: 8px; }
         .notes { margin-top: 20px; }
         .notes .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #64748B; margin-bottom: 4px; }
         .muted { color: #64748B; }
@@ -47,7 +49,7 @@
             body { background: #fff; }
             .toolbar { display: none; }
             .sheet { margin: 0; width: auto; min-height: auto; padding: 0; }
-            @page { size: A4; margin: 16mm; }
+            @page { size: A4; margin: 18mm 18mm; }
         }
     </style>
 </head>
@@ -109,7 +111,7 @@
                         <td class="num">{{ rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',') }}</td>
                         <td>{{ $line->unit }}</td>
                         <td class="num">{{ $rupiah($line->selling_price) }}</td>
-                        @if ($hasDiscount)<td class="num">{{ (float) $line->discount_amount > 0 ? $rupiah($line->discount_amount).' ('.$pct($line->discount_percent ?? 0).')' : '—' }}</td>@endif
+                        @if ($hasDiscount)<td class="num">@if ((float) $line->discount_amount > 0){{ $rupiah($line->discount_amount) }}<br><span class="muted" style="font-size:10px">({{ $pct($line->discount_percent ?? 0) }})</span>@else—@endif</td>@endif
                         @if ($hasTax)<td>{{ $line->tax ? $line->tax->name : ((float) $line->tax_rate > 0 ? $pct($line->tax_rate) : '—') }}</td>@endif
                         <td class="num">{{ $rupiah($line->subtotal) }}</td>
                     </tr>
@@ -137,6 +139,8 @@
             <div class="col">
                 <div class="role">Hormat kami,</div>
                 <div class="party">PT General Solusindo</div>
+                <div class="field">Sales: {{ $quotation->sales?->name ?? '-' }}</div>
+                <div class="field">Tanggal: {{ $quotation->created_at?->format('d M Y') }}</div>
                 <div class="box"></div>
                 <div class="cap">( {{ $quotation->sales?->name ?? '..............................' }} )</div>
             </div>

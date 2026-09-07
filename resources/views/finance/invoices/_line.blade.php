@@ -1,6 +1,6 @@
 <tr>
     <td>{{ $no }}</td>
-    <td>{{ $line->item_name }}</td>
+    <td>{{ preg_replace('/\s*\((?:DP\s[\d.,]+\s*%|Pelunasan)\)\s*$/u', '', $line->item_name) }}</td>
     <td class="num">{{ $qtyFmt($line->qty) }}</td>
     <td>{{ $line->salesOrderLine?->unit ?? '—' }}</td>
     <td class="num">{{ $rupiah($line->unit_price) }}</td>

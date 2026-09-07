@@ -214,6 +214,60 @@ class SowSignatureChainTest extends TestCase
         $this->assertNull($sow->technician_id);
     }
 
+    public function test_technician_and_vendor_cannot_see_sow_before_their_stage(): void
+    {
+        // Bangun sampai draft (belum submit ke HR).
+        $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
+        $lead = Lead::create(['contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified']);
+        $lead->requirements()->create(['item_name' => 'ODP', 'qty' => 1, 'unit' => 'unit', 'created_by' => $sales->id]);
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/submit-procurement");
+        $pr = $lead->procurementRequests()->with('lines')->latest('id')->firstOrFail();
+        $pr->lines()->update(['cost_price' => 1000000, 'availability_status' => 'available']);
+        $pr->update(['status' => 'ready']);
+        $this->actingAs($sales)->post("/sales/procurement-requests/{$pr->id}/quotations", [
+            'lines' => [['procurement_request_line_id' => $pr->lines()->first()->id, 'selling_price' => 1300000]],
+        ]);
+        $quotation = $pr->quotations()->latest('id')->firstOrFail();
+        $quotation->update(['status' => 'sent']);
+        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload('mixed'));
+        $so = $quotation->salesOrder()->firstOrFail();
+        $finance = User::factory()->create(['role' => 'finance']);
+        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'dp']);
+        $invoice = $so->invoices()->latest('id')->firstOrFail();
+        $this->actingAs($finance)->post("/finance/invoices/{$invoice->id}/payments", [
+            'amount_paid' => (float) $invoice->amount + (float) $invoice->tax_amount, 'paid_at' => now()->toDateTimeString(),
+        ]);
+        $project = Project::where('sales_order_id', $so->id)->firstOrFail();
+        $vendor = Vendor::create(['name' => 'Vendor A', 'provides_technical' => true]);
+        $project->update(['vendor_id' => $vendor->id]);
+        $technician = User::factory()->create(['role' => 'technician', 'vendor_id' => $vendor->id, 'is_active' => true]);
+        $vendorUser = User::factory()->create(['role' => 'vendor', 'vendor_id' => $vendor->id, 'is_active' => true]);
+
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow", [
+            'number' => 'SOW-001', 'project_name' => 'Jasa X', 'technician_id' => $technician->id,
+        ]);
+        $sow = Sow::where('project_id', $project->id)->firstOrFail();
+
+        // Draft: teknisi & vendor belum boleh lihat.
+        $this->actingAs($technician)->get("/technician/sows/{$sow->id}")->assertForbidden();
+        $this->actingAs($vendorUser)->get("/vendor/sows/{$sow->id}")->assertForbidden();
+        $this->assertCount(0, $this->actingAs($technician)->get('/technician/sows')->viewData('page')['props']['sows']['data']);
+
+        // Setelah HR setujui isi → teknisi boleh lihat, vendor belum.
+        $this->actingAs($ops)->post("/operational/projects/{$project->id}/sow/submit");
+        $hr = User::factory()->create(['role' => 'hr', 'is_active' => true]);
+        $this->actingAs($hr)->post("/hr/sows/{$sow->id}/review", ['approved' => true]);
+
+        $this->actingAs($technician)->get("/technician/sows/{$sow->id}")->assertOk();
+        $this->actingAs($vendorUser)->get("/vendor/sows/{$sow->id}")->assertForbidden();
+
+        // Setelah teknisi TTD → vendor boleh lihat.
+        $this->actingAs($technician)->post("/technician/sows/{$sow->id}/sign", ['signature' => $this->fakeSignature()]);
+        $this->actingAs($vendorUser)->get("/vendor/sows/{$sow->id}")->assertOk();
+    }
+
     public function test_cannot_skip_signature_order(): void
     {
         ['sow' => $sow, 'vendorUser' => $vendorUser, 'ops' => $ops, 'management' => $management] = $this->readyForSignature();
