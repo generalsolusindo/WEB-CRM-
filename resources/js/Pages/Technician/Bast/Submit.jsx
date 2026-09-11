@@ -1,6 +1,7 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { pickFiles } from '../../../utils/fileValidation';
+import { PageHeader } from '../../../Components/ui';
 
 export default function Submit({ project }) {
     const allDone = project.tasks.length > 0 && project.tasks.every((t) => t.status === 'done');
@@ -15,15 +16,15 @@ export default function Submit({ project }) {
         <AppLayout>
             <Head title="Submit BAST" />
             <div className="mx-auto max-w-2xl space-y-5">
-                <div>
-                    <Link href="/technician/tasks" className="text-sm text-info">← Tugas Saya</Link>
-                    <h1 className="mt-2 text-2xl font-bold text-text">Submit BAST — {project.number}</h1>
-                    <p className="text-sm text-text-muted">{project.sales_order}</p>
-                </div>
+                <PageHeader
+                    title={`Submit BAST — ${project.number}`}
+                    subtitle={project.sales_order}
+                    back={{ href: '/technician/tasks', label: 'Tugas Saya' }}
+                />
 
-                {form.errors.bast && <div className="rounded-lg border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">{form.errors.bast}</div>}
+                {form.errors.bast && <div className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">{form.errors.bast}</div>}
 
-                <section className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+                <section className="card p-5">
                     <h2 className="mb-2 text-sm font-semibold text-text">Status Task</h2>
                     <ul className="space-y-1 text-sm">
                         {project.tasks.map((t) => (
@@ -36,7 +37,7 @@ export default function Submit({ project }) {
                     {!allDone && <p className="mt-2 text-xs text-danger">Semua task harus Selesai sebelum BAST dikirim.</p>}
                 </section>
 
-                <form onSubmit={submit} className="space-y-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
+                <form onSubmit={submit} className="space-y-4 card p-6">
                     <label className="block text-sm font-medium text-text">Catatan
                         <textarea rows="3" value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} className="input" />
                     </label>
@@ -46,7 +47,7 @@ export default function Submit({ project }) {
                         {(form.errors.documents || form.errors['documents.0']) && <span className="text-xs text-danger">{form.errors.documents || form.errors['documents.0']}</span>}
                     </label>
                     <div className="flex justify-end">
-                        <button disabled={form.processing || !allDone} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                        <button disabled={form.processing || !allDone} className="btn btn-primary">
                             {form.processing ? 'Mengirim...' : 'Kirim BAST'}
                         </button>
                     </div>

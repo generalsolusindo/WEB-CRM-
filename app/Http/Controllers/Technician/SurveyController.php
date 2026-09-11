@@ -7,6 +7,7 @@ use App\Enums\SurveyReportStatus;
 use App\Enums\SurveyStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Technician\CheckInSurveyRequest;
+use App\Http\Requests\Technician\CheckOutSurveyRequest;
 use App\Http\Requests\Technician\SaveSurveyReportRequest;
 use App\Http\Requests\Technician\UploadSurveyAttachmentRequest;
 use App\Models\Attachment;
@@ -45,6 +46,7 @@ class SurveyController extends Controller
                 'report_status' => $s->report?->status,
                 'revision' => $s->report?->revision,
                 'checked_in' => $s->hasCheckedIn($request->user()),
+                'checked_out' => $s->hasCheckedOut($request->user()),
             ]);
 
         return Inertia::render('Technician/Surveys/Index', ['surveys' => $surveys]);
@@ -64,9 +66,17 @@ class SurveyController extends Controller
         $user = request()->user();
         $userId = $user->id;
         $checkedIn = $survey->hasCheckedIn($user);
+        $checkedOut = $survey->hasCheckedOut($user);
         $mySelfie = $checkedIn
             ? $survey->attachments()
                 ->where('category', 'checkin_selfie')
+                ->where('uploaded_by', $userId)
+                ->latest()
+                ->first()
+            : null;
+        $myCheckoutSelfie = $checkedOut
+            ? $survey->attachments()
+                ->where('category', 'checkout_selfie')
                 ->where('uploaded_by', $userId)
                 ->latest()
                 ->first()
@@ -95,6 +105,9 @@ class SurveyController extends Controller
             'checkedIn' => $checkedIn,
             'canCheckIn' => $user->can('checkIn', $survey),
             'selfieUrl' => $mySelfie ? Storage::disk('local')->temporaryUrl($mySelfie->file_path, now()->addDay()) : null,
+            'checkedOut' => $checkedOut,
+            'canCheckOut' => $user->can('checkOut', $survey),
+            'checkoutSelfieUrl' => $myCheckoutSelfie ? Storage::disk('local')->temporaryUrl($myCheckoutSelfie->file_path, now()->addDay()) : null,
         ]);
     }
 
@@ -107,6 +120,17 @@ class SurveyController extends Controller
         ]);
 
         return back()->with('success', 'Absen kehadiran tersimpan.');
+    }
+
+    public function checkOut(CheckOutSurveyRequest $request, Survey $survey): RedirectResponse
+    {
+        $survey->attachments()->create([
+            'category' => 'checkout_selfie',
+            'file_path' => $request->file('photo')->store('checkout-selfies'),
+            'uploaded_by' => $request->user()->id,
+        ]);
+
+        return back()->with('success', 'Absen pulang tersimpan.');
     }
 
     public function saveReport(SaveSurveyReportRequest $request, Survey $survey): RedirectResponse

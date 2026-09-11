@@ -1,5 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
+import { PageHeader, Card, Field, Input, Select, Textarea, FormActions } from '../../../Components/ui';
 
 export default function Form({ lead = null, contacts, stageOptions, selectedContactId = null }) {
     const editing = Boolean(lead);
@@ -8,22 +9,74 @@ export default function Form({ lead = null, contacts, stageOptions, selectedCont
         stage: lead?.stage ?? 'new', source: lead?.source ?? '', notes: lead?.notes ?? '',
         pic_name: lead?.pic_name ?? '', pic_position: lead?.pic_position ?? '', pic_phone: lead?.pic_phone ?? '',
     });
-    function submit(e) { e.preventDefault(); editing ? put(`/sales/leads/${lead.id}`) : post('/sales/leads'); }
-    return <AppLayout><Head title={editing ? 'Edit Lead' : 'Tambah Lead'} /><div className="mx-auto max-w-3xl">
-        <div className="mb-5"><h1 className="text-2xl font-bold text-text">{editing ? 'Edit Lead' : 'Tambah Lead'}</h1><p className="text-sm text-text-muted">Hubungkan lead dengan contact yang sudah tersedia.</p></div>
-        <form onSubmit={submit} className="space-y-5 rounded-xl border border-border bg-surface p-6 shadow-sm">
-            {contacts.length === 0 ? <div className="rounded-lg border border-warning/20 bg-warning/10 p-4 text-sm text-warning">Anda belum memiliki contact. <Link href="/sales/contacts/create" className="font-semibold underline">Buat contact terlebih dahulu.</Link></div> : null}
-            <label className="block text-sm font-medium text-text">Contact *<select value={data.contact_id} onChange={(e) => setData('contact_id', e.target.value)} className="mt-1 w-full rounded-lg border border-border px-3 py-2"><option value="">Pilih contact</option>{contacts.map((c) => <option key={c.id} value={c.id}>{c.name}{c.company_name ? ` — ${c.company_name}` : ''}</option>)}</select>{errors.contact_id && <span className="mt-1 block text-sm text-danger">{errors.contact_id}</span>}</label>
-            <label className="block text-sm font-medium text-text">Stage *<select value={data.stage} onChange={(e) => setData('stage', e.target.value)} className="mt-1 w-full rounded-lg border border-border px-3 py-2">{stageOptions.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select>{errors.stage && <span className="mt-1 block text-sm text-danger">{errors.stage}</span>}</label>
-            <label className="block text-sm font-medium text-text">Source<input value={data.source} onChange={(e) => setData('source', e.target.value)} placeholder="Referral, Website, Telepon, dll." className="mt-1 w-full rounded-lg border border-border px-3 py-2 outline-none focus:border-navy" />{errors.source && <span className="mt-1 block text-sm text-danger">{errors.source}</span>}</label>
-            <div className="grid gap-5 sm:grid-cols-3">
-                <label className="block text-sm font-medium text-text">Nama PIC Customer<input value={data.pic_name} onChange={(e) => setData('pic_name', e.target.value)} placeholder="Nama penanggung jawab di lapangan" className="mt-1 w-full rounded-lg border border-border px-3 py-2 outline-none focus:border-navy" />{errors.pic_name && <span className="mt-1 block text-sm text-danger">{errors.pic_name}</span>}</label>
-                <label className="block text-sm font-medium text-text">Jabatan PIC<input value={data.pic_position} onChange={(e) => setData('pic_position', e.target.value)} placeholder="Mis. Manager Operasional" className="mt-1 w-full rounded-lg border border-border px-3 py-2 outline-none focus:border-navy" />{errors.pic_position && <span className="mt-1 block text-sm text-danger">{errors.pic_position}</span>}</label>
-                <label className="block text-sm font-medium text-text">Telepon PIC<input value={data.pic_phone} onChange={(e) => setData('pic_phone', e.target.value)} placeholder="08xxxxxxxxxx" className="mt-1 w-full rounded-lg border border-border px-3 py-2 outline-none focus:border-navy" />{errors.pic_phone && <span className="mt-1 block text-sm text-danger">{errors.pic_phone}</span>}</label>
+
+    function submit(e) {
+        e.preventDefault();
+        editing ? put(`/sales/leads/${lead.id}`) : post('/sales/leads');
+    }
+
+    return (
+        <AppLayout>
+            <Head title={editing ? 'Edit Lead' : 'Tambah Lead'} />
+            <div className="mx-auto max-w-3xl space-y-5">
+                <PageHeader
+                    title={editing ? 'Edit Lead' : 'Tambah Lead'}
+                    subtitle="Hubungkan lead dengan contact yang sudah tersedia."
+                    back={{ href: editing ? `/sales/leads/${lead.id}` : '/sales/leads' }}
+                />
+
+                <form onSubmit={submit}>
+                    <Card className="space-y-5">
+                        {contacts.length === 0 && (
+                            <div className="rounded-xl border border-warning/20 bg-warning-soft p-4 text-sm font-medium text-warning">
+                                Anda belum memiliki contact. <Link href="/sales/contacts/create" className="font-semibold underline">Buat contact terlebih dahulu.</Link>
+                            </div>
+                        )}
+
+                        <Field label="Contact" required error={errors.contact_id}>
+                            <Select value={data.contact_id} onChange={(e) => setData('contact_id', e.target.value)}>
+                                <option value="">Pilih contact</option>
+                                {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}{c.company_name ? ` — ${c.company_name}` : ''}</option>)}
+                            </Select>
+                        </Field>
+
+                        <Field label="Stage" required error={errors.stage}>
+                            <Select value={data.stage} onChange={(e) => setData('stage', e.target.value)}>
+                                {stageOptions.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                            </Select>
+                        </Field>
+
+                        <Field label="Source" error={errors.source}>
+                            <Input value={data.source} onChange={(e) => setData('source', e.target.value)} placeholder="Referral, Website, Telepon, dll." />
+                        </Field>
+
+                        <div>
+                            <div className="grid gap-5 sm:grid-cols-3">
+                                <Field label="Nama PIC Customer" error={errors.pic_name}>
+                                    <Input value={data.pic_name} onChange={(e) => setData('pic_name', e.target.value)} placeholder="PJ di lapangan" />
+                                </Field>
+                                <Field label="Jabatan PIC" error={errors.pic_position}>
+                                    <Input value={data.pic_position} onChange={(e) => setData('pic_position', e.target.value)} placeholder="Mis. Manager Operasional" />
+                                </Field>
+                                <Field label="Telepon PIC" error={errors.pic_phone}>
+                                    <Input value={data.pic_phone} onChange={(e) => setData('pic_phone', e.target.value)} placeholder="08xxxxxxxxxx" />
+                                </Field>
+                            </div>
+                            <p className="mt-2 text-xs text-text-muted">PIC ini nanti dipakai otomatis untuk pihak yang tanda tangan BAST.</p>
+                        </div>
+
+                        <Field label="Catatan" error={errors.notes}>
+                            <Textarea rows={4} value={data.notes} onChange={(e) => setData('notes', e.target.value)} />
+                        </Field>
+
+                        <FormActions
+                            cancelHref={editing ? `/sales/leads/${lead.id}` : '/sales/leads'}
+                            processing={processing}
+                            disabled={contacts.length === 0}
+                        />
+                    </Card>
+                </form>
             </div>
-            <p className="-mt-3 text-xs text-text-muted">PIC ini nanti dipakai otomatis untuk pihak yang tanda tangan BAST.</p>
-            <label className="block text-sm font-medium text-text">Catatan<textarea rows="4" value={data.notes} onChange={(e) => setData('notes', e.target.value)} className="mt-1 w-full rounded-lg border border-border px-3 py-2 outline-none focus:border-navy" />{errors.notes && <span className="mt-1 block text-sm text-danger">{errors.notes}</span>}</label>
-            <div className="flex justify-end gap-3"><Link href={editing ? `/sales/leads/${lead.id}` : '/sales/leads'} className="rounded-lg border border-border px-4 py-2 text-sm text-text-muted">Batal</Link><button disabled={processing || contacts.length === 0} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{processing ? 'Menyimpan...' : 'Simpan'}</button></div>
-        </form>
-    </div></AppLayout>;
+        </AppLayout>
+    );
 }

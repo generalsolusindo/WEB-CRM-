@@ -1,17 +1,17 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
+import { FiPlay, FiCheck, FiXCircle } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import CategoryBadge from '../../../Components/CategoryBadge';
+import { PageHeader, Card, Button, Modal, StatusBadge, CurrencyInput } from '../../../Components/ui';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
 }
 
-const statusBadge = {
-    submitted: 'bg-warning/10 text-warning',
-    searching: 'bg-info/10 text-info',
-    ready: 'bg-success/10 text-success',
-};
+function Alert({ text }) {
+    return <div className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">{text}</div>;
+}
 
 export default function Show({ procurementRequest: pr, editable, canStart, canFinalize, availabilityOptions, taxes, catalog }) {
     const number = `PR-${String(pr.id).padStart(6, '0')}`;
@@ -56,7 +56,6 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
         const product = catalog.find((c) => String(c.id) === String(value));
         setLine(i, {
             vendor_product_id: value,
-            // auto-isi harga & kategori dari katalog; tetap bisa diedit manual sesudahnya
             ...(product ? { cost_price: Number(product.price).toFixed(2), category: product.category } : {}),
         });
     }
@@ -70,129 +69,127 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
         put(`/procurement/procurement-requests/${pr.id}/lines`, { preserveScroll: true });
     }
 
+    const control = 'w-full rounded-lg border border-border-strong bg-surface px-2 py-2 text-xs outline-none transition focus:border-primary disabled:bg-bg disabled:text-text-muted';
+
     return (
         <AppLayout>
             <Head title={number} />
             <div className="mx-auto max-w-6xl space-y-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <Link href="/procurement/procurement-requests" className="text-sm text-info">← Kembali</Link>
-                        <div className="mt-2 flex items-center gap-3">
-                            <h1 className="text-2xl font-bold text-text">{number}</h1>
-                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadge[pr.status] ?? 'bg-bg text-text-muted'}`}>{pr.status}</span>
-                        </div>
-                        <p className="text-sm text-text-muted">{pr.lead.contact.name} · {pr.lead.contact.company_name || 'Tanpa perusahaan'}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {canStart && <button onClick={start} className="rounded-lg bg-info px-4 py-2 text-sm font-semibold text-white">Mulai Kerjakan</button>}
-                        {canFinalize && <button onClick={markReady} className="rounded-lg bg-success px-4 py-2 text-sm font-semibold text-white">Tandai Ready</button>}
-                        {canFinalize && <button onClick={() => setRejectOpen(true)} className="rounded-lg border border-danger/30 px-4 py-2 text-sm font-semibold text-danger">Tolak PR</button>}
-                    </div>
-                </div>
-
-                {pr.status === 'rejected' && pr.rejection_reason && (
-                    <div className="rounded-lg border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">Ditolak: {pr.rejection_reason}</div>
-                )}
-                {errors.procurement_request && <div className="rounded-lg border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">{errors.procurement_request}</div>}
-                {errors.lines && <div className="rounded-lg border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">{errors.lines}</div>}
-
-                <form onSubmit={submit} className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-                    <div className="border-b border-border p-5">
-                        <h2 className="font-semibold text-text">Sourcing per Item</h2>
-                        <p className="text-sm text-text-muted">Kebutuhan berasal dari Sales. Isi vendor, cost price, pajak, dan ketersediaan.</p>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-bg text-text-muted">
-                                <tr>
-                                    <th className="px-3 py-3">Kebutuhan</th>
-                                    <th className="px-3 py-3">Qty</th>
-                                    <th className="px-3 py-3">Vendor / Produk</th>
-                                    <th className="px-3 py-3">Cost Price</th>
-                                    <th className="px-3 py-3">Pajak</th>
-                                    <th className="px-3 py-3">Ketersediaan</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {pr.lines.map((line, i) => (
-                                    <tr key={line.id}>
-                                        <td className="px-3 py-3">
-                                            <div className="font-medium text-text">{line.item_name}<CategoryBadge category={data.lines[i].category} /></div>
-                                            <div className="text-xs text-text-muted">{line.description || '—'}</div>
-                                            {line.requirement?.notes && <div className="mt-1 text-xs text-warning">Catatan: {line.requirement.notes}</div>}
-                                            <label className="mt-2 block text-[11px] font-medium text-text-muted">Kategori
-                                                <select disabled={!editable} value={data.lines[i].category} onChange={(e) => setLine(i, { category: e.target.value })} className="mt-1 w-full rounded-lg border border-border px-2 py-1.5 text-xs outline-none focus:border-navy disabled:bg-bg">
-                                                    <option value="material">Material</option>
-                                                    <option value="service">Jasa</option>
-                                                    <option value="reimburse">Biaya Reimburse</option>
-                                                </select>
-                                            </label>
-                                            <label className="mt-2 block text-[11px] font-medium text-text-muted">Catatan Sourcing / Opsi Merk
-                                                <textarea rows="2" disabled={!editable} value={data.lines[i].sourcing_note} onChange={(e) => setLine(i, { sourcing_note: e.target.value })} placeholder="mis. Rekomendasi Hikvision DS-2CD; alternatif Dahua (−10%). Customer belum tentukan merk." className="mt-1 w-full rounded-lg border border-border px-2 py-1.5 text-xs outline-none focus:border-navy disabled:bg-bg" />
-                                            </label>
-                                            {errors[`lines.${i}.sourcing_note`] && <span className="text-xs text-danger">{errors[`lines.${i}.sourcing_note`]}</span>}
-                                        </td>
-                                        <td className="whitespace-nowrap px-3 py-3 text-text-muted">{line.qty} {line.unit}</td>
-                                        <td className="min-w-56 px-3 py-3">
-                                            <select disabled={!editable} value={data.lines[i].vendor_product_id} onChange={(e) => pickProduct(i, e.target.value)} className="w-full rounded-lg border border-border px-2 py-2 outline-none focus:border-navy disabled:bg-bg">
-                                                <option value="">— pilih —</option>
-                                                {catalog.map((c) => <option key={c.id} value={c.id}>{c.vendor?.name} · {c.item_name} ({money(c.price)}/{c.unit})</option>)}
-                                            </select>
-                                            {errors[`lines.${i}.vendor_product_id`] && <span className="text-xs text-danger">{errors[`lines.${i}.vendor_product_id`]}</span>}
-                                        </td>
-                                        <td className="min-w-36 px-3 py-3">
-                                            <input type="number" min="0" step="0.01" disabled={!editable} value={data.lines[i].cost_price} onChange={(e) => setLine(i, { cost_price: e.target.value })} className="w-full rounded-lg border border-border px-2 py-2 text-right outline-none focus:border-navy disabled:bg-bg" />
-                                            {errors[`lines.${i}.cost_price`] && <span className="text-xs text-danger">{errors[`lines.${i}.cost_price`]}</span>}
-                                        </td>
-                                        <td className="min-w-36 px-3 py-3">
-                                            <select disabled={!editable} value={data.lines[i].tax_id} onChange={(e) => setLine(i, { tax_id: e.target.value })} className="w-full rounded-lg border border-border px-2 py-2 outline-none focus:border-navy disabled:bg-bg">
-                                                <option value="">Tanpa pajak</option>
-                                                {taxes.map((t) => <option key={t.id} value={t.id}>{t.name} ({Number(t.rate)}%)</option>)}
-                                            </select>
-                                        </td>
-                                        <td className="min-w-40 px-3 py-3">
-                                            <select disabled={!editable} value={data.lines[i].availability_status} onChange={(e) => setLine(i, { availability_status: e.target.value })} className="w-full rounded-lg border border-border px-2 py-2 outline-none focus:border-navy disabled:bg-bg">
-                                                {availabilityOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                            </select>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    {editable && (
-                        <div className="flex justify-end border-t border-border p-4">
-                            <button disabled={processing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
-                                {processing ? 'Menyimpan...' : 'Simpan'}
-                            </button>
-                        </div>
+                <PageHeader
+                    title={<span className="flex items-center gap-3">{number} <StatusBadge status={pr.status} /></span>}
+                    subtitle={`${pr.lead.contact.name} · ${pr.lead.contact.company_name || 'Tanpa perusahaan'}`}
+                    back={{ href: '/procurement/procurement-requests', label: 'Kembali' }}
+                    actions={(
+                        <>
+                            {canStart && <Button onClick={start} icon={FiPlay}>Mulai Kerjakan</Button>}
+                            {canFinalize && <Button onClick={markReady} icon={FiCheck} className="bg-success text-white hover:bg-success">Tandai Ready</Button>}
+                            {canFinalize && <Button onClick={() => setRejectOpen(true)} variant="ghost" icon={FiXCircle} className="text-danger hover:bg-danger-soft hover:text-danger">Tolak PR</Button>}
+                        </>
                     )}
-                </form>
+                />
+
+                {pr.status === 'rejected' && pr.rejection_reason && <Alert text={`Ditolak: ${pr.rejection_reason}`} />}
+                {errors.procurement_request && <Alert text={errors.procurement_request} />}
+                {errors.lines && <Alert text={errors.lines} />}
+
+                <Card padded={false}>
+                    <form onSubmit={submit}>
+                        <div className="border-b border-border p-5">
+                            <h2 className="font-semibold text-text">Sourcing per Item</h2>
+                            <p className="text-sm text-text-muted">Kebutuhan berasal dari Sales. Isi vendor, cost price, pajak, dan ketersediaan.</p>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead>
+                                    <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
+                                        <th className="px-3 py-3">Kebutuhan</th>
+                                        <th className="px-3 py-3">Qty</th>
+                                        <th className="px-3 py-3">Vendor / Produk</th>
+                                        <th className="px-3 py-3">Cost Price</th>
+                                        <th className="px-3 py-3">Pajak</th>
+                                        <th className="px-3 py-3">Ketersediaan</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {pr.lines.map((line, i) => (
+                                        <tr key={line.id}>
+                                            <td className="px-3 py-3">
+                                                <div className="font-medium text-text">{line.item_name}<CategoryBadge category={data.lines[i].category} /></div>
+                                                <div className="text-xs text-text-muted">{line.description || '—'}</div>
+                                                {line.requirement?.notes && <div className="mt-1 text-xs text-warning">Catatan: {line.requirement.notes}</div>}
+                                                <label className="mt-2 block text-[11px] font-medium text-text-muted">Kategori
+                                                    <select disabled={!editable} value={data.lines[i].category} onChange={(e) => setLine(i, { category: e.target.value })} className={`mt-1 ${control}`}>
+                                                        <option value="material">Material</option>
+                                                        <option value="service">Jasa</option>
+                                                        <option value="reimburse">Biaya Reimburse</option>
+                                                    </select>
+                                                </label>
+                                                <label className="mt-2 block text-[11px] font-medium text-text-muted">Catatan Sourcing / Opsi Merk
+                                                    <textarea rows="2" disabled={!editable} value={data.lines[i].sourcing_note} onChange={(e) => setLine(i, { sourcing_note: e.target.value })} placeholder="mis. Rekomendasi Hikvision DS-2CD; alternatif Dahua (−10%). Customer belum tentukan merk." className={`mt-1 ${control}`} />
+                                                </label>
+                                                {errors[`lines.${i}.sourcing_note`] && <span className="text-xs text-danger">{errors[`lines.${i}.sourcing_note`]}</span>}
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-3 text-text-muted">{line.qty} {line.unit}</td>
+                                            <td className="min-w-56 px-3 py-3">
+                                                <select disabled={!editable} value={data.lines[i].vendor_product_id} onChange={(e) => pickProduct(i, e.target.value)} className={control}>
+                                                    <option value="">— pilih —</option>
+                                                    {catalog.map((c) => <option key={c.id} value={c.id}>{c.vendor?.name} · {c.item_name} ({money(c.price)}/{c.unit})</option>)}
+                                                </select>
+                                                {errors[`lines.${i}.vendor_product_id`] && <span className="text-xs text-danger">{errors[`lines.${i}.vendor_product_id`]}</span>}
+                                            </td>
+                                            <td className="min-w-36 px-3 py-3">
+                                                <CurrencyInput disabled={!editable} value={data.lines[i].cost_price} onChange={(e) => setLine(i, { cost_price: e.target.value })} className={`${control} text-right`} />
+                                                {errors[`lines.${i}.cost_price`] && <span className="text-xs text-danger">{errors[`lines.${i}.cost_price`]}</span>}
+                                            </td>
+                                            <td className="min-w-36 px-3 py-3">
+                                                <select disabled={!editable} value={data.lines[i].tax_id} onChange={(e) => setLine(i, { tax_id: e.target.value })} className={control}>
+                                                    <option value="">Tanpa pajak</option>
+                                                    {taxes.map((t) => <option key={t.id} value={t.id}>{t.name} ({Number(t.rate)}%)</option>)}
+                                                </select>
+                                            </td>
+                                            <td className="min-w-40 px-3 py-3">
+                                                <select disabled={!editable} value={data.lines[i].availability_status} onChange={(e) => setLine(i, { availability_status: e.target.value })} className={control}>
+                                                    {availabilityOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                                </select>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {editable && (
+                            <div className="flex justify-end border-t border-border p-4">
+                                <Button type="submit" loading={processing}>Simpan</Button>
+                            </div>
+                        )}
+                    </form>
+                </Card>
             </div>
 
-            {rejectOpen && (
-                <div className="fixed inset-0 z-20 flex items-center justify-center bg-navy/40 p-4">
-                    <form onSubmit={submitReject} className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-lg">
-                        <h3 className="text-lg font-semibold text-text">Tolak Procurement Request</h3>
-                        <p className="mt-1 text-sm text-text-muted">PR dikembalikan ke Sales untuk revisi requirement. Wajib isi alasan.</p>
-                        <textarea
-                            rows="4"
-                            autoFocus
-                            value={rejectForm.data.rejection_reason}
-                            onChange={(e) => rejectForm.setData('rejection_reason', e.target.value)}
-                            className="input mt-3"
-                            placeholder="Contoh: spesifikasi item tidak jelas, qty tidak masuk akal, dst."
-                        />
-                        {rejectForm.errors.rejection_reason && <span className="text-xs text-danger">{rejectForm.errors.rejection_reason}</span>}
-                        <div className="mt-4 flex justify-end gap-2">
-                            <button type="button" onClick={() => setRejectOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm">Batal</button>
-                            <button disabled={rejectForm.processing} className="rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-                                {rejectForm.processing ? 'Memproses...' : 'Tolak & Kembalikan'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
+            <Modal
+                open={rejectOpen}
+                onClose={() => setRejectOpen(false)}
+                title="Tolak Procurement Request"
+                footer={(
+                    <>
+                        <Button type="button" variant="outline" onClick={() => setRejectOpen(false)}>Batal</Button>
+                        <Button type="submit" form="reject-pr-form" variant="danger" loading={rejectForm.processing}>Tolak &amp; Kembalikan</Button>
+                    </>
+                )}
+            >
+                <form id="reject-pr-form" onSubmit={submitReject}>
+                    <p className="text-sm text-text-muted">PR dikembalikan ke Sales untuk revisi requirement. Wajib isi alasan.</p>
+                    <textarea
+                        rows="4"
+                        autoFocus
+                        value={rejectForm.data.rejection_reason}
+                        onChange={(e) => rejectForm.setData('rejection_reason', e.target.value)}
+                        className="input mt-3"
+                        placeholder="Contoh: spesifikasi item tidak jelas, qty tidak masuk akal, dst."
+                    />
+                    {rejectForm.errors.rejection_reason && <span className="text-xs text-danger">{rejectForm.errors.rejection_reason}</span>}
+                </form>
+            </Modal>
         </AppLayout>
     );
 }

@@ -166,12 +166,9 @@ class ProjectExecutionTest extends TestCase
         $project = Project::where('sales_order_id', $so->id)->firstOrFail();
         $project->update(['status' => 'planning']);
 
-        $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
-        foreach ($project->actualProcurements as $item) {
-            $this->actingAs($procurement)->put("/procurement/project-procurements/{$item->id}", [
-                'cost_price' => 1000, 'status' => 'received',
-            ]);
-        }
+        $project->actualProcurements()->update([
+            'cost_price' => 1000, 'is_paid' => true, 'status' => 'received', 'received_at' => now(),
+        ]);
 
         $tech = User::factory()->create(['role' => 'technician', 'is_active' => true]);
         $this->actingAs($this->ops)->post("/operational/projects/{$project->id}/tasks", ['title' => 'Instalasi']);

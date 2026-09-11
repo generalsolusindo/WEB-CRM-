@@ -48,6 +48,30 @@ class VendorCatalogTest extends TestCase
         ]);
     }
 
+    public function test_vendor_bank_account_note_can_be_set_and_updated(): void
+    {
+        $user = $this->procurement();
+
+        $this->actingAs($user)->post('/procurement/vendors', [
+            'name' => 'PT Rekening Jaya',
+            'bank_account_note' => 'BCA 1234567890 a.n. PT Rekening Jaya',
+        ])->assertRedirect();
+
+        $vendor = Vendor::where('name', 'PT Rekening Jaya')->firstOrFail();
+        $this->assertSame('BCA 1234567890 a.n. PT Rekening Jaya', $vendor->bank_account_note);
+
+        $this->actingAs($user)->get("/procurement/vendors/{$vendor->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('vendor.bank_account_note', 'BCA 1234567890 a.n. PT Rekening Jaya'));
+
+        $this->actingAs($user)->put("/procurement/vendors/{$vendor->id}", [
+            'name' => $vendor->name,
+            'bank_account_note' => 'Mandiri 999888777 a.n. PT Rekening Jaya',
+        ])->assertRedirect();
+
+        $this->assertSame('Mandiri 999888777 a.n. PT Rekening Jaya', $vendor->fresh()->bank_account_note);
+    }
+
     public function test_product_validation_rejects_bad_input(): void
     {
         $user = $this->procurement();

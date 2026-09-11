@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 /**
  * Generates human-readable document numbers.
  *
- *   Quotation   : QUO-{YYYY}-{0001}   (sequence resets every year)
+ *   Quotation   : {urutan}/GS-PN/{MM}/{YYYY}   (sequence resets every year)
  *   Sales Order : SO-{YYYY}-{0001}
  *   Revision    : {parent number}-R{revision_number}   (revision 1 keeps the parent number)
  *
@@ -22,9 +22,9 @@ class DocumentNumber
 {
     public function nextQuotationNumber(): string
     {
-        return $this->nextSequential(
+        return $this->nextSlashSequential(
             Quotation::query()->whereNull('parent_quotation_id'),
-            'QUO',
+            'GS-PN',
         );
     }
 
@@ -42,6 +42,12 @@ class DocumentNumber
     public function nextSurveyInvoiceNumber(): string
     {
         return $this->nextSequential(Invoice::query(), 'SRV');
+    }
+
+    /** Format: {urutan}/GS-PP/{MM}/{YYYY} — pengajuan pembayaran pengadaan project. */
+    public function nextProcurementPaymentNumber(): string
+    {
+        return $this->nextSlashSequential(\App\Models\ProcurementPayment::query(), 'GS-PP');
     }
 
     /** Format: {urutan}/GS-DO/{MM}/{YYYY} — nomor urut reset tiap tahun. */

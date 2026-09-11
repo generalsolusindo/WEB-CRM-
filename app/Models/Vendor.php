@@ -23,6 +23,7 @@ class Vendor extends Model
         'address',
         'city',
         'coverage_area',
+        'bank_account_note',
         'provides_survey',
         'provides_technical',
     ];

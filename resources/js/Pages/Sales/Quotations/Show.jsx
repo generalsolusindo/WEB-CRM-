@@ -1,48 +1,169 @@
+import { Fragment } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
+import { FiPrinter, FiEdit2, FiSend, FiCheck, FiX, FiCopy, FiTrash2 } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import CategoryBadge from '../../../Components/CategoryBadge';
+import { PageHeader, Card, CardHeader, Button, Info, InfoGrid, StatusBadge } from '../../../Components/ui';
 
 export default function Show({ quotation, history, totals, permissions }) {
     const number = quotation.number ?? `QT-${String(quotation.id).padStart(6, '0')} / R${quotation.revision_number}`;
+    const validUntil = quotation.valid_until
+        ? new Date(quotation.valid_until).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
+        : null;
+    const orderedLines = [...quotation.lines].sort(
+        (a, b) => (a.category === 'material' ? 0 : 1) - (b.category === 'material' ? 0 : 1),
+    );
     function action(path, message) { if (confirm(message)) router.post(path); }
     function destroy() { if (confirm('Hapus quotation draft ini?')) router.delete(`/sales/quotations/${quotation.id}`); }
 
-    return <AppLayout><Head title={number} /><div className="mx-auto max-w-6xl space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-4"><div><Link href="/sales/quotations" className="text-sm text-info">← Kembali ke Quotations</Link><div className="mt-2 flex items-center gap-3"><h1 className="text-2xl font-bold text-text">{number}</h1><Status value={quotation.status} /></div><p className="text-sm text-text-muted">{quotation.contact.name} · {quotation.contact.company_name || 'Tanpa perusahaan'}</p></div><div className="flex flex-wrap gap-2"><a href={`/sales/quotations/${quotation.id}/print`} target="_blank" rel="noreferrer" className="rounded-lg border border-border px-4 py-2 text-sm">Cetak / PDF</a>{permissions.update && <Link href={`/sales/quotations/${quotation.id}/edit`} className="rounded-lg border border-border px-4 py-2 text-sm">Edit</Link>}{permissions.send && <button onClick={() => action(`/sales/quotations/${quotation.id}/send`, 'Tandai quotation sudah dikirim ke customer?')} className="rounded-lg bg-info px-4 py-2 text-sm font-semibold text-white">Mark as Sent</button>}{permissions.confirm && <Link href={`/sales/quotations/${quotation.id}/confirm`} className="rounded-lg bg-success px-4 py-2 text-sm font-semibold text-white">Confirm Deal</Link>}{permissions.reject && <button onClick={() => action(`/sales/quotations/${quotation.id}/reject`, 'Tandai quotation ditolak customer?')} className="rounded-lg border border-danger/30 px-4 py-2 text-sm text-danger">Mark Rejected</button>}{permissions.revise && <button onClick={() => action(`/sales/quotations/${quotation.id}/revisions`, 'Buat revision baru dari quotation ini?')} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white">Create Revision</button>}{permissions.delete && <button onClick={destroy} className="rounded-lg border border-danger/30 px-4 py-2 text-sm text-danger">Hapus</button>}</div></div>
-        <section className="grid gap-5 rounded-xl border border-border bg-surface p-6 shadow-sm sm:grid-cols-3"><Info label="Customer" value={quotation.contact.name} /><Info label="Perusahaan" value={quotation.contact.company_name} /><Info label="Valid Until" value={quotation.valid_until} /><Info label="Procurement Request" value={`#${quotation.procurement_request_id} · ${quotation.procurement_request.status}`} /><Info label="Lead" value={`#${quotation.lead_id}`} /><Info label="Catatan" value={quotation.notes} /></section>
-        {quotation.status === 'draft' && <ReviewGate quotation={quotation} />}
-        <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm"><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-bg text-text-muted"><tr><th className="px-4 py-3">Item</th><th className="px-4 py-3">Qty</th><th className="px-4 py-3 text-right">Cost</th><th className="px-4 py-3 text-right">Selling</th><th className="px-4 py-3 text-right">Diskon</th><th className="px-4 py-3 text-right">Markup / Margin</th><th className="px-4 py-3">Pajak</th><th className="px-4 py-3 text-right">DPP</th></tr></thead><tbody className="divide-y divide-border">{quotation.lines.map((line) => <tr key={line.id}><td className="px-4 py-3"><div className="font-medium text-text">{line.item_name}</div><div className="text-xs text-text-muted">{line.description || '—'}<CategoryBadge category={line.category} /></div>{line.sourcing_note && <div className="mt-0.5 text-[11px] italic text-text-muted">Opsi: {line.sourcing_note}</div>}</td><td className="px-4 py-3 text-text-muted">{line.qty} {line.unit}</td><td className="px-4 py-3 text-right text-text-muted">{money(line.cost_price)}</td><td className="px-4 py-3 text-right text-text">{money(line.selling_price)}</td><td className="px-4 py-3 text-right text-text-muted">{Number(line.discount_amount) > 0 ? <>{money(line.discount_amount)}<div className="text-xs">{line.discount_percent ?? 0}%</div></> : '—'}</td><td className={`px-4 py-3 text-right ${Number(line.markup_percent) < 0 ? 'text-danger' : 'text-success'}`}>{line.markup_percent === null ? '—' : `${line.markup_percent}%`}<div className="text-xs text-text-muted">{line.effective_margin_percent === null || line.effective_margin_percent === undefined ? '—' : `${line.effective_margin_percent}% efektif`}</div></td><td className="px-4 py-3 text-text-muted">{line.tax ? line.tax.name : (Number(line.tax_rate) > 0 ? `${line.tax_rate}%` : '—')}</td><td className="px-4 py-3 text-right font-medium text-text">{money(line.subtotal)}</td></tr>)}</tbody><Totals totals={totals} span={7} /></table></div></section>
-        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm"><h2 className="mb-4 font-semibold text-text">Revision History</h2><div className="flex flex-wrap gap-2">{history.map((item) => <Link key={item.id} href={`/sales/quotations/${item.id}`} className={`rounded-lg border px-4 py-3 text-sm ${item.id === quotation.id ? 'border-navy bg-navy text-white' : 'border-border hover:bg-bg'}`}><span className="font-semibold">Revision {item.revision_number}</span><span className="ml-2 capitalize opacity-75">{item.status}</span></Link>)}</div></section>
-    </div></AppLayout>;
+    return (
+        <AppLayout>
+            <Head title={number} />
+            <div className="mx-auto max-w-6xl space-y-5">
+                <PageHeader
+                    title={<span className="flex items-center gap-3">{number} <StatusBadge status={quotation.status} /></span>}
+                    subtitle={`${quotation.contact.name} · ${quotation.contact.company_name || 'Tanpa perusahaan'}`}
+                    back={{ href: '/sales/quotations', label: 'Kembali ke Quotations' }}
+                    actions={
+                        <>
+                            <Button href={`/sales/quotations/${quotation.id}/print`} external variant="outline" icon={FiPrinter}>Cetak / PDF</Button>
+                            {permissions.update && <Button href={`/sales/quotations/${quotation.id}/edit`} variant="outline" icon={FiEdit2}>Edit</Button>}
+                            {permissions.send && <Button onClick={() => action(`/sales/quotations/${quotation.id}/send`, 'Tandai quotation sudah dikirim ke customer?')} icon={FiSend}>Tandai Terkirim</Button>}
+                            {permissions.confirm && <Button href={`/sales/quotations/${quotation.id}/confirm`} icon={FiCheck}>Confirm Deal</Button>}
+                            {permissions.reject && <Button onClick={() => action(`/sales/quotations/${quotation.id}/reject`, 'Tandai quotation ditolak customer?')} variant="ghost" icon={FiX} className="text-danger hover:bg-danger-soft hover:text-danger">Tandai Ditolak</Button>}
+                            {permissions.revise && <Button onClick={() => action(`/sales/quotations/${quotation.id}/revisions`, 'Buat revision baru dari quotation ini?')} variant="outline" icon={FiCopy}>Buat Revisi</Button>}
+                            {permissions.delete && <Button onClick={destroy} variant="ghost" icon={FiTrash2} className="text-danger hover:bg-danger-soft hover:text-danger">Hapus</Button>}
+                        </>
+                    }
+                />
+
+                <Card>
+                    <InfoGrid cols={3}>
+                        <Info label="Customer" value={quotation.contact.name} />
+                        <Info label="Perusahaan" value={quotation.contact.company_name} />
+                        <Info label="Berlaku Sampai" value={validUntil} />
+                        <Info label="Disiapkan Oleh" value={quotation.sales?.name} />
+                        <Info label="Procurement Request" value={`#${quotation.procurement_request_id} · ${quotation.procurement_request.status}`} />
+                        <Info label="Lead" value={`#${quotation.lead_id}`} />
+                        <Info label="Catatan" value={quotation.notes} />
+                    </InfoGrid>
+                </Card>
+
+                {quotation.status === 'draft' && <ReviewGate quotation={quotation} />}
+
+                <Card padded={false}>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead>
+                                <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
+                                    <th className="px-4 py-3">Item</th>
+                                    <th className="px-4 py-3">Qty</th>
+                                    <th className="px-4 py-3 text-right">Cost</th>
+                                    <th className="px-4 py-3 text-right">Selling</th>
+                                    <th className="px-4 py-3 text-right">Diskon</th>
+                                    <th className="px-4 py-3 text-right">Markup / Margin</th>
+                                    <th className="px-4 py-3">Pajak</th>
+                                    <th className="px-4 py-3 text-right">DPP</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {orderedLines.map((line, pos) => (
+                                  <Fragment key={line.id}>
+                                    {(pos === 0 || (orderedLines[pos - 1].category === 'material') !== (line.category === 'material')) && (
+                                        <tr className="bg-surface-2">
+                                            <td colSpan="8" className="px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
+                                                {line.category === 'material' ? 'Material' : 'Jasa'}
+                                            </td>
+                                        </tr>
+                                    )}
+                                    <tr>
+                                        <td className="px-4 py-3.5">
+                                            <div className="font-medium text-text">{line.item_name}</div>
+                                            <div className="text-xs text-text-muted">{line.description || '—'}<CategoryBadge category={line.category} /></div>
+                                            {line.sourcing_note && <div className="mt-0.5 text-[11px] italic text-text-muted">Opsi: {line.sourcing_note}</div>}
+                                        </td>
+                                        <td className="px-4 py-3.5 text-text-muted">{line.qty} {line.unit}</td>
+                                        <td className="px-4 py-3.5 text-right tabular-nums text-text-muted">{money(line.cost_price)}</td>
+                                        <td className="px-4 py-3.5 text-right tabular-nums text-text">{money(line.selling_price)}</td>
+                                        <td className="px-4 py-3.5 text-right tabular-nums text-text-muted">{Number(line.discount_amount) > 0 ? <>{money(line.discount_amount)}<div className="text-xs">{line.discount_percent ?? 0}%</div></> : '—'}</td>
+                                        <td className={`px-4 py-3.5 text-right tabular-nums ${Number(line.markup_percent) < 0 ? 'text-danger' : 'text-success'}`}>
+                                            {line.markup_percent === null ? '—' : `${line.markup_percent}%`}
+                                            <div className="text-xs text-text-muted">{line.effective_margin_percent == null ? '—' : `${line.effective_margin_percent}% efektif`}</div>
+                                        </td>
+                                        <td className="px-4 py-3.5 text-text-muted">{line.tax ? line.tax.name : (Number(line.tax_rate) > 0 ? `${line.tax_rate}%` : '—')}</td>
+                                        <td className="px-4 py-3.5 text-right font-medium tabular-nums text-text">{money(line.subtotal)}</td>
+                                    </tr>
+                                  </Fragment>
+                                ))}
+                            </tbody>
+                            <Totals totals={totals} span={7} />
+                        </table>
+                    </div>
+                </Card>
+
+                <Card>
+                    <CardHeader title="Riwayat Revisi" className="-mx-5 -mt-5 mb-4 px-5" />
+                    <div className="flex flex-wrap gap-2">
+                        {history.map((item) => (
+                            <Link
+                                key={item.id}
+                                href={`/sales/quotations/${item.id}`}
+                                className={`rounded-xl border px-4 py-2.5 text-sm transition ${item.id === quotation.id ? 'border-navy bg-navy text-white' : 'border-border hover:bg-bg'}`}
+                            >
+                                <span className="font-semibold">Revisi {item.revision_number}</span>
+                                <span className="ml-2 capitalize opacity-75">{item.status}</span>
+                            </Link>
+                        ))}
+                    </div>
+                </Card>
+            </div>
+        </AppLayout>
+    );
 }
+
 function ReviewGate({ quotation }) {
     const pm = quotation.lead?.delegatedTo;
     const pmStatus = quotation.pm_review_status;
     const mgrStatus = quotation.manager_review_status;
 
-    let message = '';
-    if (!pm) {
-        message = 'Opportunity ini belum didelegasikan ke Project Manager oleh Manager — quotation belum bisa diverifikasi.';
-    } else if (pmStatus === 'rejected') {
-        message = `Ditolak oleh Project Manager (${quotation.pmReviewedBy?.name || '-'})${quotation.pm_review_notes ? `: ${quotation.pm_review_notes}` : ''}. Silakan revisi quotation ini.`;
-    } else if (pmStatus !== 'approved') {
-        message = `Menunggu verifikasi Project Manager (${pm.name}).`;
-    } else if (mgrStatus === 'rejected') {
-        message = `Ditolak oleh Manager (${quotation.managerReviewedBy?.name || '-'})${quotation.manager_review_notes ? `: ${quotation.manager_review_notes}` : ''}. Silakan revisi quotation ini.`;
-    } else if (mgrStatus !== 'approved') {
-        message = 'Sudah disetujui Project Manager, menunggu verifikasi Manager.';
-    } else {
-        message = 'Sudah disetujui Project Manager & Manager — siap dikirim ke customer.';
-    }
+    let message;
+    if (!pm) message = 'Opportunity ini belum didelegasikan ke Project Manager oleh Manager — quotation belum bisa diverifikasi.';
+    else if (pmStatus === 'rejected') message = `Ditolak oleh Project Manager (${quotation.pmReviewedBy?.name || '-'})${quotation.pm_review_notes ? `: ${quotation.pm_review_notes}` : ''}. Silakan revisi quotation ini.`;
+    else if (pmStatus !== 'approved') message = `Menunggu verifikasi Project Manager (${pm.name}).`;
+    else if (mgrStatus === 'rejected') message = `Ditolak oleh Manager (${quotation.managerReviewedBy?.name || '-'})${quotation.manager_review_notes ? `: ${quotation.manager_review_notes}` : ''}. Silakan revisi quotation ini.`;
+    else if (mgrStatus !== 'approved') message = 'Sudah disetujui Project Manager, menunggu verifikasi Manager.';
+    else message = 'Sudah disetujui Project Manager & Manager — siap dikirim ke customer.';
 
-    const tone = mgrStatus === 'approved' ? 'border-success/30 bg-success/5 text-success' : (pmStatus === 'rejected' || mgrStatus === 'rejected') ? 'border-danger/30 bg-danger/5 text-danger' : 'border-warning/30 bg-warning/5 text-warning';
+    const tone = mgrStatus === 'approved'
+        ? 'border-success/25 bg-success-soft text-success'
+        : (pmStatus === 'rejected' || mgrStatus === 'rejected')
+            ? 'border-danger/25 bg-danger-soft text-danger'
+            : 'border-warning/25 bg-warning-soft text-warning';
 
-    return <section className={`rounded-xl border p-4 text-sm font-medium ${tone}`}>{message}</section>;
+    return <div className={`rounded-xl border p-4 text-sm font-medium ${tone}`}>{message}</div>;
 }
 
 export function Totals({ totals, span }) {
-    return <tfoot className="border-t border-border bg-bg text-text"><tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">Subtotal Bruto</td><td className="px-4 py-2 text-right font-medium">{money(totals.gross)}</td></tr><tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">Total Diskon{Number(totals.discount) > 0 ? ` (${totals.discount_percent}%)` : ''}</td><td className="px-4 py-2 text-right font-medium text-danger">{Number(totals.discount) > 0 ? `− ${money(totals.discount)}` : money(0)}</td></tr><tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">DPP</td><td className="px-4 py-2 text-right font-medium">{money(totals.subtotal)}</td></tr><tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">Total PPN</td><td className="px-4 py-2 text-right font-medium">{money(totals.tax)}</td></tr><tr><td colSpan={span} className="px-4 py-4 text-right font-semibold">Grand Total</td><td className="px-4 py-4 text-right text-lg font-bold">{money(totals.grand_total)}</td></tr>{Number(totals.pph23_estimate) > 0 && <><tr><td colSpan={span} className="px-4 py-1.5 text-right text-xs text-text-muted">Estimasi PPh 23 (2%) — jika customer memotong</td><td className="px-4 py-1.5 text-right text-xs font-medium text-warning">− {money(totals.pph23_estimate)}</td></tr><tr><td colSpan={span} className="px-4 py-1.5 text-right text-xs text-text-muted">Estimasi diterima tunai</td><td className="px-4 py-1.5 text-right text-xs font-medium">{money(Number(totals.grand_total) - Number(totals.pph23_estimate))}</td></tr></>}{totals.margin_percent !== null && totals.margin_percent !== undefined && <tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">Estimasi margin keseluruhan</td><td className={`px-4 py-2 text-right font-medium ${Number(totals.margin_percent) < 0 ? 'text-danger' : 'text-success'}`}>{money(totals.margin_amount)} ({totals.margin_percent}%)</td></tr>}</tfoot>;
+    return (
+        <tfoot className="border-t border-border bg-surface-2 text-text">
+            <tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">Subtotal Bruto</td><td className="px-4 py-2 text-right font-medium tabular-nums">{money(totals.gross)}</td></tr>
+            <tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">Total Diskon{Number(totals.discount) > 0 ? ` (${totals.discount_percent}%)` : ''}</td><td className="px-4 py-2 text-right font-medium tabular-nums text-danger">{Number(totals.discount) > 0 ? `− ${money(totals.discount)}` : money(0)}</td></tr>
+            <tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">DPP</td><td className="px-4 py-2 text-right font-medium tabular-nums">{money(totals.subtotal)}</td></tr>
+            <tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">Total PPN</td><td className="px-4 py-2 text-right font-medium tabular-nums">{money(totals.tax)}</td></tr>
+            <tr><td colSpan={span} className="px-4 py-4 text-right font-semibold">Grand Total</td><td className="px-4 py-4 text-right text-lg font-bold tabular-nums">{money(totals.grand_total)}</td></tr>
+            {Number(totals.pph23_estimate) > 0 && (
+                <>
+                    <tr><td colSpan={span} className="px-4 py-1.5 text-right text-xs text-text-muted">Estimasi PPh 23 (2%) — jika customer memotong</td><td className="px-4 py-1.5 text-right text-xs font-medium tabular-nums text-warning">− {money(totals.pph23_estimate)}</td></tr>
+                    <tr><td colSpan={span} className="px-4 py-1.5 text-right text-xs text-text-muted">Estimasi diterima tunai</td><td className="px-4 py-1.5 text-right text-xs font-medium tabular-nums">{money(Number(totals.grand_total) - Number(totals.pph23_estimate))}</td></tr>
+                </>
+            )}
+            {totals.margin_percent != null && (
+                <tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">Estimasi margin keseluruhan</td><td className={`px-4 py-2 text-right font-medium tabular-nums ${Number(totals.margin_percent) < 0 ? 'text-danger' : 'text-success'}`}>{money(totals.margin_amount)} ({totals.margin_percent}%)</td></tr>
+            )}
+        </tfoot>
+    );
 }
-function money(value) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(value || 0)); }
-function Info({ label, value }) { return <div><div className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</div><div className="mt-1 whitespace-pre-line text-sm text-text">{value || '—'}</div></div>; }
-function Status({ value }) { const styles = { draft: 'bg-warning/10 text-warning', sent: 'bg-info/10 text-info', confirmed: 'bg-success/10 text-success', revised: 'bg-bg text-text-muted', rejected: 'bg-danger/10 text-danger' }; return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${styles[value]}`}>{value}</span>; }
+
+export function money(value) {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(value || 0));
+}

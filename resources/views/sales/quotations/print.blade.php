@@ -1,11 +1,30 @@
 @php
     $number = $quotation->number ?? ('QT-'.str_pad($quotation->id, 6, '0', STR_PAD_LEFT).' / R'.$quotation->revision_number);
-    $rupiah = fn ($v) => 'Rp '.number_format(round((float) $v), 0, ',', '.');
-    $pct = fn ($v) => rtrim(rtrim(number_format((float) $v, 2), '0'), '.').'%';
+    $rupiah = fn ($v) => number_format(round((float) $v), 0, ',', '.');
+    $pct = fn ($v) => rtrim(rtrim(number_format((float) $v, 1, ',', '.'), '0'), ',').'%';
+
     $hasDiscount = ($totals['discount'] ?? 0) > 0;
     $hasTax = $quotation->lines->contains(fn ($l) => (float) $l->tax_rate > 0);
-    // Kolom dasar: No, Item, Qty, Unit, Harga Satuan (5) + Diskon? + Pajak?  (label mengisi semua kecuali kolom nilai DPP)
-    $labelSpan = 5 + ($hasDiscount ? 1 : 0) + ($hasTax ? 1 : 0);
+    $ppnRate = (float) ($quotation->lines->max('tax_rate') ?? 0);
+
+    $materials = $quotation->lines->filter(fn ($l) => $l->category === 'material')->values();
+    $services = $quotation->lines->filter(fn ($l) => in_array($l->category, ['service', 'reimburse'], true))->values();
+    $groups = array_filter(['Materials' => $materials, 'Services' => $services], fn ($g) => $g->isNotEmpty());
+
+    $qtyFmt = fn ($l) => rtrim(rtrim(number_format((float) $l->qty, 2, ',', '.'), '0'), ',').' '.$l->unit;
+
+    // kolom: Quantity, Description, Unit Price, Disc (+ Pajak?), Amount
+    $cols = 4 + ($hasTax ? 1 : 0);
+    $labelSpan = $cols - 1;
+
+    $terms = [
+        'Price Include Tax',
+        'Payment DP 50%',
+        'Payment 50% After BAST',
+        'Warranty Services 1 Month',
+        'No Cancellation',
+        'The final report will be submitted one business day after full payment (100%) has been received',
+    ];
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -14,42 +33,69 @@
     <title>Quotation {{ $number }}</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Inter', Arial, sans-serif; color: #001B3A; font-size: 12px; background: #f1f5f9; }
-        .sheet { width: 210mm; min-height: 297mm; margin: 12px auto; padding: 18mm; background: #fff; }
+        body { font-family: 'Inter', Arial, sans-serif; color: #1E293B; font-size: 11px; background: #f1f5f9; }
+        .sheet { width: 210mm; min-height: 297mm; margin: 12px auto; padding: 15mm 16mm; background: #fff; }
         .toolbar { width: 210mm; margin: 12px auto 0; text-align: right; }
         .toolbar button { padding: 8px 16px; border: 0; border-radius: 6px; background: #001B3A; color: #fff; font-size: 12px; cursor: pointer; }
-        header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #001B3A; padding-bottom: 12px; }
-        header h1 { font-size: 20px; letter-spacing: 1px; }
-        header .doc { text-align: right; }
-        header .doc .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #64748B; }
-        header .doc .num { font-size: 15px; font-weight: 700; }
-        .parties { display: flex; justify-content: space-between; margin: 18px 0; }
-        .parties .block { width: 48%; }
-        .parties .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #64748B; margin-bottom: 4px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-        th, td { padding: 8px 10px; border-bottom: 1px solid #E2E8F0; text-align: left; }
-        th { background: #F8FAFC; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: #64748B; white-space: nowrap; }
-        td.num, th.num { text-align: right; }
-        td.num { white-space: nowrap; }
-        tfoot td { border-bottom: 0; }
-        tfoot tr td { padding-top: 4px; padding-bottom: 4px; }
-        tfoot tr.grand td { border-top: 2px solid #001B3A; font-size: 14px; font-weight: 700; padding-top: 8px; }
-        .notes { margin-top: 20px; }
-        .notes .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #64748B; margin-bottom: 4px; }
-        .muted { color: #64748B; }
-        .approval { display: flex; justify-content: space-between; margin-top: 48px; }
-        .approval .col { width: 45%; }
-        .approval .role { font-size: 11px; color: #64748B; }
-        .approval .party { font-weight: 700; margin-top: 2px; }
-        .approval .field { margin-top: 8px; font-size: 11px; color: #334155; }
-        .approval .box { height: 96px; border: 1px dashed #94A3B8; border-radius: 4px; margin-top: 8px; }
-        .approval .cap { text-align: center; font-size: 10px; color: #94A3B8; margin-top: 4px; }
-        .approval-note { margin-top: 12px; font-size: 10px; color: #94A3B8; }
+
+        header { display: flex; justify-content: space-between; align-items: flex-start; }
+        header .brand img { height: 46px; display: block; }
+        header .brand .tag { font-size: 9px; font-style: italic; color: #475569; margin-top: 4px; letter-spacing: .2px; }
+        header .brand .web { font-size: 9px; color: #2563EB; }
+        header h1 { font-size: 34px; font-weight: 300; letter-spacing: 3px; color: #64748B; }
+
+        .top { display: flex; justify-content: space-between; margin-top: 6px; }
+        .top .addr { font-size: 10px; color: #475569; line-height: 1.6; }
+        .top .meta { font-size: 10px; }
+        .top .meta table { border-collapse: collapse; }
+        .top .meta td { padding: 1px 0 1px 12px; text-align: right; }
+        .top .meta td.k { font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+
+        .parties { display: flex; justify-content: space-between; margin-top: 14px; }
+        .parties .label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: #64748B; margin-bottom: 3px; }
+        .parties .to strong { font-size: 12px; }
+        .parties .valid { text-align: right; font-size: 10px; }
+        .parties .valid .row { margin-bottom: 2px; }
+        .parties .valid em { color: #64748B; font-style: italic; }
+
+        table.grid { width: 100%; border-collapse: collapse; margin-top: 14px; }
+        table.grid th, table.grid td { border: 1px solid #94A3B8; padding: 4px 7px; text-align: left; vertical-align: top; }
+        table.grid thead th { background: #F1F5F9; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; text-align: center; }
+
+        .strip td { font-size: 10px; }
+        .strip td { text-align: center; }
+
+        .items th.num, .items td.num { text-align: right; white-space: nowrap; }
+        .items tr.group td { background: #F8FAFC; font-weight: 700; font-size: 10px; }
+        .items .desc .sub { color: #64748B; font-size: 9.5px; margin-top: 1px; }
+
+        .summary { display: flex; justify-content: space-between; margin-top: 4px; }
+        .summary .left { width: 56%; font-size: 10px; }
+        .summary .left .prep { font-weight: 700; margin-bottom: 4px; }
+        .summary .left .lead { margin-bottom: 3px; }
+        .summary .left ul { list-style: none; }
+        .summary .left ul li { padding: 1px 0; }
+        .summary .left ul li::before { content: "- "; }
+        .summary .totals { width: 40%; }
+        .summary .totals table { width: 100%; border-collapse: collapse; }
+        .summary .totals td { padding: 3px 4px; font-size: 10px; }
+        .summary .totals td.k { text-align: right; text-transform: uppercase; font-weight: 700; letter-spacing: .3px; color: #475569; }
+        .summary .totals td.v { text-align: right; border: 1px solid #94A3B8; font-weight: 700; }
+        .summary .totals tr.grand td { font-size: 12px; }
+
+        .sign { margin-top: 18px; font-size: 10px; }
+        .sign .line { display: inline-block; border-bottom: 1px solid #334155; width: 320px; margin-left: 6px; }
+        .notes { margin-top: 14px; }
+        .notes .label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: #64748B; margin-bottom: 3px; }
+
+        footer { margin-top: 28px; text-align: center; font-size: 10px; color: #475569; }
+        footer .thanks { font-weight: 700; color: #1E293B; margin-top: 2px; }
+
         @media print {
             body { background: #fff; }
             .toolbar { display: none; }
             .sheet { margin: 0; width: auto; min-height: auto; padding: 0; }
-            @page { size: A4; margin: 18mm 18mm; }
+            @page { size: A4; margin: 14mm 15mm; }
         }
     </style>
 </head>
@@ -57,76 +103,110 @@
     <div class="toolbar"><button onclick="window.print()">Cetak / Simpan PDF</button></div>
     <div class="sheet">
         <header>
-            <div>
-                <h1>GENERAL SOLUSINDO</h1>
-                <div class="muted">Quotation Penawaran</div>
+            <div class="brand">
+                <img src="{{ asset('images/logo-gs.png') }}" alt="General Solusindo">
+                <div class="tag">IT - Consultant Integrator Supplier Training</div>
+                <div class="web">https://generalsolusindo.com/</div>
             </div>
-            <div class="doc">
-                <div class="label">Nomor Quotation</div>
-                <div class="num">{{ $number }}</div>
-                <div class="muted">Tanggal: {{ $quotation->created_at?->format('d M Y') }}</div>
-                @if ($quotation->valid_until)
-                    <div class="muted">Berlaku s/d: {{ \Illuminate\Support\Carbon::parse($quotation->valid_until)->format('d M Y') }}</div>
-                @endif
-            </div>
+            <h1>QUOTATION</h1>
         </header>
 
-        <div class="parties">
-            <div class="block">
-                <div class="label">Ditujukan Kepada</div>
-                <div><strong>{{ $quotation->contact->name }}</strong></div>
-                @if ($quotation->contact->company_name)<div>{{ $quotation->contact->company_name }}</div>@endif
-                @if ($quotation->contact->address)<div class="muted">{{ $quotation->contact->address }}</div>@endif
-                @if ($quotation->contact->npwp)<div class="muted">NPWP: {{ $quotation->contact->npwp }}</div>@endif
+        <div class="top">
+            <div class="addr">
+                Pondok Jati II AS - 31, Sidoarjo, 61252<br>
+                Email : informasi@generalsolusindo.com<br>
+                Phone : 08113219992
             </div>
-            <div class="block">
-                <div class="label">Kontak</div>
-                @if ($quotation->contact->email)<div>{{ $quotation->contact->email }}</div>@endif
-                @if ($quotation->contact->phone)<div>{{ $quotation->contact->phone }}</div>@endif
+            <div class="meta">
+                <table>
+                    <tr><td class="k">Date :</td><td>{{ $quotation->created_at?->format('d/m/Y') }}</td></tr>
+                    <tr><td class="k">Quotation # :</td><td>{{ $number }}</td></tr>
+                    <tr><td class="k">Customer ID :</td><td>&nbsp;</td></tr>
+                </table>
             </div>
         </div>
 
-        <table>
+        <div class="parties">
+            <div class="to">
+                <div class="label">Quotation For:</div>
+                <strong>{{ $quotation->contact->company_name ?: $quotation->contact->name }}</strong>
+                @if ($quotation->contact->company_name)<div>Attn. {{ $quotation->contact->name }}</div>@endif
+                @if ($quotation->contact->address)<div style="color:#64748B">{{ $quotation->contact->address }}</div>@endif
+            </div>
+            <div class="valid">
+                <div class="row"><em>Quotation valid until:</em> {{ $quotation->valid_until?->format('d/m/Y') }}</div>
+                <div class="row"><em>Prepared by:</em> {{ $quotation->sales?->name ?? '-' }}</div>
+            </div>
+        </div>
+
+        <table class="grid strip">
             <thead>
                 <tr>
-                    <th style="width:36px">No</th>
-                    <th>Item</th>
-                    <th class="num">Qty</th>
-                    <th>Unit</th>
-                    <th class="num">Harga Satuan</th>
-                    @if ($hasDiscount)<th class="num">Diskon</th>@endif
-                    @if ($hasTax)<th>Pajak</th>@endif
-                    <th class="num">DPP</th>
+                    <th>Salesperson</th><th>P.O. Number</th><th>Ship Date</th>
+                    <th>Ship Via</th><th>F.O.B. Point</th><th>Terms</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach ($quotation->lines as $i => $line)
-                    <tr>
-                        <td>{{ $i + 1 }}</td>
-                        <td>
-                            <strong>{{ $line->item_name }}</strong>@if ($line->category === 'service') <span class="muted">(Jasa)</span>@endif
-                            @if ($line->description)<br><span class="muted">{{ $line->description }}</span>@endif
-                            @if ($line->sourcing_note)<br><span class="muted">Opsi: {{ $line->sourcing_note }}</span>@endif
-                        </td>
-                        <td class="num">{{ rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',') }}</td>
-                        <td>{{ $line->unit }}</td>
-                        <td class="num">{{ $rupiah($line->selling_price) }}</td>
-                        @if ($hasDiscount)<td class="num">@if ((float) $line->discount_amount > 0){{ $rupiah($line->discount_amount) }}<br><span class="muted" style="font-size:10px">({{ $pct($line->discount_percent ?? 0) }})</span>@else—@endif</td>@endif
-                        @if ($hasTax)<td>{{ $line->tax ? $line->tax->name : ((float) $line->tax_rate > 0 ? $pct($line->tax_rate) : '—') }}</td>@endif
-                        <td class="num">{{ $rupiah($line->subtotal) }}</td>
-                    </tr>
+                <tr>
+                    <td>{{ $quotation->sales?->name ?? '-' }}</td>
+                    <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+                    <td>Due on receipt</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <table class="grid items">
+            <thead>
+                <tr>
+                    <th>Quantity</th>
+                    <th>Description</th>
+                    <th class="num">Unit Price</th>
+                    <th class="num">Disc</th>
+                    @if ($hasTax)<th class="num">Pajak</th>@endif
+                    <th class="num">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($groups as $groupLabel => $lines)
+                    <tr class="group"><td colspan="{{ $cols }}">{{ $groupLabel }}</td></tr>
+                    @foreach ($lines as $line)
+                        <tr>
+                            <td>{{ $qtyFmt($line) }}</td>
+                            <td class="desc">
+                                <strong>{{ $line->item_name }}</strong>
+                                @if ($line->description)<div class="sub">{{ $line->description }}</div>@endif
+                                @if ($line->sourcing_note)<div class="sub">Opsi: {{ $line->sourcing_note }}</div>@endif
+                            </td>
+                            <td class="num">{{ $rupiah($line->selling_price) }}</td>
+                            <td class="num">@if ((float) $line->discount_amount > 0){{ $rupiah($line->discount_amount) }}<br><span style="color:#64748B;font-size:9px">({{ $pct($line->discount_percent ?? 0) }})</span>@else&mdash;@endif</td>
+                            @if ($hasTax)<td class="num">{{ (float) $line->tax_rate > 0 ? $pct($line->tax_rate) : '—' }}</td>@endif
+                            <td class="num">{{ $rupiah($line->subtotal) }}</td>
+                        </tr>
+                    @endforeach
                 @endforeach
             </tbody>
-            <tfoot>
-                @if ($hasDiscount)
-                    <tr><td colspan="{{ $labelSpan }}" class="num muted">Subtotal Bruto</td><td class="num">{{ $rupiah($totals['gross']) }}</td></tr>
-                    <tr><td colspan="{{ $labelSpan }}" class="num muted">Total Diskon ({{ $pct($totals['discount_percent']) }})</td><td class="num">− {{ $rupiah($totals['discount']) }}</td></tr>
-                @endif
-                <tr><td colspan="{{ $labelSpan }}" class="num muted">{{ $hasTax ? 'DPP' : 'Subtotal' }}</td><td class="num">{{ $rupiah($totals['subtotal']) }}</td></tr>
-                @if ($hasTax)<tr><td colspan="{{ $labelSpan }}" class="num muted">Total PPN</td><td class="num">{{ $rupiah($totals['tax']) }}</td></tr>@endif
-                <tr class="grand"><td colspan="{{ $labelSpan }}" class="num">Grand Total</td><td class="num">{{ $rupiah($totals['grand_total']) }}</td></tr>
-            </tfoot>
         </table>
+
+        <div class="summary">
+            <div class="left">
+                <div class="prep">Quotation prepared by: {{ $quotation->sales?->name ?? '-' }}</div>
+                <div class="lead">This is a quotation on the items listed, subject to the conditions noted below:</div>
+                <ul>
+                    @foreach ($terms as $term)<li>{{ $term }}</li>@endforeach
+                </ul>
+            </div>
+            <div class="totals">
+                <table>
+                    <tr><td class="k">Sub Total</td><td class="v">{{ $rupiah($totals['gross']) }}</td></tr>
+                    @if ($hasDiscount)
+                        <tr><td class="k">Disc</td><td class="v">{{ $pct($totals['discount_percent']) }}</td></tr>
+                    @endif
+                    <tr><td class="k">DPP</td><td class="v">{{ $rupiah($totals['subtotal']) }}</td></tr>
+                    <tr><td class="k">PPN ({{ $pct($ppnRate) }})</td><td class="v">{{ $rupiah($totals['tax']) }}</td></tr>
+                    <tr class="grand"><td class="k">Total</td><td class="v">{{ $rupiah($totals['grand_total']) }}</td></tr>
+                </table>
+            </div>
+        </div>
 
         @if ($quotation->notes)
             <div class="notes">
@@ -135,25 +215,12 @@
             </div>
         @endif
 
-        <div class="approval">
-            <div class="col">
-                <div class="role">Hormat kami,</div>
-                <div class="party">PT General Solusindo</div>
-                <div class="field">Sales: {{ $quotation->sales?->name ?? '-' }}</div>
-                <div class="field">Tanggal: {{ $quotation->created_at?->format('d M Y') }}</div>
-                <div class="box"></div>
-                <div class="cap">( {{ $quotation->sales?->name ?? '..............................' }} )</div>
-            </div>
-            <div class="col">
-                <div class="role">Menyetujui,</div>
-                <div class="party">{{ $quotation->contact->company_name ?: $quotation->contact->name }}</div>
-                <div class="field">Nama &amp; Jabatan: ..................................................</div>
-                <div class="field">Tanggal: ..................................................</div>
-                <div class="box"></div>
-                <div class="cap">Tanda tangan &amp; Stempel</div>
-            </div>
-        </div>
-        <div class="approval-note">Persetujuan sah bila dokumen ini ditandatangani; stempel wajib bila customer berupa perusahaan/instansi. Kirim kembali dokumen ini (atau terbitkan Purchase Order) sebagai dasar penerbitan Sales Order.</div>
+        <div class="sign">To accept this quotation, sign here and return : <span class="line"></span></div>
+
+        <footer>
+            <div>If you have any questions concerning this quotation, contact {{ $quotation->sales?->name ?? 'kami' }}, 08113219992, informasi@generalsolusindo.com.</div>
+            <div class="thanks">THANK YOU FOR YOUR BUSINESS!</div>
+        </footer>
     </div>
 </body>
 </html>

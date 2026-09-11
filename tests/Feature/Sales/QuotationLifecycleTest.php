@@ -34,7 +34,8 @@ class QuotationLifecycleTest extends TestCase
         $this->assertSame('draft', $quotation->status);
         $this->assertSame(1, $quotation->revision_number);
 
-        $this->assertMatchesRegularExpression('/^QUO-\d{4}-0001$/', $quotation->number);
+        $this->assertMatchesRegularExpression('#^1/GS-PN/\d{2}/\d{4}$#', $quotation->number);
+        $this->assertSame(now()->addDays(10)->toDateString(), $quotation->valid_until->toDateString());
 
         $quotationLine = $quotation->lines->firstOrFail();
         $this->assertSame('1000000.00', $quotationLine->cost_price);
@@ -51,7 +52,7 @@ class QuotationLifecycleTest extends TestCase
         $this->actingAs($sales)->get("/sales/quotations/{$quotation->id}/print")
             ->assertOk()
             ->assertSee($quotation->number)
-            ->assertSee('GENERAL SOLUSINDO');
+            ->assertSee('THANK YOU FOR YOUR BUSINESS!');
 
         $other = User::factory()->create(['role' => 'sales']);
         $this->actingAs($other)->get("/sales/quotations/{$quotation->id}/print")->assertForbidden();

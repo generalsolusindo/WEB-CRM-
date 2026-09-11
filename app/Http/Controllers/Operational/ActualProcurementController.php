@@ -30,7 +30,8 @@ class ActualProcurementController extends Controller
         Gate::authorize('manageResources', $project);
         abort_unless($actualProcurement->project_id === $project->id, 404);
 
-        if ($actualProcurement->status !== ActualProcurementStatus::Pending->value) {
+        if ($actualProcurement->status !== ActualProcurementStatus::Pending->value
+            || $actualProcurement->procurement_payment_id !== null) {
             return back()->with('error', 'Item yang sudah diproses Procurement tidak bisa dihapus.');
         }
 

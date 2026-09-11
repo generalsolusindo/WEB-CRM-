@@ -1,33 +1,100 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
-import Pagination from '../../../Components/Pagination';
+import { FiShoppingCart } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
+import { PageHeader, Toolbar, SearchInput, FilterSelect, Button, DataTable, StatusBadge, Pagination, EmptyState } from '../../../Components/ui';
+
+function label(v) {
+    return String(v || '—').replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+function date(v) {
+    if (!v) return '—';
+    const d = new Date(String(v).length <= 10 ? `${v}T00:00:00` : v);
+    return Number.isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(d);
+}
+function money(v) {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
+}
 
 export default function Index({ orders, filters, statusOptions }) {
     const [form, setForm] = useState(filters);
 
-    function submit(event) {
-        event.preventDefault();
+    function submit(e) {
+        e?.preventDefault();
         router.get('/sales/sales-orders', form, { preserveState: true, replace: true });
     }
 
-    return <AppLayout><Head title="Sales Orders" /><div className="mx-auto max-w-7xl space-y-5">
-        <div><h1 className="text-2xl font-bold text-text">Sales Orders</h1><p className="text-sm text-text-muted">Pantau deal yang sudah dikonfirmasi dan perkembangan pembayaran dari Finance.</p></div>
-        <form onSubmit={submit} className="grid gap-3 rounded-xl border border-border bg-surface p-4 shadow-sm sm:grid-cols-[1fr_220px_auto_auto]">
-            <input value={form.search} onChange={(event) => setForm({ ...form, search: event.target.value })} placeholder="Cari nomor SO, customer, perusahaan" className="rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-navy" />
-            <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} className="rounded-lg border border-border px-3 py-2 text-sm"><option value="">Semua status</option>{statusOptions.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select>
-            <button className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white">Filter</button>
-            <button type="button" onClick={() => router.get('/sales/sales-orders')} className="rounded-lg border border-border px-4 py-2 text-sm">Reset</button>
-        </form>
-        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm"><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-bg text-text-muted"><tr><th className="px-4 py-3">Nomor</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Tipe / Pembayaran</th><th className="px-4 py-3">Status SO</th><th className="px-4 py-3">Invoice Terakhir</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-right">Aksi</th></tr></thead><tbody className="divide-y divide-border">
-            {orders.data.map((order) => { const invoice = order.invoices?.[0]; return <tr key={order.id} className="hover:bg-bg/70"><td className="px-4 py-3"><div className="font-semibold text-text">{order.number ?? `SO-${String(order.id).padStart(6, '0')}`}</div><div className="text-xs text-text-muted">{order.quotation.number ?? `QT-${String(order.quotation_id).padStart(6, '0')} / R${order.quotation.revision_number}`}</div></td><td className="px-4 py-3"><div className="font-medium text-text">{order.contact.name}</div><div className="text-xs text-text-muted">{order.contact.company_name || '—'}</div></td><td className="px-4 py-3"><div>{label(order.order_type)}</div><div className="text-xs text-text-muted">{label(order.payment_rule)}</div></td><td className="px-4 py-3"><Status value={order.status} /></td><td className="px-4 py-3">{invoice ? <><InvoiceStatus value={invoice.status} /><div className="mt-1 text-xs capitalize text-text-muted">{invoice.invoice_phase} · jatuh tempo {date(invoice.due_date)}</div></> : <span className="text-text-muted">Belum ada</span>}</td><td className="px-4 py-3 text-right font-medium text-text">{money(order.total_amount)}</td><td className="px-4 py-3 text-right"><Link href={`/sales/sales-orders/${order.id}`} className="font-medium text-info hover:underline">Lihat</Link></td></tr>; })}
-            {orders.data.length === 0 && <tr><td colSpan="7" className="px-4 py-12 text-center text-text-muted">Belum ada Sales Order. Konfirmasi deal dari quotation berstatus Sent terlebih dahulu.</td></tr>}
-        </tbody></table></div><div className="border-t border-border p-4"><Pagination links={orders.links} /></div></div>
-    </div></AppLayout>;
-}
+    const columns = [
+        {
+            key: 'number', label: 'Nomor',
+            render: (o) => (
+                <div>
+                    <div className="font-semibold text-text">{o.number ?? `SO-${String(o.id).padStart(6, '0')}`}</div>
+                    <div className="text-xs text-text-muted">{o.quotation.number ?? `QT-${String(o.quotation_id).padStart(6, '0')} / R${o.quotation.revision_number}`}</div>
+                </div>
+            ),
+        },
+        {
+            key: 'customer', label: 'Customer',
+            render: (o) => (
+                <div>
+                    <div className="font-medium text-text">{o.contact.name}</div>
+                    <div className="text-xs text-text-muted">{o.contact.company_name || '—'}</div>
+                </div>
+            ),
+        },
+        {
+            key: 'type', label: 'Tipe / Pembayaran',
+            render: (o) => (
+                <div className="text-text-muted">
+                    <div>{label(o.order_type)}</div>
+                    <div className="text-xs">{label(o.payment_rule)}</div>
+                </div>
+            ),
+        },
+        { key: 'status', label: 'Status SO', render: (o) => <StatusBadge status={o.status} label={label(o.status)} /> },
+        {
+            key: 'invoice', label: 'Invoice Terakhir',
+            render: (o) => {
+                const inv = o.invoices?.[0];
+                if (!inv) return <span className="text-text-muted">Belum ada</span>;
+                return (
+                    <div>
+                        <StatusBadge status={inv.status} label={label(inv.status)} />
+                        <div className="mt-1 text-xs capitalize text-text-muted">{inv.invoice_phase} · jatuh tempo {date(inv.due_date)}</div>
+                    </div>
+                );
+            },
+        },
+        { key: 'total', label: 'Total', align: 'right', render: (o) => <span className="font-semibold tabular-nums text-text">{money(o.total_amount)}</span> },
+    ];
 
-function Status({ value }) { const styles = { confirmed: 'bg-info/10 text-info', in_progress: 'bg-warning/10 text-warning', completed: 'bg-success/10 text-success', cancelled: 'bg-danger/10 text-danger' }; return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${styles[value] || 'bg-bg text-text-muted'}`}>{label(value)}</span>; }
-function InvoiceStatus({ value }) { const styles = { draft: 'bg-bg text-text-muted', sent: 'bg-info/10 text-info', partially_paid: 'bg-warning/10 text-warning', paid: 'bg-success/10 text-success', overdue: 'bg-danger/10 text-danger', cancelled: 'bg-danger/10 text-danger' }; return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${styles[value] || 'bg-bg text-text-muted'}`}>{label(value)}</span>; }
-function label(value) { return String(value || '—').replaceAll('_', ' ').replace(/\b\w/g, (character) => character.toUpperCase()); }
-function date(value) { if (!value) return '—'; const d = new Date(String(value).length <= 10 ? `${value}T00:00:00` : value); return Number.isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(d); }
-function money(value) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(value || 0)); }
+    return (
+        <AppLayout>
+            <Head title="Sales Orders" />
+            <div className="mx-auto max-w-6xl space-y-5">
+                <PageHeader title="Sales Orders" subtitle="Pantau deal yang sudah dikonfirmasi dan perkembangan pembayaran dari Finance." />
+
+                <form onSubmit={submit}>
+                    <Toolbar>
+                        <SearchInput value={form.search} onChange={(v) => setForm({ ...form, search: v })} placeholder="Cari nomor SO, customer, perusahaan" />
+                        <FilterSelect value={form.status} onChange={(v) => setForm({ ...form, status: v })} className="min-w-36">
+                            <option value="">Semua status</option>
+                            {statusOptions.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                        </FilterSelect>
+                        <Button type="submit">Filter</Button>
+                        <Button type="button" variant="outline" onClick={() => router.get('/sales/sales-orders')}>Reset</Button>
+                    </Toolbar>
+                </form>
+
+                <DataTable
+                    columns={columns}
+                    rows={orders.data}
+                    rowHref={(o) => `/sales/sales-orders/${o.id}`}
+                    footer={<Pagination links={orders.links} />}
+                    empty={<EmptyState icon={FiShoppingCart} title="Belum ada Sales Order" description="Konfirmasi deal dari quotation berstatus Sent terlebih dahulu." />}
+                />
+            </div>
+        </AppLayout>
+    );
+}

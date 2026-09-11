@@ -1,43 +1,36 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
+import { FiPlus } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
+import { PageHeader, Button, DataTable, EmptyState } from '../../../Components/ui';
 
 export default function Index({ salesOrder, deliveryNotes, canCreate }) {
+    const columns = [
+        { key: 'number', label: 'Nomor', render: (dn) => <span className="font-medium text-text">{dn.number}</span> },
+        { key: 'created_by', label: 'Dibuat oleh', render: (dn) => dn.created_by },
+        {
+            key: 'status',
+            label: 'Status',
+            render: (dn) => <span className={`badge ${dn.status === 'received' ? 'badge-success' : 'badge-warning'}`}>{dn.status === 'received' ? 'Diterima' : 'Terkirim'}</span>,
+        },
+    ];
+
     return (
         <AppLayout>
             <Head title={`Delivery Note — ${salesOrder.number}`} />
             <div className="mx-auto max-w-4xl space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold text-text">Delivery Note</h1>
-                        <p className="text-sm text-text-muted">{salesOrder.number} · {salesOrder.customer}</p>
-                    </div>
-                    {canCreate && (
-                        <Link href={`/operational/sales-orders/${salesOrder.id}/delivery-notes/create`} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white">
-                            Buat Delivery Note
-                        </Link>
-                    )}
-                </div>
+                <PageHeader
+                    title="Delivery Note"
+                    subtitle={`${salesOrder.number} · ${salesOrder.customer}`}
+                    actions={canCreate && <Button href={`/operational/sales-orders/${salesOrder.id}/delivery-notes/create`} icon={FiPlus}>Buat Delivery Note</Button>}
+                />
 
-                <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-bg text-text-muted"><tr><th className="px-4 py-3">Nomor</th><th className="px-4 py-3">Dibuat oleh</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Aksi</th></tr></thead>
-                        <tbody className="divide-y divide-border">
-                            {deliveryNotes.map((dn) => (
-                                <tr key={dn.id} className="hover:bg-bg/70">
-                                    <td className="px-4 py-3 font-medium text-text">{dn.number}</td>
-                                    <td className="px-4 py-3 text-text-muted">{dn.created_by}</td>
-                                    <td className="px-4 py-3">
-                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${dn.status === 'received' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
-                                            {dn.status === 'received' ? 'Diterima' : 'Terkirim'}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-right"><Link href={`/operational/delivery-notes/${dn.id}`} className="font-medium text-info hover:underline">Lihat</Link></td>
-                                </tr>
-                            ))}
-                            {deliveryNotes.length === 0 && <tr><td colSpan="4" className="px-4 py-12 text-center text-text-muted">Belum ada Delivery Note untuk Sales Order ini.</td></tr>}
-                        </tbody>
-                    </table>
-                </div>
+                <DataTable
+                    columns={columns}
+                    rows={deliveryNotes}
+                    rowKey="id"
+                    rowHref={(dn) => `/operational/delivery-notes/${dn.id}`}
+                    empty={<EmptyState title="Belum ada Delivery Note untuk Sales Order ini." />}
+                />
             </div>
         </AppLayout>
     );

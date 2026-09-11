@@ -23,6 +23,7 @@ class StoreVendorRequest extends FormRequest
             'address' => ['nullable', 'string'],
             'city' => ['nullable', 'string', 'max:120'],
             'coverage_area' => ['nullable', 'string'],
+            'bank_account_note' => ['nullable', 'string', 'max:1000'],
             'provides_survey' => ['sometimes', 'boolean'],
             'provides_technical' => ['sometimes', 'boolean'],
         ];

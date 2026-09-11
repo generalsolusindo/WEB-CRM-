@@ -48,7 +48,7 @@ export default function RequirementsPanel({ leadId, requirements, editable }) {
     }
 
     return (
-        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <section className="card p-6">
             <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 className="font-semibold text-text">Requirements</h2>
@@ -59,7 +59,7 @@ export default function RequirementsPanel({ leadId, requirements, editable }) {
                 <div className="flex items-center gap-2">
                     <span className="rounded-full bg-bg px-3 py-1 text-sm text-text-muted">{requirements.length} item</span>
                     {editable && requirements.length > 0 && (
-                        <button onClick={submitToProcurement} className="rounded-lg bg-info px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+                        <button onClick={submitToProcurement} className="btn btn-primary">
                             Submit ke Procurement
                         </button>
                     )}
@@ -69,23 +69,23 @@ export default function RequirementsPanel({ leadId, requirements, editable }) {
             {requirements.length > 0 ? (
                 <div className="mb-5 overflow-x-auto rounded-lg border border-border">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-bg text-text-muted"><tr><th className="px-3 py-2">Item</th><th className="px-3 py-2">Qty</th><th className="px-3 py-2">Deskripsi</th>{editable && <th className="px-3 py-2 text-right">Aksi</th>}</tr></thead>
+                        <thead className="bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint"><tr><th className="px-3 py-2">Item</th><th className="px-3 py-2">Qty</th><th className="px-3 py-2">Deskripsi</th>{editable && <th className="px-3 py-2 text-right">Aksi</th>}</tr></thead>
                         <tbody className="divide-y divide-border">
                             {requirements.map((item) => (
                                 <tr key={item.id}>
                                     <td className="px-3 py-3"><div className="font-medium text-text">{item.item_name}<CategoryBadge category={item.category} /></div>{item.notes && <div className="text-xs text-text-muted">{item.notes}</div>}</td>
                                     <td className="whitespace-nowrap px-3 py-3 text-text-muted">{item.qty} {item.unit}</td>
                                     <td className="px-3 py-3 text-text-muted">{item.description || '—'}</td>
-                                    {editable && <td className="whitespace-nowrap px-3 py-3 text-right"><button onClick={() => beginEdit(item)} className="mr-3 text-info">Edit</button><button onClick={() => destroy(item.id)} className="text-danger">Hapus</button></td>}
+                                    {editable && <td className="whitespace-nowrap px-3 py-3 text-right"><button onClick={() => beginEdit(item)} className="mr-3 font-medium text-primary hover:underline">Edit</button><button onClick={() => destroy(item.id)} className="font-medium text-danger hover:underline">Hapus</button></td>}
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
-            ) : <div className="mb-5 rounded-lg bg-bg p-6 text-center text-sm text-text-muted">Belum ada requirement.</div>}
+            ) : <div className="mb-5 rounded-xl border border-border bg-surface-2 p-8 text-center text-sm text-text-muted">Belum ada requirement.</div>}
 
             {editable && (
-                <form onSubmit={submit} className="space-y-4 rounded-lg border border-border bg-bg/50 p-4">
+                <form onSubmit={submit} className="space-y-4 rounded-xl border border-border bg-surface-2 p-4">
                     <h3 className="font-medium text-text">{editingId ? 'Edit Requirement' : 'Tambah Requirement'}</h3>
                     <div className="grid gap-4 md:grid-cols-4">
                         <Field label="Nama item *" error={errors.item_name} className="md:col-span-2"><input value={data.item_name} onChange={(e) => setData('item_name', e.target.value)} className="input" /></Field>
@@ -101,7 +101,7 @@ export default function RequirementsPanel({ leadId, requirements, editable }) {
                     </div>
                     <Field label="Deskripsi" error={errors.description}><textarea rows="2" value={data.description} onChange={(e) => setData('description', e.target.value)} className="input" /></Field>
                     <Field label="Catatan" error={errors.notes}><textarea rows="2" value={data.notes} onChange={(e) => setData('notes', e.target.value)} className="input" /></Field>
-                    <div className="flex justify-end gap-2">{editingId && <button type="button" onClick={cancel} className="rounded-lg border border-border px-4 py-2 text-sm">Batal</button>}<button disabled={processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{processing ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Tambah Item'}</button></div>
+                    <div className="flex justify-end gap-2">{editingId && <button type="button" onClick={cancel} className="btn btn-outline">Batal</button>}<button disabled={processing} className="btn btn-primary">{processing ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Tambah Item'}</button></div>
                 </form>
             )}
         </section>

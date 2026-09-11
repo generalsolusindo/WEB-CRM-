@@ -161,6 +161,14 @@ class SurveyPolicy
             && $survey->status === SurveyStatus::InProgress->value;
     }
 
+    /** Absen pulang (selfie) — hanya setelah absen kedatangan dan belum absen pulang. */
+    public function checkOut(User $user, Survey $survey): bool
+    {
+        return $this->checkIn($user, $survey)
+            && $survey->hasCheckedIn($user)
+            && ! $survey->hasCheckedOut($user);
+    }
+
     /** Anggota tim mengisi draft / unggah lampiran (hanya saat survey berjalan, wajib sudah absen). */
     public function workReport(User $user, Survey $survey): bool
     {

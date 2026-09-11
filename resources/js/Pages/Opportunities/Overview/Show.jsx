@@ -1,5 +1,6 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
+import { PageHeader } from '../../../Components/ui';
 
 export default function Show({ opportunity, canDelegate, projectManagerOptions = [] }) {
     const delegateForm = useForm({ project_manager_id: opportunity.delegated_to?.id ?? '' });
@@ -14,13 +15,13 @@ export default function Show({ opportunity, canDelegate, projectManagerOptions =
         <AppLayout>
             <Head title={opportunity.code} />
             <div className="mx-auto max-w-2xl space-y-5">
-                <div>
-                    <Link href={backHref} className="text-sm text-info">← Kembali</Link>
-                    <h1 className="mt-2 text-2xl font-bold text-text">{opportunity.code}</h1>
-                    <p className="text-sm text-text-muted">{opportunity.company || opportunity.customer}</p>
-                </div>
+                <PageHeader
+                    title={opportunity.code}
+                    subtitle={opportunity.company || opportunity.customer}
+                    back={{ href: backHref, label: 'Kembali' }}
+                />
 
-                <section className="grid gap-4 rounded-xl border border-border bg-surface p-6 shadow-sm sm:grid-cols-2">
+                <section className="grid gap-x-6 gap-y-4 card p-6 sm:grid-cols-2">
                     <Info label="Customer" value={opportunity.customer} />
                     <Info label="Perusahaan" value={opportunity.company} />
                     <Info label="Email / Telepon" value={[opportunity.email, opportunity.phone].filter(Boolean).join(' · ')} />
@@ -34,7 +35,7 @@ export default function Show({ opportunity, canDelegate, projectManagerOptions =
                 </section>
 
                 {canDelegate && (
-                    <form onSubmit={submitDelegate} className="space-y-3 rounded-xl border border-border bg-surface p-6 shadow-sm">
+                    <form onSubmit={submitDelegate} className="space-y-3 card p-6">
                         <h2 className="font-semibold text-text">Tunjuk Project Manager</h2>
                         <p className="text-sm text-text-muted">Wajib ditunjuk — quotation dari opportunity ini baru bisa dikirim ke customer setelah diverifikasi PM di sini dan Manager.</p>
                         <select value={delegateForm.data.project_manager_id} onChange={(e) => delegateForm.setData('project_manager_id', e.target.value)} className="input">
@@ -43,7 +44,7 @@ export default function Show({ opportunity, canDelegate, projectManagerOptions =
                         </select>
                         {delegateForm.errors.project_manager_id && <span className="block text-xs text-danger">{delegateForm.errors.project_manager_id}</span>}
                         <div className="flex justify-end">
-                            <button disabled={delegateForm.processing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">Simpan</button>
+                            <button disabled={delegateForm.processing} className="btn btn-primary">Simpan</button>
                         </div>
                     </form>
                 )}
@@ -53,5 +54,5 @@ export default function Show({ opportunity, canDelegate, projectManagerOptions =
 }
 
 function Info({ label, value }) {
-    return <div><div className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</div><div className="mt-1 whitespace-pre-line text-sm text-text">{value || '—'}</div></div>;
+    return <div><div className="text-[11px] font-bold uppercase tracking-wider text-text-faint">{label}</div><div className="mt-1 whitespace-pre-line text-sm text-text">{value || '—'}</div></div>;
 }

@@ -43,14 +43,14 @@ export default function SurveyPanel({ leadId, surveys = [], requestable = false,
     }
 
     return (
-        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <section className="card p-6">
             <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 className="font-semibold text-text">Survey Lapangan</h2>
                     <p className="text-sm text-text-muted">Minta survey sebelum menyusun requirement. Proses berjalan di Procurement → Finance → Operasional; Sales memantau read-only.</p>
                 </div>
                 {requestable && !hasOpenSurvey && (
-                    <button onClick={() => setOpen((v) => !v)} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white">
+                    <button onClick={() => setOpen((v) => !v)} className="btn btn-primary">
                         {open ? 'Tutup' : 'Minta Survey'}
                     </button>
                 )}
@@ -68,7 +68,7 @@ export default function SurveyPanel({ leadId, surveys = [], requestable = false,
                                     <div className="font-medium text-text">{s.code} · {s.site_region}</div>
                                     <div className="text-xs text-text-muted">{s.delivery_mode} · {s.billable ? 'Ditagih ke customer' : 'Tidak ditagih'}</div>
                                 </div>
-                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badge(s.status)}`}>{s.status_label}</span>
+                                <span className={`badge ${badge(s.status)}`}>{s.status_label}</span>
                             </div>
                             <div className="mt-2 whitespace-pre-line text-sm text-text">{s.site_address}</div>
                             <div className="mt-2 grid gap-1 text-xs text-text-muted sm:grid-cols-3">
@@ -114,12 +114,12 @@ export default function SurveyPanel({ leadId, surveys = [], requestable = false,
                                             onClick={() => finalize(s.id, true)}
                                             disabled={s.requirements_locked}
                                             title={s.requirements_locked ? 'Requirement terkunci (sudah dikirim ke Procurement)' : ''}
-                                            className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                                            className="btn btn-primary"
                                         >
                                             Salin {s.report.items.length} item ke Requirement &amp; Tutup
                                         </button>
                                     )}
-                                    <button onClick={() => finalize(s.id, false)} className="rounded-lg border border-border px-4 py-2 text-sm">
+                                    <button onClick={() => finalize(s.id, false)} className="btn btn-outline">
                                         Tutup tanpa menyalin
                                     </button>
                                 </div>
@@ -128,7 +128,7 @@ export default function SurveyPanel({ leadId, surveys = [], requestable = false,
                     ))}
                 </div>
             ) : (
-                <div className="mb-5 rounded-lg bg-bg p-6 text-center text-sm text-text-muted">Belum ada survey untuk opportunity ini.</div>
+                <div className="mb-5 rounded-xl border border-border bg-surface-2 p-8 text-center text-sm text-text-muted">Belum ada survey untuk opportunity ini.</div>
             )}
 
             {requestable && open && !hasOpenSurvey && (
@@ -159,8 +159,8 @@ export default function SurveyPanel({ leadId, surveys = [], requestable = false,
                         {errors.notes && <span className="mt-1 block text-xs text-danger">{errors.notes}</span>}
                     </label>
                     <div className="flex justify-end gap-2">
-                        <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-border px-4 py-2 text-sm">Batal</button>
-                        <button disabled={processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                        <button type="button" onClick={() => setOpen(false)} className="btn btn-outline">Batal</button>
+                        <button disabled={processing} className="btn btn-primary">
                             {processing ? 'Mengirim...' : 'Kirim ke Procurement'}
                         </button>
                     </div>
@@ -171,7 +171,7 @@ export default function SurveyPanel({ leadId, surveys = [], requestable = false,
 }
 
 function badge(status) {
-    if (['verified', 'closed'].includes(status)) return 'bg-success/10 text-success';
-    if (status === 'cancelled') return 'bg-danger/10 text-danger';
-    return 'bg-warning/10 text-warning';
+    if (['verified', 'closed'].includes(status)) return 'badge-success';
+    if (status === 'cancelled') return 'badge-danger';
+    return 'badge-warning';
 }

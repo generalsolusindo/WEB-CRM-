@@ -1,5 +1,7 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
+import { FiFileText } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
+import { PageHeader, Card, Field, Input, Textarea, Button } from '../../../Components/ui';
 
 export default function BastDraft({ project, draft, hasDraft }) {
     const form = useForm({
@@ -23,68 +25,72 @@ export default function BastDraft({ project, draft, hasDraft }) {
         <AppLayout>
             <Head title={`Generate BAST — ${project.number}`} />
             <div className="mx-auto max-w-3xl space-y-5">
-                <div>
-                    <Link href={`/operational/projects/${project.id}`} className="text-sm text-info">← Kembali ke Project</Link>
-                    <h1 className="mt-2 text-2xl font-bold text-text">Generate BAST — {project.number}</h1>
-                    <p className="text-sm text-text-muted">{project.company || project.customer}{project.po_number ? ` · PO ${project.po_number}` : ''}</p>
-                </div>
+                <PageHeader
+                    title={`Generate BAST — ${project.number}`}
+                    subtitle={`${project.company || project.customer}${project.po_number ? ` · PO ${project.po_number}` : ''}`}
+                    back={{ href: `/operational/projects/${project.id}`, label: 'Kembali ke Project' }}
+                />
 
-                <form onSubmit={submit} className="space-y-5 rounded-xl border border-border bg-surface p-6 shadow-sm">
-                    <div className="grid gap-5 sm:grid-cols-2">
-                        <Field label="Nomor BAST" value={form.data.number} onChange={(v) => form.setData('number', v)} error={form.errors.number} placeholder="Diisi manual" />
-                        <Field label="Tanggal Pelaksanaan" type="date" value={form.data.event_date} onChange={(v) => form.setData('event_date', v)} error={form.errors.event_date} />
-                    </div>
-
-                    <Field label="Pekerjaan" value={form.data.job_title} onChange={(v) => form.setData('job_title', v)} error={form.errors.job_title} placeholder="Mis. Instalasi PLTS On-Grid 10 kWp" />
-
-                    <label className="block text-sm font-medium text-text">
-                        Deskripsi Pelaksanaan Pekerjaan
-                        <textarea rows="4" value={form.data.work_description} onChange={(e) => form.setData('work_description', e.target.value)} placeholder="Uraikan pekerjaan yang telah dilaksanakan..." className="mt-1 w-full rounded-lg border border-border px-3 py-2 outline-none focus:border-navy" />
-                        {form.errors.work_description && <span className="mt-1 block text-sm text-danger">{form.errors.work_description}</span>}
-                    </label>
-
-                    <div>
-                        <h2 className="mb-2 text-sm font-semibold text-text">Pihak Kesatu (Customer)</h2>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Nama PIC" value={form.data.pic_name} onChange={(v) => form.setData('pic_name', v)} error={form.errors.pic_name} />
-                            <Field label="Jabatan PIC" value={form.data.pic_position} onChange={(v) => form.setData('pic_position', v)} error={form.errors.pic_position} />
-                            <div className="sm:col-span-2"><Field label="Alamat" value={form.data.pic_address} onChange={(v) => form.setData('pic_address', v)} error={form.errors.pic_address} /></div>
+                <form onSubmit={submit}>
+                    <Card className="space-y-5">
+                        <div className="grid gap-5 sm:grid-cols-2">
+                            <Field label="Nomor BAST" error={form.errors.number}>
+                                <Input value={form.data.number} onChange={(e) => form.setData('number', e.target.value)} placeholder="Diisi manual" />
+                            </Field>
+                            <Field label="Tanggal Pelaksanaan" error={form.errors.event_date}>
+                                <Input type="date" value={form.data.event_date} onChange={(e) => form.setData('event_date', e.target.value)} />
+                            </Field>
                         </div>
-                        <p className="mt-1 text-xs text-text-muted">Terisi otomatis dari data PIC di Lead — silakan sesuaikan dengan kondisi di lapangan.</p>
-                    </div>
 
-                    <div>
-                        <h2 className="mb-2 text-sm font-semibold text-text">Pihak Kedua (Teknisi)</h2>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Nama Leader" value={form.data.leader_name} onChange={(v) => form.setData('leader_name', v)} error={form.errors.leader_name} />
-                            <Field label="Jabatan" value={form.data.leader_position} onChange={(v) => form.setData('leader_position', v)} error={form.errors.leader_position} placeholder="Teknisi" />
+                        <Field label="Pekerjaan" error={form.errors.job_title}>
+                            <Input value={form.data.job_title} onChange={(e) => form.setData('job_title', e.target.value)} placeholder="Mis. Instalasi PLTS On-Grid 10 kWp" />
+                        </Field>
+
+                        <Field label="Deskripsi Pelaksanaan Pekerjaan" error={form.errors.work_description}>
+                            <Textarea rows={4} value={form.data.work_description} onChange={(e) => form.setData('work_description', e.target.value)} placeholder="Uraikan pekerjaan yang telah dilaksanakan..." />
+                        </Field>
+
+                        <div>
+                            <h2 className="mb-2 text-sm font-semibold text-text">Pihak Kesatu (Customer)</h2>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <Field label="Nama PIC" error={form.errors.pic_name}>
+                                    <Input value={form.data.pic_name} onChange={(e) => form.setData('pic_name', e.target.value)} />
+                                </Field>
+                                <Field label="Jabatan PIC" error={form.errors.pic_position}>
+                                    <Input value={form.data.pic_position} onChange={(e) => form.setData('pic_position', e.target.value)} />
+                                </Field>
+                                <div className="sm:col-span-2">
+                                    <Field label="Alamat" error={form.errors.pic_address}>
+                                        <Input value={form.data.pic_address} onChange={(e) => form.setData('pic_address', e.target.value)} />
+                                    </Field>
+                                </div>
+                            </div>
+                            <p className="mt-1 text-xs text-text-muted">Terisi otomatis dari data PIC di Lead — silakan sesuaikan dengan kondisi di lapangan.</p>
                         </div>
-                        <p className="mt-1 text-xs text-text-muted">Terisi otomatis dari leader tim teknisi project ini — silakan sesuaikan bila perlu.</p>
-                    </div>
 
-                    <div className="flex flex-wrap justify-end gap-2">
-                        {hasDraft && (
-                            <a href={`/operational/projects/${project.id}/bast-draft/print`} target="_blank" rel="noreferrer" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text">
-                                Lihat / Cetak PDF
-                            </a>
-                        )}
-                        <button disabled={form.processing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
-                            {form.processing ? 'Menyimpan…' : 'Simpan'}
-                        </button>
-                    </div>
-                    {!hasDraft && <p className="text-right text-xs text-text-muted">Simpan dulu untuk bisa melihat/cetak PDF-nya.</p>}
+                        <div>
+                            <h2 className="mb-2 text-sm font-semibold text-text">Pihak Kedua (Teknisi)</h2>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <Field label="Nama Leader" error={form.errors.leader_name}>
+                                    <Input value={form.data.leader_name} onChange={(e) => form.setData('leader_name', e.target.value)} />
+                                </Field>
+                                <Field label="Jabatan" error={form.errors.leader_position}>
+                                    <Input value={form.data.leader_position} onChange={(e) => form.setData('leader_position', e.target.value)} placeholder="Teknisi" />
+                                </Field>
+                            </div>
+                            <p className="mt-1 text-xs text-text-muted">Terisi otomatis dari leader tim teknisi project ini — silakan sesuaikan bila perlu.</p>
+                        </div>
+
+                        <div className="flex flex-wrap justify-end gap-2">
+                            {hasDraft && (
+                                <Button href={`/operational/projects/${project.id}/bast-draft/print`} external variant="outline" icon={FiFileText}>Lihat / Cetak PDF</Button>
+                            )}
+                            <Button type="submit" loading={form.processing}>Simpan</Button>
+                        </div>
+                        {!hasDraft && <p className="text-right text-xs text-text-muted">Simpan dulu untuk bisa melihat/cetak PDF-nya.</p>}
+                    </Card>
                 </form>
             </div>
         </AppLayout>
-    );
-}
-
-function Field({ label, value, onChange, error, type = 'text', placeholder }) {
-    return (
-        <label className="block text-sm font-medium text-text">
-            {label}
-            <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="mt-1 w-full rounded-lg border border-border px-3 py-2 outline-none focus:border-navy" />
-            {error && <span className="mt-1 block text-sm text-danger">{error}</span>}
-        </label>
     );
 }

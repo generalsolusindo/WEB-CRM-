@@ -1,5 +1,6 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
+import { PageHeader, StatusBadge } from '../../../Components/ui';
 
 export default function Show({ project, canDelegate, projectManagerOptions = [] }) {
     const delegateForm = useForm({ project_manager_id: project.delegated_to?.id ?? '' });
@@ -15,16 +16,13 @@ export default function Show({ project, canDelegate, projectManagerOptions = [] 
         <AppLayout>
             <Head title={project.number} />
             <div className="mx-auto max-w-3xl space-y-5">
-                <div>
-                    <Link href={backHref} className="text-sm text-info">← Kembali</Link>
-                    <div className="mt-2 flex items-center gap-3">
-                        <h1 className="text-2xl font-bold text-text">{project.number}</h1>
-                        <span className="rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning">{project.status_label}</span>
-                    </div>
-                    <p className="text-sm text-text-muted">{project.customer} · {project.company || 'Tanpa perusahaan'} · {project.sales_order}</p>
-                </div>
+                <PageHeader
+                    title={<span className="flex items-center gap-3">{project.number} <StatusBadge status={project.status} label={project.status_label} /></span>}
+                    subtitle={`${project.customer} · ${project.company || 'Tanpa perusahaan'} · ${project.sales_order}`}
+                    back={{ href: backHref, label: 'Kembali' }}
+                />
 
-                <section className="grid gap-4 rounded-xl border border-border bg-surface p-6 shadow-sm sm:grid-cols-2">
+                <section className="grid gap-x-6 gap-y-4 card p-6 sm:grid-cols-2">
                     <Info label="Tipe Order" value={project.order_type} />
                     <Info
                         label="Status Material"
@@ -39,7 +37,7 @@ export default function Show({ project, canDelegate, projectManagerOptions = [] 
                 </section>
 
                 {canDelegate && (
-                    <form onSubmit={submitDelegate} className="space-y-3 rounded-xl border border-border bg-surface p-6 shadow-sm">
+                    <form onSubmit={submitDelegate} className="space-y-3 card p-6">
                         <h2 className="font-semibold text-text">Delegasi Project</h2>
                         <p className="text-sm text-text-muted">Serahkan pengawasan project ini ke salah satu Project Manager, atau kosongkan untuk kembali dipegang Manager.</p>
                         <select value={delegateForm.data.project_manager_id} onChange={(e) => delegateForm.setData('project_manager_id', e.target.value)} className="input">
@@ -48,12 +46,12 @@ export default function Show({ project, canDelegate, projectManagerOptions = [] 
                         </select>
                         {delegateForm.errors.project_manager_id && <span className="block text-xs text-danger">{delegateForm.errors.project_manager_id}</span>}
                         <div className="flex justify-end">
-                            <button disabled={delegateForm.processing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">Simpan</button>
+                            <button disabled={delegateForm.processing} className="btn btn-primary">Simpan</button>
                         </div>
                     </form>
                 )}
 
-                <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+                <section className="card p-6">
                     <h2 className="font-semibold text-text">Tim Teknisi</h2>
                     {project.technicians.length === 0 ? (
                         <p className="mt-2 text-sm text-text-muted">Belum ditugaskan.</p>
@@ -64,7 +62,7 @@ export default function Show({ project, canDelegate, projectManagerOptions = [] 
                     )}
                 </section>
 
-                <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+                <section className="card p-6">
                     <h2 className="font-semibold text-text">Task</h2>
                     {project.tasks.length === 0 ? (
                         <p className="mt-2 text-sm text-text-muted">Belum ada task.</p>
@@ -80,7 +78,7 @@ export default function Show({ project, canDelegate, projectManagerOptions = [] 
                     )}
                 </section>
 
-                <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+                <section className="card p-6">
                     <h2 className="font-semibold text-text">Absensi Kehadiran</h2>
                     {project.check_ins.length === 0 ? (
                         <p className="mt-2 text-sm text-text-muted">Belum ada teknisi yang absen.</p>
@@ -99,7 +97,7 @@ export default function Show({ project, canDelegate, projectManagerOptions = [] 
                     )}
                 </section>
 
-                <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+                <section className="card p-6">
                     <h2 className="font-semibold text-text">BAST</h2>
                     {project.bast_records.length === 0 ? (
                         <p className="mt-2 text-sm text-text-muted">Belum ada BAST.</p>
@@ -120,5 +118,5 @@ export default function Show({ project, canDelegate, projectManagerOptions = [] 
 }
 
 function Info({ label, value }) {
-    return <div><div className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</div><div className="mt-1 whitespace-pre-line text-sm text-text">{value || '—'}</div></div>;
+    return <div><div className="text-[11px] font-bold uppercase tracking-wider text-text-faint">{label}</div><div className="mt-1 whitespace-pre-line text-sm text-text">{value || '—'}</div></div>;
 }

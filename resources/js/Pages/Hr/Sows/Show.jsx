@@ -1,6 +1,7 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
+import { PageHeader } from '../../../Components/ui';
 
 export default function Show({ sow, canReview, canVerifySignatures }) {
     const form = useForm({ approved: true, notes: '' });
@@ -17,14 +18,14 @@ export default function Show({ sow, canReview, canVerifySignatures }) {
         <AppLayout>
             <Head title={sow.number || `SOW #${sow.id}`} />
             <div className="mx-auto max-w-3xl space-y-5">
-                <div>
-                    <Link href="/hr/sows" className="text-sm text-info">← Kembali</Link>
-                    <h1 className="mt-2 text-2xl font-bold text-text">{sow.number} — {sow.project_name}</h1>
-                    <p className="text-sm text-text-muted">{sow.company || sow.customer} · dibuat oleh {sow.created_by}</p>
-                </div>
+                <PageHeader
+                    title={`${sow.number} — ${sow.project_name}`}
+                    subtitle={`${sow.company || sow.customer} · dibuat oleh ${sow.created_by}`}
+                    back={{ href: '/hr/sows', label: 'Kembali' }}
+                />
 
                 {sow.hr_content_reviewed_by && (
-                    <div className="rounded-xl border border-border bg-surface p-4 text-sm text-text-muted">
+                    <div className="card p-4 text-sm text-text-muted">
                         Direview oleh {sow.hr_content_reviewed_by} · {new Date(sow.hr_content_reviewed_at).toLocaleString('id-ID')}
                         {sow.hr_content_review_notes && <div className="mt-1 text-text">Catatan: {sow.hr_content_review_notes}</div>}
                     </div>
@@ -84,7 +85,7 @@ export default function Show({ sow, canReview, canVerifySignatures }) {
                 )}
 
                 {(canReview || canVerifySignatures) && (
-                    <div className="space-y-3 rounded-xl border border-border bg-surface p-6 shadow-sm">
+                    <div className="space-y-3 card p-6">
                         <h2 className="font-semibold text-text">{canVerifySignatures ? 'Verifikasi Tanda Tangan' : 'Review SOW'}</h2>
                         <textarea
                             value={form.data.notes}
@@ -94,10 +95,10 @@ export default function Show({ sow, canReview, canVerifySignatures }) {
                         />
                         {form.errors.notes && <span className="block text-xs text-danger">{form.errors.notes}</span>}
                         <div className="flex justify-end gap-2">
-                            <button disabled={form.processing} onClick={() => submit(false)} className="rounded-lg border border-danger/30 px-5 py-2 text-sm font-semibold text-danger disabled:opacity-50">
+                            <button disabled={form.processing} onClick={() => submit(false)} className="btn btn-outline border-danger/40 text-danger">
                                 {form.processing && action === 'reject' ? 'Memproses…' : 'Tolak'}
                             </button>
-                            <button disabled={form.processing} onClick={() => submit(true)} className="rounded-lg bg-success px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                            <button disabled={form.processing} onClick={() => submit(true)} className="btn btn-primary bg-success">
                                 {form.processing && action === 'approve' ? 'Memproses…' : 'Setujui'}
                             </button>
                         </div>
@@ -110,7 +111,7 @@ export default function Show({ sow, canReview, canVerifySignatures }) {
 
 function Section({ title, children }) {
     return (
-        <section className="space-y-2 rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <section className="space-y-2 card p-6">
             <h2 className="font-semibold text-text">{title}</h2>
             {children}
         </section>
@@ -122,13 +123,13 @@ function Body({ value }) {
 }
 
 function Info({ label, value }) {
-    return <div><div className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</div><div className="mt-1 text-sm text-text">{value || '—'}</div></div>;
+    return <div><div className="text-[11px] font-bold uppercase tracking-wider text-text-faint">{label}</div><div className="mt-1 text-sm text-text">{value || '—'}</div></div>;
 }
 
 function SignaturePreview({ label, image, name }) {
     return (
         <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-text-faint">{label}</div>
             {image ? (
                 <>
                     <img src={image} className="mt-1 h-16 border-b border-border object-contain" />

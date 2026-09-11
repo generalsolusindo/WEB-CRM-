@@ -1,7 +1,8 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
 import SignaturePad from '../../../Components/SignaturePad';
+import { PageHeader } from '../../../Components/ui';
 
 export default function Sow({ project, vendor, materials = [], technicianOptions = [], sow, signatures, canEdit, canSignAdmin, canRestartSignatures }) {
     const [adminSignature, setAdminSignature] = useState(null);
@@ -73,14 +74,11 @@ export default function Sow({ project, vendor, materials = [], technicianOptions
         <AppLayout>
             <Head title={`Generate SOW — ${project.number}`} />
             <div className="mx-auto max-w-4xl space-y-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <Link href={`/operational/projects/${project.id}`} className="text-sm text-info">← Kembali ke Project</Link>
-                        <h1 className="mt-2 text-2xl font-bold text-text">Generate SOW — {project.number}</h1>
-                        <p className="text-sm text-text-muted">{project.company || project.customer}{vendor ? ` · Vendor: ${vendor.name}` : ''}</p>
-                    </div>
-                    {sow.status && <span className="rounded-full bg-info/10 px-3 py-1 text-xs font-semibold text-info">{sow.status_label}</span>}
-                </div>
+                <PageHeader
+                    title={<span className="flex flex-wrap items-center gap-3">Generate SOW — {project.number} {sow.status && <span className="badge badge-primary">{sow.status_label}</span>}</span>}
+                    subtitle={`${project.company || project.customer}${vendor ? ` · Vendor: ${vendor.name}` : ''}`}
+                    back={{ href: `/operational/projects/${project.id}`, label: 'Kembali ke Project' }}
+                />
 
                 {sow.status === 'rejected_by_hr' && (
                     <div className="rounded-xl border border-danger/30 bg-danger/5 p-4 text-sm text-danger">
@@ -93,7 +91,7 @@ export default function Sow({ project, vendor, materials = [], technicianOptions
                     <section className="rounded-xl border-2 border-danger/40 bg-danger/5 p-6 shadow-sm">
                         <h2 className="mb-1 font-semibold text-danger">Tanda Tangan Ditolak HR</h2>
                         <p className="mb-3 text-sm text-danger">HR menolak tanda tangan Teknisi/PIC Vendor. Ulangi proses tanda tangan dari awal.</p>
-                        <button onClick={restartSignatures} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white">Ulangi Proses Tanda Tangan</button>
+                        <button onClick={restartSignatures} className="btn btn-primary">Ulangi Proses Tanda Tangan</button>
                     </section>
                 )}
 
@@ -103,7 +101,7 @@ export default function Sow({ project, vendor, materials = [], technicianOptions
                         <p className="mb-3 text-sm text-text-muted">Teknisi & PIC Vendor sudah tanda tangan dan diverifikasi HR. Tanda tangani di bawah ini untuk meneruskan ke Direktur.</p>
                         <SignaturePad onChange={setAdminSignature} />
                         <div className="mt-3 flex justify-end">
-                            <button onClick={signAsAdmin} disabled={!adminSignature || signing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                            <button onClick={signAsAdmin} disabled={!adminSignature || signing} className="btn btn-primary">
                                 {signing ? 'Menyimpan…' : 'Tanda Tangani & Kirim ke Direktur'}
                             </button>
                         </div>
@@ -227,15 +225,15 @@ export default function Sow({ project, vendor, materials = [], technicianOptions
                     {canEdit && isDraftLike && (
                         <div className="flex flex-wrap justify-end gap-2">
                             {sow.id && (
-                                <a href={`/operational/projects/${project.id}/sow/print`} target="_blank" rel="noreferrer" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text">
+                                <a href={`/operational/projects/${project.id}/sow/print`} target="_blank" rel="noreferrer" className="btn btn-outline">
                                     Lihat / Cetak PDF
                                 </a>
                             )}
-                            <button disabled={form.processing} className="rounded-lg border border-border px-5 py-2 text-sm font-semibold text-text disabled:opacity-50">
+                            <button disabled={form.processing} className="btn btn-outline">
                                 {form.processing ? 'Menyimpan…' : 'Simpan Draft'}
                             </button>
                             {sow.id && (
-                                <button type="button" onClick={submitToHr} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white">
+                                <button type="button" onClick={submitToHr} className="btn btn-primary">
                                     Kirim ke HR
                                 </button>
                             )}
@@ -243,7 +241,7 @@ export default function Sow({ project, vendor, materials = [], technicianOptions
                     )}
                     {!isDraftLike && sow.id && (
                         <div className="flex justify-end">
-                            <a href={`/operational/projects/${project.id}/sow/print`} target="_blank" rel="noreferrer" className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text">
+                            <a href={`/operational/projects/${project.id}/sow/print`} target="_blank" rel="noreferrer" className="btn btn-outline">
                                 Lihat / Cetak PDF
                             </a>
                         </div>
@@ -256,7 +254,7 @@ export default function Sow({ project, vendor, materials = [], technicianOptions
 
 function Section({ title, children }) {
     return (
-        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <section className="card p-6">
             <h2 className="mb-3 font-semibold text-text">{title}</h2>
             {children}
         </section>

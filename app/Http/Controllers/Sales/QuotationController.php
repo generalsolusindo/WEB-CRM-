@@ -95,6 +95,7 @@ class QuotationController extends Controller
             'contact:id,name,company_name,email,phone,address,npwp',
             'lead:id,type,stage,delegated_to',
             'lead.delegatedTo:id,name',
+            'sales:id,name',
             'procurementRequest:id,status',
             'lines.tax:id,name,rate',
             'parent:id,revision_number,status',

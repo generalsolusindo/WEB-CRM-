@@ -1,36 +1,30 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
-import Pagination from '../../../Components/Pagination';
+import { PageHeader, DataTable, EmptyState, Pagination } from '../../../Components/ui';
 
 export default function Index({ sows }) {
+    const columns = [
+        { key: 'number', label: 'Nomor', render: (s) => <span className="font-medium text-text">{s.number}</span> },
+        { key: 'project_name', label: 'Nama Proyek' },
+        { key: 'customer', label: 'Customer', render: (s) => s.customer || '—' },
+    ];
+
     return (
         <AppLayout>
             <Head title="SOW Menunggu TTD" />
             <div className="mx-auto max-w-4xl space-y-5">
-                <div>
-                    <h1 className="text-2xl font-bold text-text">SOW Menunggu Tanda Tangan</h1>
-                    <p className="text-sm text-text-muted">SOW yang sudah ditanda tangani Teknisi, PIC Vendor, dan Admin Project — menunggu tanda tangan akhir Anda.</p>
-                </div>
-
-                <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-bg text-text-muted">
-                            <tr><th className="px-4 py-3">Nomor</th><th className="px-4 py-3">Nama Proyek</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3 text-right">Aksi</th></tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {sows.data.map((s) => (
-                                <tr key={s.id} className="hover:bg-bg/70">
-                                    <td className="px-4 py-3 font-medium text-text">{s.number}</td>
-                                    <td className="px-4 py-3 text-text-muted">{s.project_name}</td>
-                                    <td className="px-4 py-3 text-text-muted">{s.customer || '—'}</td>
-                                    <td className="px-4 py-3 text-right"><Link href={`/management/sows/${s.id}`} className="font-medium text-info hover:underline">Lihat</Link></td>
-                                </tr>
-                            ))}
-                            {sows.data.length === 0 && <tr><td colSpan={4} className="px-4 py-12 text-center text-text-muted">Tidak ada SOW yang menunggu tanda tangan Anda.</td></tr>}
-                        </tbody>
-                    </table>
-                    <div className="border-t border-border p-4"><Pagination links={sows.links} /></div>
-                </div>
+                <PageHeader
+                    title="SOW Menunggu Tanda Tangan"
+                    subtitle="SOW yang sudah ditanda tangani Teknisi, PIC Vendor, dan Admin Project — menunggu tanda tangan akhir Anda."
+                />
+                <DataTable
+                    columns={columns}
+                    rows={sows.data}
+                    rowKey="id"
+                    rowHref={(s) => `/management/sows/${s.id}`}
+                    empty={<EmptyState title="Tidak ada SOW yang menunggu tanda tangan Anda." />}
+                    footer={<Pagination links={sows.links} />}
+                />
             </div>
         </AppLayout>
     );

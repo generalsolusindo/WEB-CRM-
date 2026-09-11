@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Technician;
 use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Technician\CheckInProjectRequest;
+use App\Http\Requests\Technician\CheckOutProjectRequest;
 use App\Http\Requests\Technician\UploadTaskPhotoRequest;
 use App\Models\Project;
 use App\Models\ProjectTask;
@@ -41,6 +42,7 @@ class TaskController extends Controller
                 'sales_order' => $project->salesOrder->number,
                 'is_leader' => (bool) optional($project->technicians->first())->is_leader,
                 'checked_in' => $project->hasCheckedIn($user),
+                'checked_out' => $project->hasCheckedOut($user),
                 'tasks' => $project->tasks->map(fn ($t) => [
                     'id' => $t->id, 'title' => $t->title, 'status' => $t->status,
                     'scheduled_date' => $t->scheduled_date,
@@ -75,9 +77,17 @@ class TaskController extends Controller
             ->values();
 
         $checkedIn = $task->project->hasCheckedIn($user);
+        $checkedOut = $task->project->hasCheckedOut($user);
         $mySelfie = $checkedIn
             ? $task->project->attachments()
                 ->where('category', 'checkin_selfie')
+                ->where('uploaded_by', $user->id)
+                ->latest()
+                ->first()
+            : null;
+        $myCheckoutSelfie = $checkedOut
+            ? $task->project->attachments()
+                ->where('category', 'checkout_selfie')
                 ->where('uploaded_by', $user->id)
                 ->latest()
                 ->first()
@@ -96,6 +106,9 @@ class TaskController extends Controller
             'checkedIn' => $checkedIn,
             'canCheckIn' => $user->can('checkIn', $task->project),
             'selfieUrl' => $mySelfie ? Storage::disk('local')->temporaryUrl($mySelfie->file_path, now()->addDay()) : null,
+            'checkedOut' => $checkedOut,
+            'canCheckOut' => $user->can('checkOut', $task->project),
+            'checkoutSelfieUrl' => $myCheckoutSelfie ? Storage::disk('local')->temporaryUrl($myCheckoutSelfie->file_path, now()->addDay()) : null,
         ]);
     }
 
@@ -108,6 +121,17 @@ class TaskController extends Controller
         ]);
 
         return back()->with('success', 'Absen kehadiran tersimpan.');
+    }
+
+    public function checkOut(CheckOutProjectRequest $request, Project $project): RedirectResponse
+    {
+        $project->attachments()->create([
+            'category' => 'checkout_selfie',
+            'file_path' => $request->file('photo')->store('checkout-selfies'),
+            'uploaded_by' => $request->user()->id,
+        ]);
+
+        return back()->with('success', 'Absen pulang tersimpan.');
     }
 
     public function updateStatus(Request $request, ProjectTask $task): RedirectResponse

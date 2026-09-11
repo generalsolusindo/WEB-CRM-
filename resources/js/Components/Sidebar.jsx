@@ -2,36 +2,49 @@ import { Link, router, usePage } from '@inertiajs/react';
 import { FiLogOut } from 'react-icons/fi';
 import { getMenuForUser } from '../config/menuConfig';
 
+const ROLE_LABEL = {
+    sales: 'Sales', procurement: 'Procurement', operational: 'Operasional', technician: 'Teknisi',
+    finance: 'Finance', management: 'Manajemen', administrator: 'Administrator',
+    project_manager: 'Project Manager', hr: 'HR', vendor: 'Vendor',
+};
+
+/** Cocokkan item menu dengan URL aktif — exact, prefix path, atau query-string yang sama. */
+function isActive(href, url) {
+    if (href === '#') return false;
+    const [hPath, hQuery] = href.split('?');
+    const [uPath, uQuery] = url.split('?');
+    if (hQuery) return uPath === hPath && (uQuery ?? '') === hQuery;
+    if (uPath === hPath) return true;
+    if (hPath !== '/dashboard' && uPath.startsWith(hPath + '/')) return true;
+    return false;
+}
+
 export default function Sidebar() {
     const { auth } = usePage().props;
-    const currentUrl = usePage().url;
+    const url = usePage().url;
     const items = getMenuForUser(auth);
-
-    function logout() {
-        router.post('/logout');
-    }
+    const user = auth?.user;
+    const initial = user?.name?.charAt(0)?.toUpperCase() ?? '?';
 
     return (
-        <aside className="flex h-screen w-64 flex-col border-r border-border bg-surface">
-            <div className="flex h-16 items-center border-b border-border px-6">
-                <span className="text-lg font-bold text-navy">GS CRM</span>
+        <aside className="flex w-[248px] shrink-0 flex-col rounded-2xl border border-border bg-surface shadow-sm">
+            {/* Brand */}
+            <div className="flex flex-col items-center px-5 pb-4 pt-6 text-center">
+                <img src="/images/logo-gs.png" alt="General Solusindo" className="h-12 w-auto" />
+                <span className="mt-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-text-faint">CRM Internal</span>
             </div>
 
-            <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+            {/* Nav */}
+            <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
                 {items.map((item, i) => {
                     const Icon = item.icon;
-                    const isDisabled = item.href === '#';
-                    const isActive = !isDisabled && currentUrl === item.href;
+                    const disabled = item.href === '#';
+                    const active = isActive(item.href, url);
 
-                    const base = 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium';
-
-                    if (isDisabled) {
+                    if (disabled) {
                         return (
-                            <div
-                                key={i}
-                                className={`${base} cursor-not-allowed text-text-muted opacity-50`}
-                            >
-                                <Icon className="h-4 w-4 shrink-0" />
+                            <div key={i} className="flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-text-faint">
+                                <Icon className="h-[18px] w-[18px] shrink-0" />
                                 <span>{item.label}</span>
                             </div>
                         );
@@ -41,26 +54,43 @@ export default function Sidebar() {
                         <Link
                             key={i}
                             href={item.href}
-                            className={`${base} ${
-                                isActive
-                                    ? 'bg-navy text-white'
+                            className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                                active
+                                    ? 'bg-navy text-white shadow-sm'
                                     : 'text-text-muted hover:bg-bg hover:text-text'
                             }`}
                         >
-                            <Icon className="h-4 w-4 shrink-0" />
-                            <span>{item.label}</span>
+                            <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-white' : 'text-text-faint group-hover:text-text'}`} />
+                            <span className="truncate">{item.label}</span>
+                            {item.badge != null && (
+                                <span className={`ml-auto rounded-full px-1.5 py-0.5 text-[11px] font-bold ${
+                                    active ? 'bg-white/20 text-white' : 'bg-primary-soft text-primary-strong'
+                                }`}>
+                                    {item.badge}
+                                </span>
+                            )}
                         </Link>
                     );
                 })}
             </nav>
 
+            {/* User + logout */}
             <div className="border-t border-border p-3">
+                <div className="flex items-center gap-3 rounded-xl px-2 py-2">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy text-sm font-semibold text-white">
+                        {initial}
+                    </span>
+                    <span className="min-w-0 leading-tight">
+                        <span className="block truncate text-sm font-semibold text-text">{user?.name}</span>
+                        <span className="block text-xs text-text-muted">{ROLE_LABEL[user?.role] ?? user?.role}</span>
+                    </span>
+                </div>
                 <button
-                    onClick={logout}
-                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-text-muted hover:text-danger"
+                    onClick={() => router.post('/logout')}
+                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-text-muted transition hover:bg-danger-soft hover:text-danger"
                 >
-                    <FiLogOut className="h-4 w-4 shrink-0" />
-                    <span>Logout</span>
+                    <FiLogOut className="h-[18px] w-[18px] shrink-0" />
+                    <span>Keluar</span>
                 </button>
             </div>
         </aside>

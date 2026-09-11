@@ -58,6 +58,7 @@ const menuConfig = {
         { label: 'Invoice', href: '/finance/invoices', icon: FiFileText },
         { label: 'Survey', href: '/finance/surveys', icon: FiClipboard },
         { label: 'Pembayaran', href: '/finance/payments', icon: FiCreditCard },
+        { label: 'Pembayaran Vendor', href: '/finance/procurement-payments', icon: FiTruck },
     ],
     management: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
@@ -70,6 +71,7 @@ const menuConfig = {
     project_manager: [
         { label: 'Opportunity Saya', href: '/project-manager/opportunities', icon: FiUsers },
         { label: 'Verifikasi Quotation', href: '/project-manager/quotations', icon: FiFileText },
+        { label: 'Persetujuan Pengadaan', href: '/project-manager/procurement-payments', icon: FiCheckSquare },
         { label: 'Project Saya', href: '/project-manager/projects', icon: FiCalendar },
     ],
     administrator: [

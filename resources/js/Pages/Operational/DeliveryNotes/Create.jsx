@@ -1,5 +1,10 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
+import { PageHeader, Card, CardHeader, Field, Input, Textarea, FormActions } from '../../../Components/ui';
+
+function Alert({ text }) {
+    return <div className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">{text}</div>;
+}
 
 export default function Create({ salesOrder, defaultAddress, lines }) {
     const { data, setData, post, processing, errors, transform } = useForm({
@@ -29,54 +34,53 @@ export default function Create({ salesOrder, defaultAddress, lines }) {
         <AppLayout>
             <Head title="Buat Delivery Note" />
             <div className="mx-auto max-w-3xl space-y-5">
-                <div>
-                    <Link href={`/operational/sales-orders/${salesOrder.id}/delivery-notes`} className="text-sm text-info">← Kembali</Link>
-                    <h1 className="mt-2 text-2xl font-bold text-text">Buat Delivery Note</h1>
-                    <p className="text-sm text-text-muted">{salesOrder.number} · {salesOrder.customer}</p>
-                </div>
+                <PageHeader
+                    title="Buat Delivery Note"
+                    subtitle={`${salesOrder.number} · ${salesOrder.customer}`}
+                    back={{ href: `/operational/sales-orders/${salesOrder.id}/delivery-notes`, label: 'Kembali' }}
+                />
 
-                {errors.sales_order && <div className="rounded-lg border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">{errors.sales_order}</div>}
-                {errors.lines && <div className="rounded-lg border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">{errors.lines}</div>}
+                {errors.sales_order && <Alert text={errors.sales_order} />}
+                {errors.lines && <Alert text={errors.lines} />}
 
                 <form onSubmit={submit} className="space-y-5">
-                    <section className="space-y-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
-                        <label className="block text-sm font-medium text-text">Alamat Pengiriman *
-                            <textarea rows="3" value={data.delivery_address} onChange={(e) => setData('delivery_address', e.target.value)} className="input" />
-                            <span className="mt-1 block text-xs text-text-muted">Default dari alamat customer, bisa diubah sesuai lokasi pengiriman.</span>
-                            {errors.delivery_address && <span className="mt-1 block text-xs text-danger">{errors.delivery_address}</span>}
-                        </label>
+                    <Card className="space-y-4">
+                        <Field label="Alamat Pengiriman" required hint="Default dari alamat customer, bisa diubah sesuai lokasi pengiriman." error={errors.delivery_address}>
+                            <Textarea rows={3} value={data.delivery_address} onChange={(e) => setData('delivery_address', e.target.value)} />
+                        </Field>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <label className="block text-sm font-medium text-text">Shipper (opsional)
-                                <input value={data.shipper_name} onChange={(e) => setData('shipper_name', e.target.value)} className="input" placeholder="nama pengirim" />
-                            </label>
-                            <label className="block text-sm font-medium text-text">Approved by (opsional)
-                                <input value={data.approved_by_name} onChange={(e) => setData('approved_by_name', e.target.value)} className="input" placeholder="nama yang menyetujui" />
-                            </label>
+                            <Field label="Shipper (opsional)">
+                                <Input value={data.shipper_name} onChange={(e) => setData('shipper_name', e.target.value)} placeholder="nama pengirim" />
+                            </Field>
+                            <Field label="Approved by (opsional)">
+                                <Input value={data.approved_by_name} onChange={(e) => setData('approved_by_name', e.target.value)} placeholder="nama yang menyetujui" />
+                            </Field>
                         </div>
-                    </section>
+                    </Card>
 
-                    <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-                        <div className="border-b border-border p-5">
-                            <h2 className="font-semibold text-text">Barang yang Dikirim</h2>
-                            <p className="text-sm text-text-muted">Hanya baris material yang masih punya sisa belum terkirim. Centang & isi qty untuk yang mau dikirim sekarang.</p>
-                        </div>
+                    <Card padded={false}>
+                        <CardHeader title="Barang yang Dikirim" subtitle="Hanya baris material yang masih punya sisa belum terkirim. Centang & isi qty untuk yang mau dikirim sekarang." />
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-bg text-text-muted"><tr><th className="px-3 py-3 w-10"></th><th className="px-3 py-3">Item</th><th className="px-3 py-3">Unit</th><th className="px-3 py-3 text-right">Sisa Belum Terkirim</th><th className="px-3 py-3 text-right">Qty Dikirim</th></tr></thead>
+                                <thead>
+                                    <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
+                                        <th className="w-10 px-3 py-3"></th><th className="px-3 py-3">Item</th><th className="px-3 py-3">Unit</th><th className="px-3 py-3 text-right">Sisa Belum Terkirim</th><th className="px-3 py-3 text-right">Qty Dikirim</th>
+                                    </tr>
+                                </thead>
                                 <tbody className="divide-y divide-border">
                                     {data.lines.map((line, i) => (
                                         <tr key={line.sales_order_line_id}>
-                                            <td className="px-3 py-3"><input type="checkbox" checked={line.checked} onChange={(e) => setLine(i, { checked: e.target.checked })} /></td>
-                                            <td className="px-3 py-3 text-text">{line.item_name}</td>
+                                            <td className="px-3 py-3"><input type="checkbox" checked={line.checked} onChange={(e) => setLine(i, { checked: e.target.checked })} className="accent-navy" /></td>
+                                            <td className="px-3 py-3 font-medium text-text">{line.item_name}</td>
                                             <td className="px-3 py-3 text-text-muted">{line.unit}</td>
-                                            <td className="px-3 py-3 text-right text-text-muted">{line.qty_remaining}</td>
+                                            <td className="px-3 py-3 text-right tabular-nums text-text-muted">{line.qty_remaining}</td>
                                             <td className="px-3 py-3 text-right">
                                                 <input
                                                     type="number" min="0" max={line.qty_remaining} step="0.01"
                                                     disabled={!line.checked}
                                                     value={line.qty_delivered}
                                                     onChange={(e) => setLine(i, { qty_delivered: e.target.value })}
-                                                    className="w-28 rounded-lg border border-border px-2 py-1.5 text-right text-sm disabled:bg-bg"
+                                                    className="w-28 rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-right text-sm outline-none focus:border-primary disabled:bg-bg"
                                                 />
                                             </td>
                                         </tr>
@@ -85,12 +89,13 @@ export default function Create({ salesOrder, defaultAddress, lines }) {
                                 </tbody>
                             </table>
                         </div>
-                    </section>
+                    </Card>
 
-                    <div className="flex justify-end gap-3">
-                        <Link href={`/operational/sales-orders/${salesOrder.id}/delivery-notes`} className="rounded-lg border border-border px-4 py-2 text-sm">Batal</Link>
-                        <button disabled={processing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{processing ? 'Menyimpan...' : 'Buat Delivery Note'}</button>
-                    </div>
+                    <FormActions
+                        cancelHref={`/operational/sales-orders/${salesOrder.id}/delivery-notes`}
+                        submitLabel="Buat Delivery Note"
+                        processing={processing}
+                    />
                 </form>
             </div>
         </AppLayout>

@@ -40,7 +40,7 @@ export default function MeetingsPanel({ leadId, meetings, editable }) {
     }
 
     return (
-        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <section className="card p-6">
             <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 className="font-semibold text-text">Data Meeting / MoM</h2>
@@ -74,7 +74,7 @@ export default function MeetingsPanel({ leadId, meetings, editable }) {
                     ))}
                 </div>
             ) : (
-                <div className="mb-5 rounded-lg bg-bg p-6 text-center text-sm text-text-muted">Belum ada data meeting.</div>
+                <div className="mb-5 rounded-xl border border-border bg-surface-2 p-8 text-center text-sm text-text-muted">Belum ada data meeting.</div>
             )}
 
             {editable && (
@@ -98,8 +98,8 @@ export default function MeetingsPanel({ leadId, meetings, editable }) {
                         <textarea rows="3" value={data.notes} onChange={(e) => setData('notes', e.target.value)} className="input" />
                     </Field>
                     <div className="flex justify-end gap-2">
-                        {editingId && <button type="button" onClick={cancel} className="rounded-lg border border-border px-4 py-2 text-sm">Batal</button>}
-                        <button disabled={processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                        {editingId && <button type="button" onClick={cancel} className="btn btn-outline">Batal</button>}
+                        <button disabled={processing} className="btn btn-primary">
                             {processing ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Tambah Meeting'}
                         </button>
                     </div>

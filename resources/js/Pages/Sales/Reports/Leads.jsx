@@ -1,50 +1,44 @@
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
+import { PageHeader, Toolbar, Button, Card, CardHeader, EmptyState } from '../../../Components/ui';
+
+const DATE_CLS = 'rounded-lg border border-border-strong bg-surface px-3 py-2 text-sm text-text outline-none transition hover:border-text-faint focus:border-primary focus:shadow-[0_0_0_3px_var(--color-primary-ring)]';
 
 export default function Leads({ filters, byStage, bySource, funnel }) {
     const [form, setForm] = useState(filters);
+    const set = (name, value) => setForm((c) => ({ ...c, [name]: value }));
 
-    function set(name, value) {
-        setForm((c) => ({ ...c, [name]: value }));
-    }
     function submit(e) {
         e.preventDefault();
         router.get('/sales/reports/leads', form, { preserveState: true, replace: true });
-    }
-    function reset() {
-        router.get('/sales/reports/leads', {}, { replace: true });
     }
 
     return (
         <AppLayout>
             <Head title="Report Lead" />
             <div className="mx-auto max-w-5xl space-y-5">
-                <div>
-                    <h1 className="text-2xl font-bold text-text">Report Lead</h1>
-                    <p className="text-sm text-text-muted">Rekap pipeline lead milik Anda.</p>
-                </div>
+                <PageHeader title="Report Lead" subtitle="Rekap pipeline lead milik Anda." />
 
-                <form onSubmit={submit} className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-4 shadow-sm">
-                    <label className="text-sm font-medium text-text">Dari
-                        <input type="date" value={form.from} onChange={(e) => set('from', e.target.value)} className="input" />
-                    </label>
-                    <label className="text-sm font-medium text-text">Sampai
-                        <input type="date" value={form.to} onChange={(e) => set('to', e.target.value)} className="input" />
-                    </label>
-                    <button className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white">Terapkan</button>
-                    <button type="button" onClick={reset} className="rounded-lg border border-border px-4 py-2 text-sm">Reset</button>
+                <form onSubmit={submit}>
+                    <Toolbar>
+                        <input type="date" value={form.from} onChange={(e) => set('from', e.target.value)} className={DATE_CLS} />
+                        <span className="text-sm text-text-faint">—</span>
+                        <input type="date" value={form.to} onChange={(e) => set('to', e.target.value)} className={DATE_CLS} />
+                        <Button type="submit">Terapkan</Button>
+                        <Button type="button" variant="outline" onClick={() => router.get('/sales/reports/leads', {}, { replace: true })}>Reset</Button>
+                    </Toolbar>
                 </form>
 
                 <div className="grid gap-4 sm:grid-cols-4">
                     <Stat label="Total Lead" value={funnel.leads} />
                     <Stat label="Opportunity" value={funnel.opportunities} sub={`${funnel.lead_to_opportunity}% dari lead`} />
-                    <Stat label="Won" value={funnel.won} sub={`${funnel.opportunity_to_won}% dari opportunity`} />
-                    <Stat label="Lost" value={funnel.lost} />
+                    <Stat label="Won" value={funnel.won} sub={`${funnel.opportunity_to_won}% dari opportunity`} tone="success" />
+                    <Stat label="Lost" value={funnel.lost} tone="danger" />
                 </div>
 
                 <div className="grid gap-5 md:grid-cols-2">
-                    <TableCard title="Per Stage" rows={byStage} />
+                    <TableCard title="Per Stage" rows={byStage} empty="Belum ada data stage." />
                     <TableCard title="Per Source" rows={bySource} empty="Belum ada data source." />
                 </div>
             </div>
@@ -52,34 +46,33 @@ export default function Leads({ filters, byStage, bySource, funnel }) {
     );
 }
 
-function Stat({ label, value, sub }) {
+function Stat({ label, value, sub, tone }) {
+    const valueColor = tone === 'success' ? 'text-success' : tone === 'danger' ? 'text-danger' : 'text-text';
     return (
-        <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</div>
-            <div className="mt-1 text-2xl font-bold text-text">{value}</div>
-            {sub && <div className="text-xs text-text-muted">{sub}</div>}
-        </div>
+        <Card>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-text-faint">{label}</div>
+            <div className={`mt-1 text-2xl font-bold tracking-tight ${valueColor}`}>{value}</div>
+            {sub && <div className="mt-0.5 text-xs text-text-muted">{sub}</div>}
+        </Card>
     );
 }
 
-function TableCard({ title, rows, empty = 'Tidak ada data.' }) {
+function TableCard({ title, rows, empty }) {
     return (
-        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-            <div className="border-b border-border px-5 py-3 text-sm font-semibold text-text">{title}</div>
+        <Card padded={false}>
+            <CardHeader title={title} />
             {rows.length === 0 ? (
-                <p className="px-5 py-4 text-sm text-text-muted">{empty}</p>
+                <EmptyState title={empty} />
             ) : (
-                <table className="w-full text-left text-sm">
-                    <tbody className="divide-y divide-border">
-                        {rows.map((row, i) => (
-                            <tr key={i}>
-                                <td className="px-5 py-2 text-text-muted">{row.label}</td>
-                                <td className="px-5 py-2 text-right font-medium text-text">{row.total}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                <div className="divide-y divide-border">
+                    {rows.map((row, i) => (
+                        <div key={i} className="flex items-center justify-between px-5 py-2.5 text-sm">
+                            <span className="text-text-muted">{row.label}</span>
+                            <span className="font-semibold tabular-nums text-text">{row.total}</span>
+                        </div>
+                    ))}
+                </div>
             )}
-        </div>
+        </Card>
     );
 }

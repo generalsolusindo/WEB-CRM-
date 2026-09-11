@@ -31,7 +31,6 @@ class SaveQuotationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'valid_until' => ['nullable', 'date', 'after_or_equal:today'],
             'notes' => ['nullable', 'string'],
             'agreed_dpp' => ['nullable', 'numeric', 'min:0', 'decimal:0,2'],
             'lines' => ['required', 'array', 'min:1'],

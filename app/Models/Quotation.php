@@ -44,6 +44,7 @@ class Quotation extends Model
     {
         return [
             'agreed_dpp' => 'decimal:2',
+            'valid_until' => 'date',
             'pm_reviewed_at' => 'datetime',
             'manager_reviewed_at' => 'datetime',
         ];

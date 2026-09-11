@@ -1,6 +1,7 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
+import { PageHeader, Button, StatusBadge } from '../../../Components/ui';
 
 export default function Show({ survey, report, canBrief, canVerify, canCancel, canManageTeam, surveyorOptions = [], checkIns = [] }) {
     const currentTeam = survey.team ?? [];
@@ -30,19 +31,14 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
         <AppLayout>
             <Head title={survey.code} />
             <div className="mx-auto max-w-3xl space-y-5">
-                <div>
-                    <Link href="/operational/surveys" className="text-sm text-info">← Kembali</Link>
-                    <div className="mt-2 flex items-center gap-3">
-                        <h1 className="text-2xl font-bold text-text">{survey.code}</h1>
-                        <span className="rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning">{survey.status_label}</span>
-                    </div>
-                    <p className="text-sm text-text-muted">{survey.customer} · {survey.company || 'Tanpa perusahaan'}</p>
-                    {canCancel && (
-                        <button onClick={cancelSurvey} className="mt-3 rounded-lg border border-danger/30 px-4 py-2 text-sm text-danger">Batalkan Survey</button>
-                    )}
-                </div>
+                <PageHeader
+                    title={<span className="flex items-center gap-3">{survey.code} <StatusBadge status={survey.status} label={survey.status_label} tone="warning" /></span>}
+                    subtitle={`${survey.customer} · ${survey.company || 'Tanpa perusahaan'}`}
+                    back={{ href: '/operational/surveys', label: 'Kembali' }}
+                    actions={canCancel && <Button onClick={cancelSurvey} variant="ghost" className="text-danger hover:bg-danger-soft hover:text-danger">Batalkan Survey</Button>}
+                />
 
-                <section className="grid gap-4 rounded-xl border border-border bg-surface p-6 shadow-sm sm:grid-cols-2">
+                <section className="grid gap-4 card p-6 sm:grid-cols-2">
                     <Info label="Lokasi" value={`${survey.site_region} — ${survey.site_address}`} />
                     <Info label="Pelaksana" value={survey.delivery_mode} />
                     <Info label="Vendor" value={survey.vendor} />
@@ -55,7 +51,7 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
                     {survey.notes && <div className="sm:col-span-2"><Info label="Catatan Sales" value={survey.notes} /></div>}
                 </section>
 
-                <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+                <section className="card p-6">
                     <h2 className="font-semibold text-text">Absensi Kehadiran</h2>
                     {checkIns.length === 0 ? (
                         <p className="mt-2 text-sm text-text-muted">Belum ada surveyor yang absen.</p>
@@ -75,7 +71,7 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
                 </section>
 
                 {canBrief ? (
-                    <form onSubmit={submitBrief} className="space-y-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
+                    <form onSubmit={submitBrief} className="space-y-4 card p-6">
                         <h2 className="font-semibold text-text">Tugaskan Tim & Beri Arahan</h2>
                         <TeamPicker
                             options={surveyorOptions}
@@ -91,19 +87,19 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
                             {briefForm.errors.briefing && <span className="text-xs text-danger">{briefForm.errors.briefing}</span>}
                         </div>
                         <div className="flex justify-end">
-                            <button disabled={briefForm.processing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">Tugaskan & Kirim Arahan</button>
+                            <button disabled={briefForm.processing} className="btn btn-primary">Tugaskan & Kirim Arahan</button>
                         </div>
                     </form>
                 ) : (
                     <>
                         {survey.briefing && (
-                            <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+                            <section className="card p-6">
                                 <h2 className="font-semibold text-text">Arahan</h2>
                                 <p className="mt-2 whitespace-pre-line text-sm text-text">{survey.briefing}</p>
                             </section>
                         )}
                         {canManageTeam && (
-                            <form onSubmit={submitTeam} className="space-y-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
+                            <form onSubmit={submitTeam} className="space-y-4 card p-6">
                                 <h2 className="font-semibold text-text">Ubah Komposisi Tim</h2>
                                 <p className="text-sm text-text-muted">Masih bisa diubah selama survey berjalan.</p>
                                 <TeamPicker
@@ -115,7 +111,7 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
                                     error={teamForm.errors.surveyor_ids || teamForm.errors.leader_id}
                                 />
                                 <div className="flex justify-end">
-                                    <button disabled={teamForm.processing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">Simpan Tim</button>
+                                    <button disabled={teamForm.processing} className="btn btn-primary">Simpan Tim</button>
                                 </div>
                             </form>
                         )}
@@ -123,7 +119,7 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
                 )}
 
                 {report && ['submitted', 'verified', 'rejected'].includes(report.status) && (
-                    <section className="space-y-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
+                    <section className="space-y-4 card p-6">
                         <div className="flex items-center justify-between">
                             <h2 className="font-semibold text-text">Laporan Survey · rev.{report.revision}</h2>
                             <span className="text-xs text-text-muted">{report.submitted_by} · {report.submitted_at?.slice(0, 16).replace('T', ' ')}</span>
@@ -138,7 +134,7 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
                         {report.items.length > 0 && (
                             <div className="overflow-x-auto rounded-lg border border-border">
                                 <table className="w-full text-left text-sm">
-                                    <thead className="bg-bg text-text-muted"><tr><th className="px-3 py-2">Item Rekomendasi</th><th className="px-3 py-2">Qty</th><th className="px-3 py-2">Catatan</th></tr></thead>
+                                    <thead className="bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint"><tr><th className="px-3 py-2">Item Rekomendasi</th><th className="px-3 py-2">Qty</th><th className="px-3 py-2">Catatan</th></tr></thead>
                                     <tbody className="divide-y divide-border">
                                         {report.items.map((i) => (
                                             <tr key={i.id}><td className="px-3 py-2 font-medium text-text">{i.item_name}</td><td className="px-3 py-2 text-text-muted">{i.qty} {i.unit}</td><td className="px-3 py-2 text-text-muted">{i.notes || '—'}</td></tr>
@@ -154,7 +150,7 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
                         )}
 
                         {canVerify && (
-                            <form onSubmit={submitVerify} className="space-y-3 rounded-lg border border-border bg-bg/50 p-4">
+                            <form onSubmit={submitVerify} className="space-y-3 rounded-lg border border-border bg-surface-2 p-4">
                                 <h3 className="font-medium text-text">Verifikasi</h3>
                                 <div className="flex gap-4 text-sm">
                                     <label className="flex items-center gap-2"><input type="radio" name="decision" checked={verifyForm.data.decision === 'approve'} onChange={() => verifyForm.setData('decision', 'approve')} /> Setujui</label>
@@ -163,7 +159,7 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
                                 <textarea rows="2" value={verifyForm.data.notes} onChange={(e) => verifyForm.setData('notes', e.target.value)} className="input" placeholder={verifyForm.data.decision === 'reject' ? 'Wajib: yang harus diperbaiki surveyor' : 'Catatan (opsional)'} />
                                 {verifyForm.errors.notes && <span className="text-xs text-danger">{verifyForm.errors.notes}</span>}
                                 <div className="flex justify-end">
-                                    <button disabled={verifyForm.processing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">Simpan Verifikasi</button>
+                                    <button disabled={verifyForm.processing} className="btn btn-primary">Simpan Verifikasi</button>
                                 </div>
                             </form>
                         )}

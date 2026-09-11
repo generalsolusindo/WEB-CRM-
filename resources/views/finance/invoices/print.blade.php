@@ -22,6 +22,12 @@
 
     // Kolom: No | Deskripsi | Qty | Satuan | Harga Satuan | [Diskon] | [Pajak] | Amount
     $cols = 6 + ($showLineDiscount ? 1 : 0) + ($hasTax ? 1 : 0);
+
+    // Base64 supaya logo tetap tampil saat dirender DomPDF (tidak bisa fetch URL remote).
+    $logoPath = public_path('images/logo-gs.png');
+    $logoSrc = is_file($logoPath)
+        ? 'data:image/png;base64,'.base64_encode(file_get_contents($logoPath))
+        : null;
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -38,6 +44,7 @@
         td, th { vertical-align: top; }
 
         .top td { border: 0; padding: 0; }
+        .brand-logo { height: 40px; margin-bottom: 4px; }
         .brand-name { font-size: 20px; font-weight: 700; color: #001B3A; letter-spacing: .5px; }
         .brand-sub { font-size: 10px; font-style: italic; color: #374151; margin: 2px 0 6px; }
         .muted { color: #6B7280; }
@@ -94,7 +101,11 @@
         <table class="top">
             <tr>
                 <td style="width:58%">
-                    <div class="brand-name">{{ $company['name'] }}</div>
+                    @if ($logoSrc)
+                        <img src="{{ $logoSrc }}" alt="{{ $company['name'] }}" class="brand-logo">
+                    @else
+                        <div class="brand-name">{{ $company['name'] }}</div>
+                    @endif
                     <div class="brand-sub">{{ $company['tagline'] }}</div>
                     <div class="muted">{{ $company['website'] }}</div>
                     <div class="muted">{{ $company['address'] }}</div>

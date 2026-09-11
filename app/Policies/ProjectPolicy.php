@@ -113,6 +113,14 @@ class ProjectPolicy
             && $project->technicians()->where('technician_id', $user->id)->exists();
     }
 
+    /** Absen pulang (selfie) — hanya setelah absen kedatangan dan belum absen pulang. */
+    public function checkOut(User $user, Project $project): bool
+    {
+        return $this->checkIn($user, $project)
+            && $project->hasCheckedIn($user)
+            && ! $project->hasCheckedOut($user);
+    }
+
     /** Manager mendelegasikan project ke Project Manager (atau menarik delegasinya kembali). */
     public function delegate(User $user, Project $project): bool
     {

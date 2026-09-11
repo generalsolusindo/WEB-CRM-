@@ -57,7 +57,7 @@ class CreateQuotation
                 'status' => QuotationStatus::Draft->value,
                 'revision_number' => 1,
                 'parent_quotation_id' => null,
-                'valid_until' => $data['valid_until'] ?? null,
+                'valid_until' => now()->addDays(10)->toDateString(),
                 'notes' => $data['notes'] ?? null,
                 'agreed_dpp' => isset($data['agreed_dpp']) && $data['agreed_dpp'] !== null && $data['agreed_dpp'] !== ''
                     ? (float) $data['agreed_dpp']

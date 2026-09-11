@@ -1,5 +1,6 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
+import { PageHeader, Card, Field, Input, Select, Textarea, FormActions, CurrencyInput } from '../../../Components/ui';
 
 export default function Form({ vendor, vendorProduct = null, categoryOptions }) {
     const editing = Boolean(vendorProduct);
@@ -21,50 +22,39 @@ export default function Form({ vendor, vendorProduct = null, categoryOptions }) 
     return (
         <AppLayout>
             <Head title={editing ? 'Edit Produk' : 'Tambah Produk'} />
-            <div className="mx-auto max-w-2xl">
-                <div className="mb-5">
-                    <Link href={`/procurement/vendors/${vendor.id}`} className="text-sm text-info">← Kembali ke {vendor.name}</Link>
-                    <h1 className="mt-2 text-2xl font-bold text-text">{editing ? 'Edit Produk' : 'Tambah Produk'}</h1>
-                    <p className="text-sm text-text-muted">Vendor: {vendor.name}</p>
-                </div>
-                <form onSubmit={submit} className="space-y-5 rounded-xl border border-border bg-surface p-6 shadow-sm">
-                    <label className="block text-sm font-medium text-text">
-                        Nama Item / Jasa *
-                        <input value={data.item_name} onChange={(e) => setData('item_name', e.target.value)} className="input" />
-                        {errors.item_name && <span className="mt-1 block text-xs text-danger">{errors.item_name}</span>}
-                    </label>
-                    <div className="grid gap-5 sm:grid-cols-3">
-                        <label className="block text-sm font-medium text-text">
-                            Kategori *
-                            <select value={data.category} onChange={(e) => setData('category', e.target.value)} className="input">
-                                {categoryOptions.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-                            </select>
-                            {errors.category && <span className="mt-1 block text-xs text-danger">{errors.category}</span>}
+            <div className="mx-auto max-w-2xl space-y-5">
+                <PageHeader
+                    title={editing ? 'Edit Produk' : 'Tambah Produk'}
+                    subtitle={`Vendor: ${vendor.name}`}
+                    back={{ href: `/procurement/vendors/${vendor.id}`, label: `Kembali ke ${vendor.name}` }}
+                />
+                <form onSubmit={submit}>
+                    <Card className="space-y-5">
+                        <Field label="Nama Item / Jasa" required error={errors.item_name}>
+                            <Input value={data.item_name} onChange={(e) => setData('item_name', e.target.value)} />
+                        </Field>
+                        <div className="grid gap-5 sm:grid-cols-3">
+                            <Field label="Kategori" required error={errors.category}>
+                                <Select value={data.category} onChange={(e) => setData('category', e.target.value)}>
+                                    {categoryOptions.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                </Select>
+                            </Field>
+                            <Field label="Harga (Rp)" required error={errors.price}>
+                                <CurrencyInput value={data.price} onChange={(e) => setData('price', e.target.value)} className="input" />
+                            </Field>
+                            <Field label="Unit" required error={errors.unit}>
+                                <Input value={data.unit} onChange={(e) => setData('unit', e.target.value)} placeholder="pcs, unit, lot, hari" />
+                            </Field>
+                        </div>
+                        <Field label="Deskripsi" error={errors.description}>
+                            <Textarea rows={3} value={data.description} onChange={(e) => setData('description', e.target.value)} />
+                        </Field>
+                        <label className="flex items-center gap-2 text-sm font-medium text-text">
+                            <input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} className="accent-navy" />
+                            Aktif (bisa dipilih saat sourcing Procurement Request)
                         </label>
-                        <label className="block text-sm font-medium text-text">
-                            Harga (Rp) *
-                            <input type="number" step="0.01" min="0" value={data.price} onChange={(e) => setData('price', e.target.value)} className="input" />
-                            {errors.price && <span className="mt-1 block text-xs text-danger">{errors.price}</span>}
-                        </label>
-                        <label className="block text-sm font-medium text-text">
-                            Unit *
-                            <input value={data.unit} onChange={(e) => setData('unit', e.target.value)} placeholder="pcs, unit, lot, hari" className="input" />
-                            {errors.unit && <span className="mt-1 block text-xs text-danger">{errors.unit}</span>}
-                        </label>
-                    </div>
-                    <label className="block text-sm font-medium text-text">
-                        Deskripsi
-                        <textarea rows="3" value={data.description} onChange={(e) => setData('description', e.target.value)} className="input" />
-                        {errors.description && <span className="mt-1 block text-xs text-danger">{errors.description}</span>}
-                    </label>
-                    <label className="flex items-center gap-2 text-sm font-medium text-text">
-                        <input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />
-                        Aktif (bisa dipilih saat sourcing Procurement Request)
-                    </label>
-                    <div className="flex justify-end gap-3">
-                        <Link href={`/procurement/vendors/${vendor.id}`} className="rounded-lg border border-border px-4 py-2 text-sm text-text-muted">Batal</Link>
-                        <button disabled={processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{processing ? 'Menyimpan...' : 'Simpan'}</button>
-                    </div>
+                        <FormActions cancelHref={`/procurement/vendors/${vendor.id}`} processing={processing} />
+                    </Card>
                 </form>
             </div>
         </AppLayout>

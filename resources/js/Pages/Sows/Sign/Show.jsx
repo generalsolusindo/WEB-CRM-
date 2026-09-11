@@ -1,7 +1,8 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
 import SignaturePad from '../../../Components/SignaturePad';
+import { PageHeader } from '../../../Components/ui';
 
 export default function Show({ sow, canSign, signUrl, roleLabel, backHref }) {
     const [signature, setSignature] = useState(null);
@@ -19,14 +20,11 @@ export default function Show({ sow, canSign, signUrl, roleLabel, backHref }) {
         <AppLayout>
             <Head title={sow.number || `SOW #${sow.id}`} />
             <div className="mx-auto max-w-3xl space-y-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <Link href={backHref} className="text-sm text-info">← Kembali</Link>
-                        <h1 className="mt-2 text-2xl font-bold text-text">{sow.number} — {sow.project_name}</h1>
-                        <p className="text-sm text-text-muted">{sow.company || sow.customer}</p>
-                    </div>
-                    <span className="rounded-full bg-info/10 px-3 py-1 text-xs font-semibold text-info">{sow.status_label}</span>
-                </div>
+                <PageHeader
+                    title={<span className="flex flex-wrap items-center gap-3">{sow.number} — {sow.project_name} <span className="badge badge-primary">{sow.status_label}</span></span>}
+                    subtitle={sow.company || sow.customer}
+                    back={{ href: backHref, label: 'Kembali' }}
+                />
 
                 <Section title="Informasi Umum">
                     <Info label="Lokasi" value={sow.site_location} />
@@ -69,13 +67,13 @@ export default function Show({ sow, canSign, signUrl, roleLabel, backHref }) {
                         <h2 className="font-semibold text-text">Perlu Tanda Tangan Anda — {roleLabel}</h2>
                         <SignaturePad onChange={setSignature} />
                         <div className="flex justify-end">
-                            <button onClick={submit} disabled={!signature || processing} className="rounded-lg bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                            <button onClick={submit} disabled={!signature || processing} className="btn btn-primary">
                                 {processing ? 'Menyimpan…' : 'Tanda Tangani & Kirim'}
                             </button>
                         </div>
                     </div>
                 ) : (
-                    <div className="rounded-xl border border-border bg-surface p-4 text-sm text-text-muted">
+                    <div className="card p-4 text-sm text-text-muted">
                         {sow.status === 'completed'
                             ? 'SOW ini sudah selesai — semua pihak sudah tanda tangan.'
                             : `Belum giliran Anda. Status saat ini: ${sow.status_label}.`}
@@ -88,7 +86,7 @@ export default function Show({ sow, canSign, signUrl, roleLabel, backHref }) {
 
 function Section({ title, children }) {
     return (
-        <section className="space-y-2 rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <section className="space-y-2 card p-6">
             <h2 className="font-semibold text-text">{title}</h2>
             {children}
         </section>
@@ -100,13 +98,13 @@ function Body({ value }) {
 }
 
 function Info({ label, value }) {
-    return <div><div className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</div><div className="mt-1 text-sm text-text">{value || '—'}</div></div>;
+    return <div><div className="text-[11px] font-bold uppercase tracking-wider text-text-faint">{label}</div><div className="mt-1 text-sm text-text">{value || '—'}</div></div>;
 }
 
 function SignaturePreview({ label, name, image, at }) {
     return (
         <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-text-faint">{label}</div>
             {image ? (
                 <>
                     <img src={image} className="mt-1 h-16 border-b border-border object-contain" />

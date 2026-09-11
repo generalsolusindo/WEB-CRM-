@@ -52,6 +52,12 @@ class InitializeProject
                 $lines = $order->quotation?->procurementRequest?->lines ?? collect();
 
                 foreach ($lines as $line) {
+                    // Hanya kebutuhan barang (material) yang masuk pengadaan project.
+                    // Jasa ditangani lewat SOW / tim teknisi, bukan pembelian ke vendor.
+                    if ($line->category === 'service') {
+                        continue;
+                    }
+
                     $project->actualProcurements()->create([
                         'requested_by' => null,
                         'vendor_id' => $line->vendorProduct?->vendor_id,
@@ -60,6 +66,7 @@ class InitializeProject
                         'qty' => $line->qty,
                         'unit' => $line->unit,
                         'cost_price' => $line->cost_price,
+                        'estimated_cost' => $line->cost_price,
                         'status' => ActualProcurementStatus::Pending->value,
                     ]);
                 }

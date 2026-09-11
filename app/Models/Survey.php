@@ -143,6 +143,15 @@ class Survey extends Model
             ->exists();
     }
 
+    /** Sudah absen pulang (selfie checkout). */
+    public function hasCheckedOut(User $user): bool
+    {
+        return $this->attachments()
+            ->where('category', 'checkout_selfie')
+            ->where('uploaded_by', $user->id)
+            ->exists();
+    }
+
     /** Invoice survey yang masih aktif (mengabaikan yang dibatalkan). */
     public function invoice(): HasOne
     {

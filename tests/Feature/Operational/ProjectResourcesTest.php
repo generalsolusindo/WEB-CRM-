@@ -2,21 +2,18 @@
 
 namespace Tests\Feature\Operational;
 
-use App\Models\Contact;
-use App\Models\Invoice;
-use App\Models\Lead;
-use App\Models\ProcurementRequest;
+use App\Actions\Finance\RecordProcurementPayment;
+use App\Actions\Procurement\ReviewProcurementPayment;
 use App\Models\Project;
-use App\Models\Quotation;
-use App\Models\SalesOrder;
 use App\Models\User;
 use App\Models\Vendor;
-use App\Models\VendorProduct;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\BuildsProcurementProject;
 use Tests\TestCase;
 
 class ProjectResourcesTest extends TestCase
 {
+    use BuildsProcurementProject;
     use RefreshDatabase;
 
     private User $ops;
@@ -29,42 +26,55 @@ class ProjectResourcesTest extends TestCase
         $this->procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
     }
 
-    public function test_procurement_fulfills_item_status_and_cost_operational_cannot(): void
+    private function sourcedPayload(Project $project, Vendor $vendor, float $cost = 450000): array
     {
-        $project = $this->planningProject();
-        $item = $project->actualProcurements()->firstOrFail();
-        $product = VendorProduct::create([
-            'vendor_id' => Vendor::create(['name' => 'V'])->id,
-            'item_name' => 'Kabel', 'category' => 'material', 'price' => 500000, 'unit' => 'roll', 'is_active' => true,
-        ]);
-
-        // Operational tidak boleh ubah status/vendor
-        $this->actingAs($this->ops)->put("/procurement/project-procurements/{$item->id}", [
-            'cost_price' => 400000, 'status' => 'purchased',
-        ])->assertForbidden();
-
-        // Procurement boleh
-        $this->actingAs($this->procurement)->put("/procurement/project-procurements/{$item->id}", [
-            'vendor_product_id' => $product->id,
-            'cost_price' => 450000,
-            'status' => 'purchased',
-        ])->assertSessionHas('success');
-
-        $item->refresh();
-        $this->assertSame('purchased', $item->status);
-        $this->assertSame('450000.00', $item->cost_price);
-        $this->assertSame($product->vendor_id, $item->vendor_id);
-        $this->assertSame($this->procurement->id, $item->handled_by);
-        $this->assertNotNull($item->purchased_at);
+        return [
+            'pricing_mode' => 'itemized',
+            'lines' => $project->actualProcurements->map(fn ($item) => [
+                'id' => $item->id,
+                'from_office_stock' => false,
+                'vendor_id' => $vendor->id,
+                'cost_price' => $cost,
+            ])->all(),
+        ];
     }
 
-    public function test_project_moves_to_waiting_resource_when_purchasing_starts(): void
+    public function test_procurement_submits_sourcing_operational_cannot(): void
     {
-        $project = $this->planningProject();
-        $item = $project->actualProcurements()->firstOrFail();
+        $project = $this->materialProject();
+        $vendor = Vendor::create(['name' => 'V']);
 
-        $this->actingAs($this->procurement)->put("/procurement/project-procurements/{$item->id}", [
-            'cost_price' => 100000, 'status' => 'purchased',
+        $this->actingAs($this->ops)
+            ->post("/procurement/project-procurements/{$project->id}/submit", $this->sourcedPayload($project, $vendor))
+            ->assertForbidden();
+
+        $this->actingAs($this->procurement)
+            ->post("/procurement/project-procurements/{$project->id}/submit", $this->sourcedPayload($project, $vendor))
+            ->assertSessionHas('success');
+
+        $item = $project->actualProcurements()->firstOrFail();
+        $this->assertSame($vendor->id, $item->vendor_id);
+        $this->assertSame('450000.00', $item->cost_price);
+        $this->assertSame('pending_pm', $project->fresh()->procurementPayment->status->value);
+    }
+
+    public function test_project_moves_to_waiting_resource_when_finance_pays(): void
+    {
+        $project = $this->materialProject();
+        $vendor = Vendor::create(['name' => 'V']);
+        $pm = User::find($project->delegated_to);
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+
+        $this->actingAs($this->procurement)
+            ->post("/procurement/project-procurements/{$project->id}/submit", $this->sourcedPayload($project, $vendor));
+        $payment = $project->fresh()->procurementPayment;
+        app(ReviewProcurementPayment::class)->handle($payment, $pm, true, null);
+
+        $this->assertSame('planning', $project->fresh()->status);
+
+        app(RecordProcurementPayment::class)->handle($payment->fresh(), $finance, [
+            'item_ids' => $project->actualProcurements()->pluck('id')->all(),
+            'proof' => \Illuminate\Http\UploadedFile::fake()->create('tf.pdf', 20, 'application/pdf'),
         ]);
 
         $this->assertSame('waiting_resource', $project->fresh()->status);
@@ -72,13 +82,41 @@ class ProjectResourcesTest extends TestCase
 
     public function test_all_received_notifies_operational(): void
     {
-        $project = $this->planningProject();
-        $item = $project->actualProcurements()->firstOrFail();
+        $project = $this->materialProject();
+        $this->settleProcurement($project);
 
-        $this->actingAs($this->procurement)->put("/procurement/project-procurements/{$item->id}", [
-            'cost_price' => 100000, 'status' => 'received',
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $this->ops->id,
+            'type' => 'project_procurement.ready',
         ]);
+    }
 
+    public function test_all_office_stock_request_skips_finance_and_completes_on_pm_approval(): void
+    {
+        $project = $this->materialProject([
+            ['item_name' => 'Router', 'qty' => 1, 'unit' => 'unit', 'cost_price' => 900000],
+        ]);
+        $item = $project->actualProcurements()->firstOrFail();
+        $pm = User::find($project->delegated_to);
+
+        $this->actingAs($this->procurement)->post("/procurement/project-procurements/{$project->id}/submit", [
+            'pricing_mode' => 'itemized',
+            'lines' => [[
+                'id' => $item->id,
+                'from_office_stock' => true,
+                'office_stock_note' => 'ambil dari gudang',
+            ]],
+        ])->assertSessionHas('success');
+
+        $item->refresh();
+        $this->assertTrue($item->from_office_stock);
+        $this->assertSame('pending', $item->status);
+
+        $payment = $project->fresh()->procurementPayment;
+        app(ReviewProcurementPayment::class)->handle($payment, $pm, true, null);
+
+        $this->assertSame('confirmed', $payment->fresh()->status->value);
+        $this->assertSame('received', $item->fresh()->status);
         $this->assertDatabaseHas('notifications', [
             'user_id' => $this->ops->id,
             'type' => 'project_procurement.ready',
@@ -87,7 +125,7 @@ class ProjectResourcesTest extends TestCase
 
     public function test_operational_adds_and_deletes_extra_item_only_while_pending(): void
     {
-        $project = $this->planningProject();
+        $project = $this->materialProject();
 
         $this->actingAs($this->ops)->post("/operational/projects/{$project->id}/actual-procurements", [
             'item_name' => 'Bracket tambahan', 'qty' => 4, 'unit' => 'pcs', 'cost_price' => 25000,
@@ -99,18 +137,20 @@ class ProjectResourcesTest extends TestCase
         $this->actingAs($this->ops)->delete("/operational/projects/{$project->id}/actual-procurements/{$extra->id}")
             ->assertSessionHas('success');
 
-        // item yang sudah diproses tak bisa dihapus
+        // item yang sudah masuk pengajuan pembayaran tak bisa dihapus
+        $vendor = \App\Models\Vendor::create(['name' => 'V']);
+        $project->actualProcurements()->update(['vendor_id' => $vendor->id, 'cost_price' => 1000]);
+        app(\App\Actions\Procurement\SubmitProcurementPayment::class)
+            ->handle($project->fresh(), $this->procurement, ['pricing_mode' => 'itemized']);
         $seed = $project->actualProcurements()->firstOrFail();
-        $this->actingAs($this->procurement)->put("/procurement/project-procurements/{$seed->id}", [
-            'cost_price' => 1, 'status' => 'purchased',
-        ]);
+        $this->assertNotNull($seed->fresh()->procurement_payment_id);
         $this->actingAs($this->ops)->delete("/operational/projects/{$project->id}/actual-procurements/{$seed->id}")
             ->assertSessionHas('error');
     }
 
     public function test_assign_technicians_requires_exactly_one_leader(): void
     {
-        $project = $this->planningProject();
+        $project = $this->materialProject();
         $t1 = User::factory()->create(['role' => 'technician', 'is_active' => true]);
         $t2 = User::factory()->create(['role' => 'technician', 'is_active' => true]);
 
@@ -126,25 +166,19 @@ class ProjectResourcesTest extends TestCase
 
     public function test_mark_ready_needs_all_items_received_plus_task_and_leader(): void
     {
-        $project = $this->planningProject();
+        $project = $this->materialProject();
         $tech = User::factory()->create(['role' => 'technician', 'is_active' => true]);
-        $item = $project->actualProcurements()->firstOrFail();
 
         $this->actingAs($this->ops)->post("/operational/projects/{$project->id}/tasks", ['title' => 'Instalasi']);
         $this->actingAs($this->ops)->put("/operational/projects/{$project->id}/technicians", [
             'technician_ids' => [$tech->id], 'leader_id' => $tech->id,
         ]);
 
-        // item belum received
-        $this->actingAs($this->procurement)->put("/procurement/project-procurements/{$item->id}", [
-            'cost_price' => 1, 'status' => 'purchased',
-        ]);
+        // barang belum diterima
         $this->actingAs($this->ops)->post("/operational/projects/{$project->id}/ready")
             ->assertSessionHasErrors('project');
 
-        $this->actingAs($this->procurement)->put("/procurement/project-procurements/{$item->id}", [
-            'cost_price' => 1, 'status' => 'received',
-        ]);
+        $this->settleProcurement($project);
         $this->actingAs($this->ops)->post("/operational/projects/{$project->id}/ready")
             ->assertSessionHas('success');
         $this->assertSame('ready', $project->fresh()->status);
@@ -152,7 +186,7 @@ class ProjectResourcesTest extends TestCase
 
     public function test_pure_service_project_can_be_ready_without_procurement(): void
     {
-        $project = $this->planningProject();
+        $project = $this->materialProject();
         $project->actualProcurements()->delete(); // murni jasa
         $tech = User::factory()->create(['role' => 'technician', 'is_active' => true]);
 
@@ -164,39 +198,5 @@ class ProjectResourcesTest extends TestCase
         $this->actingAs($this->ops)->post("/operational/projects/{$project->id}/ready")
             ->assertSessionHas('success');
         $this->assertSame('ready', $project->fresh()->status);
-    }
-
-    private function planningProject(): Project
-    {
-        $sales = User::factory()->create(['role' => 'sales']);
-        $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
-        $lead = Lead::create([
-            'contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified',
-        ]);
-        $lead->requirements()->create(['item_name' => 'Router', 'qty' => 2, 'unit' => 'unit', 'created_by' => $sales->id]);
-        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/submit-procurement");
-        $pr = ProcurementRequest::with('lines')->firstOrFail();
-        $pr->lines()->update(['cost_price' => 1000000, 'availability_status' => 'available']);
-        $pr->update(['status' => 'ready']);
-        $this->actingAs($sales)->post("/sales/procurement-requests/{$pr->id}/quotations", [
-            'lines' => [['procurement_request_line_id' => $pr->lines()->first()->id, 'selling_price' => 1300000]],
-        ]);
-        $quotation = Quotation::firstOrFail();
-        $quotation->update(['status' => 'sent']);
-        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload("mixed"));
-        $so = SalesOrder::firstOrFail();
-
-        $finance = User::factory()->create(['role' => 'finance']);
-        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'dp']);
-        $invoice = Invoice::firstOrFail();
-        $this->actingAs($finance)->post("/finance/invoices/{$invoice->id}/payments", [
-            'amount_paid' => (float) $invoice->amount + (float) $invoice->tax_amount,
-            'paid_at' => now()->toDateTimeString(),
-        ]);
-
-        $project = Project::firstOrFail();
-        $project->update(['status' => 'planning']);
-
-        return $project->fresh();
     }
 }

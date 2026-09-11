@@ -1,10 +1,6 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
-
-const fields = [
-    ['name', 'Nama', 'text'], ['company_name', 'Perusahaan', 'text'],
-    ['email', 'Email', 'email'], ['phone', 'Telepon', 'text'], ['npwp', 'NPWP', 'text'],
-];
+import { PageHeader, Card, Field, Input, Textarea, FormActions } from '../../../Components/ui';
 
 export default function Form({ contact = null }) {
     const editing = Boolean(contact);
@@ -14,32 +10,51 @@ export default function Form({ contact = null }) {
         address: contact?.address ?? '', notes: contact?.notes ?? '',
     });
 
-    function submit(event) {
-        event.preventDefault();
+    function submit(e) {
+        e.preventDefault();
         editing ? put(`/sales/contacts/${contact.id}`) : post('/sales/contacts');
     }
 
     return (
         <AppLayout>
             <Head title={editing ? 'Edit Contact' : 'Tambah Contact'} />
-            <div className="mx-auto max-w-3xl">
-                <div className="mb-5"><h1 className="text-2xl font-bold text-text">{editing ? 'Edit Contact' : 'Tambah Contact'}</h1><p className="text-sm text-text-muted">Isi informasi customer atau PIC.</p></div>
-                <form onSubmit={submit} className="space-y-5 rounded-xl border border-border bg-surface p-6 shadow-sm">
-                    <div className="grid gap-5 sm:grid-cols-2">
-                        {fields.map(([name, label, type]) => <Field key={name} {...{ name, label, type, data, setData, error: errors[name] }} required={name === 'name'} />)}
-                    </div>
-                    <TextArea name="address" label="Alamat" {...{ data, setData, error: errors.address }} />
-                    <TextArea name="notes" label="Catatan" {...{ data, setData, error: errors.notes }} />
-                    <div className="flex justify-end gap-3"><Link href={editing ? `/sales/contacts/${contact.id}` : '/sales/contacts'} className="rounded-lg border border-border px-4 py-2 text-sm text-text-muted">Batal</Link><button disabled={processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{processing ? 'Menyimpan...' : 'Simpan'}</button></div>
+            <div className="mx-auto max-w-3xl space-y-5">
+                <PageHeader
+                    title={editing ? 'Edit Contact' : 'Tambah Contact'}
+                    subtitle="Isi informasi customer atau PIC."
+                    back={{ href: editing ? `/sales/contacts/${contact.id}` : '/sales/contacts' }}
+                />
+
+                <form onSubmit={submit}>
+                    <Card className="space-y-5">
+                        <div className="grid gap-5 sm:grid-cols-2">
+                            <Field label="Nama" required error={errors.name}>
+                                <Input value={data.name} onChange={(e) => setData('name', e.target.value)} />
+                            </Field>
+                            <Field label="Perusahaan" error={errors.company_name}>
+                                <Input value={data.company_name} onChange={(e) => setData('company_name', e.target.value)} />
+                            </Field>
+                            <Field label="Email" error={errors.email}>
+                                <Input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} />
+                            </Field>
+                            <Field label="Telepon" error={errors.phone}>
+                                <Input value={data.phone} onChange={(e) => setData('phone', e.target.value)} />
+                            </Field>
+                            <Field label="NPWP" error={errors.npwp} className="sm:col-span-2">
+                                <Input value={data.npwp} onChange={(e) => setData('npwp', e.target.value)} />
+                            </Field>
+                        </div>
+                        <Field label="Alamat" error={errors.address}>
+                            <Textarea rows={3} value={data.address} onChange={(e) => setData('address', e.target.value)} />
+                        </Field>
+                        <Field label="Catatan" error={errors.notes}>
+                            <Textarea rows={3} value={data.notes} onChange={(e) => setData('notes', e.target.value)} />
+                        </Field>
+
+                        <FormActions cancelHref={editing ? `/sales/contacts/${contact.id}` : '/sales/contacts'} processing={processing} />
+                    </Card>
                 </form>
             </div>
         </AppLayout>
     );
-}
-
-function Field({ name, label, type, data, setData, error, required }) {
-    return <label className="block text-sm font-medium text-text">{label}{required && ' *'}<input type={type} value={data[name]} onChange={(e) => setData(name, e.target.value)} className="mt-1 w-full rounded-lg border border-border px-3 py-2 outline-none focus:border-navy" />{error && <span className="mt-1 block text-sm text-danger">{error}</span>}</label>;
-}
-function TextArea({ name, label, data, setData, error }) {
-    return <label className="block text-sm font-medium text-text">{label}<textarea rows="3" value={data[name]} onChange={(e) => setData(name, e.target.value)} className="mt-1 w-full rounded-lg border border-border px-3 py-2 outline-none focus:border-navy" />{error && <span className="mt-1 block text-sm text-danger">{error}</span>}</label>;
 }

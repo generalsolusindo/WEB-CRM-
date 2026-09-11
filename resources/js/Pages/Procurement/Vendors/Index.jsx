@@ -1,7 +1,8 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
+import { FiPlus } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
-import Pagination from '../../../Components/Pagination';
+import { PageHeader, Toolbar, SearchInput, Button, DataTable, EmptyState, Pagination } from '../../../Components/ui';
 
 export default function Index({ vendors, filters }) {
     const [search, setSearch] = useState(filters.search ?? '');
@@ -11,43 +12,55 @@ export default function Index({ vendors, filters }) {
         router.get('/procurement/vendors', { search }, { preserveState: true, replace: true });
     }
 
+    const columns = [
+        {
+            key: 'name',
+            label: 'Vendor',
+            render: (v) => (
+                <div>
+                    <div className="font-medium text-text">{v.name}</div>
+                    <div className="text-xs text-text-muted">{v.contact_person || '—'}</div>
+                </div>
+            ),
+        },
+        {
+            key: 'contact',
+            label: 'Kontak',
+            render: (v) => (
+                <div className="text-text-muted">
+                    <div>{v.email || '—'}</div>
+                    <div>{v.phone || ''}</div>
+                </div>
+            ),
+        },
+        { key: 'products_count', label: 'Produk', align: 'right', render: (v) => <span className="tabular-nums">{v.products_count}</span> },
+    ];
+
     return (
         <AppLayout>
             <Head title="Vendor & Katalog Produk" />
             <div className="mx-auto max-w-5xl space-y-5">
-                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                    <div>
-                        <h1 className="text-2xl font-bold text-text">Vendor & Katalog Produk</h1>
-                        <p className="text-sm text-text-muted">Daftar vendor dan produk/jasa beserta harga acuan.</p>
-                    </div>
-                    <Link href="/procurement/vendors/create" className="rounded-lg bg-navy px-4 py-2 text-center text-sm font-semibold text-white hover:bg-navy-light">
-                        Tambah Vendor
-                    </Link>
-                </div>
+                <PageHeader
+                    title="Vendor & Katalog Produk"
+                    subtitle="Daftar vendor dan produk/jasa beserta harga acuan."
+                    actions={<Button href="/procurement/vendors/create" icon={FiPlus}>Tambah Vendor</Button>}
+                />
 
-                <div className="rounded-xl border border-border bg-surface shadow-sm">
-                    <form onSubmit={submit} className="flex gap-2 border-b border-border p-4">
-                        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari vendor, PIC, email" className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-navy" />
-                        <button className="rounded-lg bg-navy px-4 py-2 text-sm font-medium text-white">Cari</button>
-                    </form>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-bg text-text-muted"><tr><th className="px-4 py-3">Vendor</th><th className="px-4 py-3">Kontak</th><th className="px-4 py-3 text-right">Produk</th><th className="px-4 py-3 text-right">Aksi</th></tr></thead>
-                            <tbody className="divide-y divide-border">
-                                {vendors.data.map((vendor) => (
-                                    <tr key={vendor.id} className="hover:bg-bg/70">
-                                        <td className="px-4 py-3"><div className="font-medium text-text">{vendor.name}</div><div className="text-xs text-text-muted">{vendor.contact_person || '—'}</div></td>
-                                        <td className="px-4 py-3 text-text-muted"><div>{vendor.email || '—'}</div><div>{vendor.phone || ''}</div></td>
-                                        <td className="px-4 py-3 text-right text-text-muted">{vendor.products_count}</td>
-                                        <td className="px-4 py-3 text-right"><Link href={`/procurement/vendors/${vendor.id}`} className="font-medium text-info hover:underline">Lihat</Link></td>
-                                    </tr>
-                                ))}
-                                {vendors.data.length === 0 && <tr><td colSpan="4" className="px-4 py-12 text-center text-text-muted">Belum ada vendor.</td></tr>}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="border-t border-border p-4"><Pagination links={vendors.links} /></div>
-                </div>
+                <form onSubmit={submit}>
+                    <Toolbar>
+                        <SearchInput value={search} onChange={setSearch} placeholder="Cari vendor, PIC, email" />
+                        <Button type="submit">Cari</Button>
+                    </Toolbar>
+                </form>
+
+                <DataTable
+                    columns={columns}
+                    rows={vendors.data}
+                    rowKey="id"
+                    rowHref={(v) => `/procurement/vendors/${v.id}`}
+                    empty={<EmptyState title="Belum ada vendor." />}
+                    footer={<Pagination links={vendors.links} />}
+                />
             </div>
         </AppLayout>
     );

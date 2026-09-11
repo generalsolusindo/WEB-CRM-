@@ -1,94 +1,77 @@
 import { router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
-import { FiBell, FiLogOut } from 'react-icons/fi';
+import { FiBell } from 'react-icons/fi';
+
+const DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 export default function Topbar() {
     const { auth } = usePage().props;
     const user = auth?.user;
     const notifications = auth?.notifications ?? { unread_count: 0, items: [] };
 
-    const [menuOpen, setMenuOpen] = useState(false);
     const [bellOpen, setBellOpen] = useState(false);
-    const menuRef = useRef(null);
     const bellRef = useRef(null);
 
     useEffect(() => {
         function onClick(e) {
-            if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
             if (bellRef.current && !bellRef.current.contains(e.target)) setBellOpen(false);
         }
         document.addEventListener('mousedown', onClick);
         return () => document.removeEventListener('mousedown', onClick);
     }, []);
 
-    function logout() {
-        router.post('/logout');
-    }
-
-    function openNotification(item) {
-        setBellOpen(false);
-        router.post(`/notifications/${item.id}/read`);
-    }
-
-    const initial = user?.name?.charAt(0)?.toUpperCase() ?? '?';
     const unread = notifications.unread_count ?? 0;
+    const firstName = user?.name?.split(' ')[0] ?? '';
+    const now = new Date();
+    const today = `${DAYS[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
 
     return (
-        <header className="flex h-16 items-center justify-end gap-6 border-b border-border bg-surface px-8">
+        <header className="flex shrink-0 items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-5 py-3 shadow-sm">
+            <div className="leading-tight">
+                <h2 className="text-[15px] font-bold tracking-tight text-text">Halo, {firstName} 👋</h2>
+                <p className="text-xs font-medium text-text-muted">{today}</p>
+            </div>
+
             <div className="relative" ref={bellRef}>
-                <button onClick={() => setBellOpen((v) => !v)} className="relative flex items-center">
-                    <FiBell className="h-5 w-5 text-text-muted" />
+                <button
+                    onClick={() => setBellOpen((v) => !v)}
+                    className={`relative flex h-10 w-10 items-center justify-center rounded-full transition ${
+                        bellOpen ? 'bg-navy text-white' : 'bg-bg text-text-muted hover:bg-border hover:text-text'
+                    }`}
+                    aria-label="Notifikasi"
+                >
+                    <FiBell className="h-[18px] w-[18px]" />
                     {unread > 0 && (
-                        <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">
+                        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white ring-2 ring-surface">
                             {unread > 9 ? '9+' : unread}
                         </span>
                     )}
                 </button>
 
                 {bellOpen && (
-                    <div className="absolute right-0 top-full z-10 mt-2 w-80 overflow-hidden rounded-lg border border-border bg-surface shadow-md">
-                        <div className="border-b border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
-                            Notifikasi
+                    <div className="absolute right-0 top-full z-20 mt-3 w-[22rem] overflow-hidden rounded-2xl border border-border bg-surface shadow-lg">
+                        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                            <span className="text-sm font-bold tracking-tight text-text">Notifikasi</span>
+                            {unread > 0 && <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-bold text-primary-strong">{unread} baru</span>}
                         </div>
-                        <div className="max-h-96 overflow-y-auto">
+                        <div className="max-h-[24rem] overflow-y-auto">
                             {notifications.items.length === 0 && (
-                                <p className="px-4 py-6 text-center text-sm text-text-muted">Tidak ada notifikasi.</p>
+                                <p className="px-4 py-10 text-center text-sm text-text-muted">Belum ada notifikasi.</p>
                             )}
                             {notifications.items.map((item) => (
                                 <button
                                     key={item.id}
-                                    onClick={() => openNotification(item)}
-                                    className={`block w-full border-b border-border px-4 py-3 text-left text-sm last:border-b-0 hover:bg-bg ${item.read_at ? 'text-text-muted' : 'text-text'}`}
+                                    onClick={() => { setBellOpen(false); router.post(`/notifications/${item.id}/read`); }}
+                                    className={`flex w-full gap-3 border-b border-border px-4 py-3 text-left text-sm transition last:border-b-0 hover:bg-bg ${
+                                        item.read_at ? 'text-text-muted' : 'text-text'
+                                    }`}
                                 >
-                                    {!item.read_at && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-info align-middle" />}
-                                    {item.message}
+                                    <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.read_at ? 'bg-transparent' : 'bg-primary'}`} />
+                                    <span className="leading-snug">{item.message}</span>
                                 </button>
                             ))}
                         </div>
-                    </div>
-                )}
-            </div>
-
-            <div className="relative" ref={menuRef}>
-                <button onClick={() => setMenuOpen((v) => !v)} className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy text-sm font-semibold text-white">
-                        {initial}
-                    </span>
-                    <span className="text-left leading-tight">
-                        <span className="block text-sm font-medium text-text">{user?.name}</span>
-                        <span className="block text-xs text-text-muted">{user?.role}</span>
-                    </span>
-                </button>
-
-                {menuOpen && (
-                    <div className="absolute right-0 top-full z-10 mt-2 w-40 rounded-lg border border-border bg-surface py-1 shadow-md">
-                        <button
-                            onClick={logout}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-text-muted hover:bg-bg hover:text-danger"
-                        >
-                            <FiLogOut className="h-4 w-4" />
-                            Logout
-                        </button>
                     </div>
                 )}
             </div>

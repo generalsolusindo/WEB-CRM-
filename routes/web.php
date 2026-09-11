@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\TaxController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Finance\InvoiceController;
+use App\Http\Controllers\Finance\ProcurementPaymentController as FinanceProcurementPaymentController;
 use App\Http\Controllers\Finance\PaymentController;
 use App\Http\Controllers\Finance\SurveyController as FinanceSurveyController;
 use App\Http\Controllers\Hr\SowController as HrSowController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Management\SowController as ManagementSowController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProjectManager\OpportunityController as ProjectManagerOpportunityController;
 use App\Http\Controllers\ProjectManager\ProjectController as ProjectManagerProjectController;
+use App\Http\Controllers\ProjectManager\ProcurementPaymentController as ProjectManagerProcurementPaymentController;
 use App\Http\Controllers\ProjectManager\QuotationController as ProjectManagerQuotationController;
 use App\Http\Controllers\Operational\ActualProcurementController;
 use App\Http\Controllers\Operational\BastDraftController;
@@ -107,6 +109,9 @@ Route::middleware('auth')->group(function () {
         Route::get('quotations', [ProjectManagerQuotationController::class, 'index'])->name('quotations.index');
         Route::get('quotations/{quotation}', [ProjectManagerQuotationController::class, 'show'])->name('quotations.show');
         Route::post('quotations/{quotation}/review', [ProjectManagerQuotationController::class, 'review'])->name('quotations.review');
+        Route::get('procurement-payments', [ProjectManagerProcurementPaymentController::class, 'index'])->name('procurement-payments.index');
+        Route::get('procurement-payments/{procurementPayment}', [ProjectManagerProcurementPaymentController::class, 'show'])->name('procurement-payments.show');
+        Route::post('procurement-payments/{procurementPayment}/review', [ProjectManagerProcurementPaymentController::class, 'review'])->name('procurement-payments.review');
     });
 
     Route::prefix('hr')->name('hr.')->middleware('role:hr')->group(function () {
@@ -145,8 +150,20 @@ Route::middleware('auth')->group(function () {
         Route::resource('procurement-requests', ProcurementRequestController::class)->only(['index', 'show']);
         Route::get('project-procurements', [ProjectProcurementController::class, 'index'])
             ->name('project-procurements.index');
-        Route::put('project-procurements/{actualProcurement}', [ProjectProcurementController::class, 'update'])
-            ->name('project-procurements.update');
+        Route::get('project-procurements/{project}', [ProjectProcurementController::class, 'show'])
+            ->name('project-procurements.show');
+        Route::put('project-procurements/{project}/sourcing', [ProjectProcurementController::class, 'saveSourcing'])
+            ->name('project-procurements.sourcing');
+        Route::post('project-procurements/{project}/submit', [ProjectProcurementController::class, 'submit'])
+            ->name('project-procurements.submit');
+        Route::post('project-procurements/{project}/confirm', [ProjectProcurementController::class, 'confirm'])
+            ->name('project-procurements.confirm');
+        Route::post('project-procurements/items/{actualProcurement}/receive', [ProjectProcurementController::class, 'receiveItem'])
+            ->name('project-procurements.receive');
+        Route::post('project-procurements/{project}/receive-all', [ProjectProcurementController::class, 'receiveAll'])
+            ->name('project-procurements.receive-all');
+        Route::get('procurement-payments/{procurementPayment}', [ProjectProcurementController::class, 'showPayment'])
+            ->name('procurement-payments.show');
     });
 
     Route::prefix('finance')->name('finance.')->middleware('role:finance')->group(function () {
@@ -166,6 +183,9 @@ Route::middleware('auth')->group(function () {
         Route::post('surveys/{survey}/clear', [FinanceSurveyController::class, 'clear'])->name('surveys.clear');
         Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
         Route::post('invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
+        Route::get('procurement-payments', [FinanceProcurementPaymentController::class, 'index'])->name('procurement-payments.index');
+        Route::get('procurement-payments/{procurementPayment}', [FinanceProcurementPaymentController::class, 'show'])->name('procurement-payments.show');
+        Route::post('procurement-payments/{procurementPayment}/pay', [FinanceProcurementPaymentController::class, 'pay'])->name('procurement-payments.pay');
         Route::resource('invoices', InvoiceController::class)->only(['index', 'store', 'show']);
     });
 
@@ -177,11 +197,13 @@ Route::middleware('auth')->group(function () {
         Route::post('surveys/{survey}/report/attachments', [TechnicianSurveyController::class, 'uploadAttachment'])->name('surveys.report.attachments');
         Route::delete('surveys/{survey}/report/attachments/{attachment}', [TechnicianSurveyController::class, 'deleteAttachment'])->name('surveys.report.attachments.destroy');
         Route::post('surveys/{survey}/checkin', [TechnicianSurveyController::class, 'checkIn'])->name('surveys.checkin');
+        Route::post('surveys/{survey}/checkout', [TechnicianSurveyController::class, 'checkOut'])->name('surveys.checkout');
         Route::get('tasks', [TechnicianTaskController::class, 'index'])->name('tasks.index');
         Route::get('tasks/{task}', [TechnicianTaskController::class, 'show'])->name('tasks.show');
         Route::post('tasks/{task}/status', [TechnicianTaskController::class, 'updateStatus'])->name('tasks.status');
         Route::post('tasks/{task}/photos', [TechnicianTaskController::class, 'uploadPhoto'])->name('tasks.photos');
         Route::post('projects/{project}/checkin', [TechnicianTaskController::class, 'checkIn'])->name('projects.checkin');
+        Route::post('projects/{project}/checkout', [TechnicianTaskController::class, 'checkOut'])->name('projects.checkout');
         Route::get('projects/{project}/bast/create', [TechnicianBastController::class, 'create'])->name('projects.bast.create');
         Route::post('projects/{project}/bast', [TechnicianBastController::class, 'store'])->name('projects.bast.store');
         Route::get('projects/{project}/delivery-notes', [TechnicianDeliveryNoteController::class, 'index'])

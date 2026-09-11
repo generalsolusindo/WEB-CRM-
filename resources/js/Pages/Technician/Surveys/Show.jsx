@@ -1,23 +1,31 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { pickFile } from '../../../utils/fileValidation';
+import { PageHeader, StatusBadge } from '../../../Components/ui';
 
 const emptyItem = { item_name: '', qty: 1, unit: '', notes: '' };
 
-export default function Show({ survey, report, canWork, canSubmit, checkedIn, canCheckIn, selfieUrl }) {
+export default function Show({ survey, report, canWork, canSubmit, checkedIn, canCheckIn, selfieUrl, checkedOut, canCheckOut, checkoutSelfieUrl }) {
     const { data, setData, put, processing, errors } = useForm({
         summary: report?.summary ?? '',
         items: report?.items?.map((i) => ({ item_name: i.item_name, qty: i.qty, unit: i.unit ?? '', notes: i.notes ?? '' })) ?? [],
     });
     const uploadForm = useForm({ file: null });
     const checkInForm = useForm({ photo: null });
+    const checkOutForm = useForm({ photo: null });
     const [submitError, setSubmitError] = useState(null);
 
     function checkIn(e) {
         e.preventDefault();
         checkInForm.post(`/technician/surveys/${survey.id}/checkin`, {
             forceFormData: true, preserveScroll: true, onSuccess: () => checkInForm.reset('photo'),
+        });
+    }
+    function checkOut(e) {
+        e.preventDefault();
+        checkOutForm.post(`/technician/surveys/${survey.id}/checkout`, {
+            forceFormData: true, preserveScroll: true, onSuccess: () => checkOutForm.reset('photo'),
         });
     }
 
@@ -50,19 +58,16 @@ export default function Show({ survey, report, canWork, canSubmit, checkedIn, ca
         <AppLayout>
             <Head title={survey.code} />
             <div className="mx-auto max-w-3xl space-y-5">
-                <div>
-                    <Link href="/technician/surveys" className="text-sm text-info">← Kembali</Link>
-                    <div className="mt-2 flex items-center gap-3">
-                        <h1 className="text-2xl font-bold text-text">{survey.code}</h1>
-                        <span className="rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning">{survey.status_label}</span>
-                    </div>
-                    <p className="text-sm text-text-muted">{survey.customer} · {survey.site_region}</p>
-                    {(survey.team ?? []).length > 0 && (
-                        <p className="mt-1 text-xs text-text-muted">
-                            Tim: {survey.team.map((t) => `${t.name}${t.is_leader ? ' (leader)' : ''}`).join(', ')}
-                        </p>
-                    )}
-                </div>
+                <PageHeader
+                    title={<span className="flex items-center gap-3">{survey.code} <StatusBadge status={survey.status} label={survey.status_label} tone="warning" /></span>}
+                    subtitle={`${survey.customer} · ${survey.site_region}`}
+                    back={{ href: '/technician/surveys', label: 'Kembali' }}
+                />
+                {(survey.team ?? []).length > 0 && (
+                    <p className="-mt-2 text-xs text-text-muted">
+                        Tim: {survey.team.map((t) => `${t.name}${t.is_leader ? ' (leader)' : ''}`).join(', ')}
+                    </p>
+                )}
 
                 {checkedIn ? (
                     <section className="flex items-center gap-4 rounded-xl border border-success/30 bg-success/5 p-4">
@@ -75,14 +80,34 @@ export default function Show({ survey, report, canWork, canSubmit, checkedIn, ca
                         <p className="mt-1 text-sm text-text-muted">Wajib absen selfie sebelum bisa mengisi laporan survey.</p>
                         <form onSubmit={checkIn} className="mt-4 flex flex-wrap items-end gap-3">
                             <input type="file" accept=".jpg,.jpeg,.png" capture="user" onChange={(e) => pickFile(checkInForm, 'photo', e.target.files[0], 5)} className="text-sm" />
-                            <button disabled={checkInForm.processing || !checkInForm.data.photo} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Kirim Absen</button>
+                            <button disabled={checkInForm.processing || !checkInForm.data.photo} className="btn btn-primary">Kirim Absen</button>
                             <span className="w-full text-[11px] text-text-muted">maks 5 MB</span>
                             {checkInForm.errors.photo && <span className="w-full text-xs text-danger">{checkInForm.errors.photo}</span>}
                         </form>
                     </section>
                 ) : null}
 
-                <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+                {checkedIn && (
+                    checkedOut ? (
+                        <section className="flex items-center gap-4 rounded-xl border border-success/30 bg-success/5 p-4">
+                            {checkoutSelfieUrl && <img src={checkoutSelfieUrl} alt="Selfie checkout" className="h-14 w-14 rounded-lg object-cover" />}
+                            <p className="text-sm text-success">Kamu sudah absen pulang di survey ini.</p>
+                        </section>
+                    ) : canCheckOut ? (
+                        <section className="rounded-xl border border-warning/30 bg-warning/5 p-6">
+                            <h2 className="font-semibold text-text">Absen Pulang</h2>
+                            <p className="mt-1 text-sm text-text-muted">Isi selfie sebelum meninggalkan lokasi survey.</p>
+                            <form onSubmit={checkOut} className="mt-4 flex flex-wrap items-end gap-3">
+                                <input type="file" accept=".jpg,.jpeg,.png" capture="user" onChange={(e) => pickFile(checkOutForm, 'photo', e.target.files[0], 5)} className="text-sm" />
+                                <button disabled={checkOutForm.processing || !checkOutForm.data.photo} className="btn btn-primary">Kirim Absen Pulang</button>
+                                <span className="w-full text-[11px] text-text-muted">maks 5 MB</span>
+                                {checkOutForm.errors.photo && <span className="w-full text-xs text-danger">{checkOutForm.errors.photo}</span>}
+                            </form>
+                        </section>
+                    ) : null
+                )}
+
+                <section className="card p-6">
                     <h2 className="font-semibold text-text">Arahan Operasional</h2>
                     <p className="mt-2 whitespace-pre-line text-sm text-text">{survey.briefing || 'Belum ada arahan.'}</p>
                     <div className="mt-3 text-xs text-text-muted">Lokasi: {survey.site_address}</div>
@@ -100,7 +125,7 @@ export default function Show({ survey, report, canWork, canSubmit, checkedIn, ca
                     <div className="rounded-lg border border-info/20 bg-info/10 px-4 py-3 text-sm text-info">Laporan sedang menunggu verifikasi Operasional.</div>
                 )}
 
-                <section className="space-y-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
+                <section className="space-y-4 card p-6">
                     <h2 className="font-semibold text-text">Laporan Hasil Survey</h2>
                     {readOnly && !checkedIn && <p className="text-xs text-warning">Absen dulu sebelum bisa mengisi laporan.</p>}
 
@@ -153,9 +178,9 @@ export default function Show({ survey, report, canWork, canSubmit, checkedIn, ca
                     {!readOnly && (
                         <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
                             {submitError && <span className="mr-auto self-center text-xs text-danger">{submitError}</span>}
-                            <button type="button" onClick={save} disabled={processing} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold disabled:opacity-50">Simpan Draft</button>
+                            <button type="button" onClick={save} disabled={processing} className="btn btn-outline">Simpan Draft</button>
                             {canSubmit
-                                ? <button type="button" onClick={submitReport} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white">Kirim Laporan</button>
+                                ? <button type="button" onClick={submitReport} className="btn btn-primary">Kirim Laporan</button>
                                 : <span className="self-center text-xs text-text-muted">Hanya leader tim yang mengirim laporan final.</span>}
                         </div>
                     )}

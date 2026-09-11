@@ -1,16 +1,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
-
-const statusBadge = {
-    draft: 'bg-warning/10 text-warning',
-    planning: 'bg-info/10 text-info',
-    waiting_resource: 'bg-warning/10 text-warning',
-    ready: 'bg-info/10 text-info',
-    in_progress: 'bg-info/10 text-info',
-    verification: 'bg-warning/10 text-warning',
-    completed: 'bg-success/10 text-success',
-};
+import { PageHeader, Button, StatusBadge, CurrencyInput } from '../../../Components/ui';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -24,32 +15,21 @@ export default function Show({ project, approvalDocs = [], bastRecords, taskPhot
         <AppLayout>
             <Head title={number} />
             <div className="mx-auto max-w-5xl space-y-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <Link href="/operational/projects" className="text-sm text-info">← Kembali</Link>
-                        <div className="mt-2 flex items-center gap-3">
-                            <h1 className="text-2xl font-bold text-text">{number}</h1>
-                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadge[project.status]}`}>
-                                {statusOptions.find((s) => s.value === project.status)?.label ?? project.status}
-                            </span>
-                        </div>
-                        <p className="text-sm text-text-muted">{so.number} · {so.contact.name}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {permissions.markReady && (
-                            <button onClick={() => router.post(`/operational/projects/${project.id}/ready`)} className="rounded-lg bg-success px-4 py-2 text-sm font-semibold text-white">Tandai Siap</button>
-                        )}
-                        {permissions.start && (
-                            <button onClick={() => router.post(`/operational/projects/${project.id}/start`)} className="rounded-lg bg-info px-4 py-2 text-sm font-semibold text-white">Mulai Project</button>
-                        )}
-                        {permissions.completeDirect && (
-                            <button onClick={() => { if (confirm('Selesaikan project ini? (Material Only, tanpa BAST)')) router.post(`/operational/projects/${project.id}/complete`); }} className="rounded-lg bg-success px-4 py-2 text-sm font-semibold text-white">Selesaikan Project</button>
-                        )}
-                    </div>
-                </div>
+                <PageHeader
+                    title={<span className="flex items-center gap-3">{number} <StatusBadge status={project.status} label={statusOptions.find((s) => s.value === project.status)?.label} /></span>}
+                    subtitle={`${so.number} · ${so.contact.name}`}
+                    back={{ href: '/operational/projects', label: 'Kembali' }}
+                    actions={(
+                        <>
+                            {permissions.markReady && <Button onClick={() => router.post(`/operational/projects/${project.id}/ready`)} className="bg-success text-white hover:bg-success">Tandai Siap</Button>}
+                            {permissions.start && <Button onClick={() => router.post(`/operational/projects/${project.id}/start`)}>Mulai Project</Button>}
+                            {permissions.completeDirect && <Button onClick={() => { if (confirm('Selesaikan project ini? (Material Only, tanpa BAST)')) router.post(`/operational/projects/${project.id}/complete`); }} className="bg-success text-white hover:bg-success">Selesaikan Project</Button>}
+                        </>
+                    )}
+                />
 
                 {(so.po_number || approvalDocs.length > 0) && (
-                    <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+                    <section className="card p-6">
                         <h2 className="mb-2 font-semibold text-text">Dokumen Persetujuan Customer</h2>
                         <div className="flex flex-wrap items-center gap-3 text-sm text-text-muted">
                             {so.po_number && <span>Nomor PO: <span className="font-medium text-text">{so.po_number}</span></span>}
@@ -58,17 +38,17 @@ export default function Show({ project, approvalDocs = [], bastRecords, taskPhot
                     </section>
                 )}
 
-                <section className="flex items-center justify-between rounded-xl border border-border bg-surface p-6 shadow-sm">
+                <section className="flex items-center justify-between card p-6">
                     <div>
                         <h2 className="font-semibold text-text">Delivery Note</h2>
                         <p className="text-sm text-text-muted">Pengiriman material ke lokasi project ini.</p>
                         {materialStatus && materialStatus.total > 0 && (
-                            <span className={`mt-2 inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${materialStatus.is_complete ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+                            <span className={`badge mt-2 inline-block ${materialStatus.is_complete ? 'badge-success' : 'badge-warning'}`}>
                                 Status Material: {materialStatus.complete} dari {materialStatus.total} item lengkap terkirim
                             </span>
                         )}
                     </div>
-                    <Link href={`/operational/sales-orders/${so.id}/delivery-notes`} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text">
+                    <Link href={`/operational/sales-orders/${so.id}/delivery-notes`} className="btn btn-outline">
                         Lihat Delivery Note
                     </Link>
                 </section>
@@ -78,12 +58,12 @@ export default function Show({ project, approvalDocs = [], bastRecords, taskPhot
                 <ActualProcurement project={project} availabilityOptions={availabilityOptions} progress={procurementProgress} editable={permissions.manageResources} />
                 <TechnicianTeam project={project} options={technicianOptions} editable={permissions.manageResources} />
                 {permissions.manageBastDraft && (
-                    <section className="flex items-center justify-between rounded-xl border border-border bg-surface p-6 shadow-sm">
+                    <section className="flex items-center justify-between card p-6">
                         <div>
                             <h2 className="font-semibold text-text">Generate BAST</h2>
                             <p className="text-sm text-text-muted">Siapkan draft cetakan BAST untuk dibawa teknisi ke lapangan.</p>
                         </div>
-                        <Link href={`/operational/projects/${project.id}/bast-draft`} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text">
+                        <Link href={`/operational/projects/${project.id}/bast-draft`} className="btn btn-outline">
                             Buka Form BAST
                         </Link>
                     </section>
@@ -113,7 +93,7 @@ function BastSection({ project, records, canVerify }) {
     }
 
     return (
-        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <section className="card p-6">
             <h2 className="mb-4 font-semibold text-text">BAST (Berita Acara Serah Terima)</h2>
             {records.length === 0 ? (
                 <p className="text-sm text-text-muted">Belum ada BAST dari technician.</p>
@@ -123,7 +103,7 @@ function BastSection({ project, records, canVerify }) {
                         <div key={b.id} className="rounded-lg border border-border p-3 text-sm">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div>
-                                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${b.status === 'verified' ? 'bg-success/10 text-success' : b.status === 'rejected' ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning'}`}>{b.status}</span>
+                                    <span className={`badge ${b.status === 'verified' ? 'badge-success' : b.status === 'rejected' ? 'badge-danger' : 'badge-warning'}`}>{b.status}</span>
                                     <span className="ml-2 text-text-muted">oleh {b.submitter?.name} · {b.submitted_at?.slice(0, 16).replace('T', ' ')}</span>
                                 </div>
                                 {canVerify && b.status === 'submitted' && (
@@ -148,7 +128,7 @@ function BastSection({ project, records, canVerify }) {
                     <textarea rows="3" value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} className="input" placeholder="Jelaskan apa yang perlu diperbaiki" />
                     {form.errors.notes && <span className="text-xs text-danger">{form.errors.notes}</span>}
                     <div className="flex justify-end gap-2">
-                        <button type="button" onClick={() => setRejecting(null)} className="rounded-lg border border-border px-4 py-2 text-sm">Batal</button>
+                        <button type="button" onClick={() => setRejecting(null)} className="btn btn-outline">Batal</button>
                         <button disabled={form.processing} className="rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Tolak & Rework</button>
                     </div>
                 </form>
@@ -169,7 +149,7 @@ function ChangeRequests({ project, types, editable }) {
     }
 
     return (
-        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <section className="card p-6">
             <h2 className="mb-1 font-semibold text-text">Change Request</h2>
             <p className="mb-4 text-xs text-text-muted">Pencatatan perubahan pesanan saat project berjalan. Tidak mengubah task/pengadaan — ditagih terpisah oleh Finance.</p>
             <div className="mb-4 space-y-2">
@@ -180,7 +160,7 @@ function ChangeRequests({ project, types, editable }) {
                             <div className="text-xs text-text-muted">{c.description}</div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${c.status === 'approved' ? 'bg-success/10 text-success' : c.status === 'rejected' ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning'}`}>{c.status}</span>
+                            <span className={`badge ${c.status === 'approved' ? 'badge-success' : c.status === 'rejected' ? 'badge-danger' : 'badge-warning'}`}>{c.status}</span>
                             {editable && c.status === 'pending' && (
                                 <>
                                     <button onClick={() => decide(c.id, 'approved')} className="text-xs font-semibold text-success">Setujui</button>
@@ -193,7 +173,7 @@ function ChangeRequests({ project, types, editable }) {
                 {project.change_requests.length === 0 && <p className="text-sm text-text-muted">Belum ada change request.</p>}
             </div>
             {editable && (
-                <form onSubmit={submit} className="space-y-3 rounded-lg border border-border bg-bg/50 p-4">
+                <form onSubmit={submit} className="space-y-3 rounded-lg border border-border bg-surface-2 p-4">
                     <div className="grid gap-3 sm:grid-cols-3">
                         <select value={form.data.type} onChange={(e) => form.setData('type', e.target.value)} className="input">
                             {types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -201,7 +181,7 @@ function ChangeRequests({ project, types, editable }) {
                     </div>
                     <textarea rows="2" value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} placeholder="Deskripsi perubahan" className="input" />
                     {form.errors.description && <span className="text-xs text-danger">{form.errors.description}</span>}
-                    <div className="flex justify-end"><button disabled={form.processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Catat Change Request</button></div>
+                    <div className="flex justify-end"><button disabled={form.processing} className="btn btn-primary">Catat Change Request</button></div>
                 </form>
             )}
         </section>
@@ -211,7 +191,7 @@ function ChangeRequests({ project, types, editable }) {
 function Planning({ project, canPlan }) {
     const form = useForm({ planned_start: project.planned_start ?? '', planned_end: project.planned_end ?? '' });
     return (
-        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <section className="card p-6">
             <h2 className="mb-4 font-semibold text-text">Perencanaan Jadwal</h2>
             {canPlan ? (
                 <form onSubmit={(e) => { e.preventDefault(); form.put(`/operational/projects/${project.id}/planning`, { preserveScroll: true }); }} className="space-y-4">
@@ -224,7 +204,7 @@ function Planning({ project, canPlan }) {
                             {form.errors.planned_end && <span className="text-xs text-danger">{form.errors.planned_end}</span>}
                         </label>
                     </div>
-                    <div className="flex justify-end"><button disabled={form.processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Simpan Planning</button></div>
+                    <div className="flex justify-end"><button disabled={form.processing} className="btn btn-primary">Simpan Planning</button></div>
                 </form>
             ) : (
                 <div className="grid gap-4 text-sm sm:grid-cols-2">
@@ -247,27 +227,27 @@ function ActualProcurement({ project, availabilityOptions, progress, editable })
     const done = progress.total > 0 && progress.received === progress.total;
 
     return (
-        <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+        <section className="card overflow-hidden p-0">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-5">
                 <div>
                     <h2 className="font-semibold text-text">Kebutuhan Barang (dikerjakan Procurement)</h2>
                     <p className="text-xs text-text-muted">Status pembelian diatur oleh tim Procurement. Operational hanya memantau.</p>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${done ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+                <span className={`badge ${done ? 'badge-success' : 'badge-warning'}`}>
                     Diterima {progress.received} / {progress.total}
                 </span>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                    <thead className="bg-bg text-text-muted"><tr><th className="px-4 py-3">Item</th><th className="px-4 py-3">Qty</th><th className="px-4 py-3 text-right">Cost</th><th className="px-4 py-3">Status</th>{editable && <th className="px-4 py-3 text-right">Aksi</th>}</tr></thead>
+                    <thead className="bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint"><tr><th className="px-4 py-3">Item</th><th className="px-4 py-3">Qty</th><th className="px-4 py-3 text-right">Cost</th><th className="px-4 py-3">Status</th>{editable && <th className="px-4 py-3 text-right">Aksi</th>}</tr></thead>
                     <tbody className="divide-y divide-border">
                         {project.actual_procurements.map((item) => (
                             <tr key={item.id}>
                                 <td className="px-4 py-3"><div className="font-medium text-text">{item.item_name}</div><div className="text-xs text-text-muted">{item.vendor?.name || 'Belum ada vendor'}{item.requested_by ? ' · ekstra' : ''}</div></td>
                                 <td className="px-4 py-3 text-text-muted">{item.qty} {item.unit}</td>
                                 <td className="px-4 py-3 text-right text-text-muted">{money(item.cost_price)}</td>
-                                <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.status === 'received' ? 'bg-success/10 text-success' : item.status === 'purchased' ? 'bg-info/10 text-info' : 'bg-warning/10 text-warning'}`}>{availabilityOptions.find((o) => o.value === item.status)?.label ?? item.status}</span></td>
-                                {editable && <td className="px-4 py-3 text-right">{item.status === 'pending' && <button onClick={() => { if (confirm('Hapus item?')) router.delete(`/operational/projects/${project.id}/actual-procurements/${item.id}`, { preserveScroll: true }); }} className="text-danger">Hapus</button>}</td>}
+                                <td className="px-4 py-3"><span className={`badge ${item.status === 'received' ? 'badge-success' : item.status === 'purchased' ? 'badge-primary' : 'badge-warning'}`}>{availabilityOptions.find((o) => o.value === item.status)?.label ?? item.status}</span></td>
+                                {editable && <td className="px-4 py-3 text-right">{item.status === 'pending' && !item.procurement_payment_id && <button onClick={() => { if (confirm('Hapus item?')) router.delete(`/operational/projects/${project.id}/actual-procurements/${item.id}`, { preserveScroll: true }); }} className="text-danger">Hapus</button>}</td>}
                             </tr>
                         ))}
                         {project.actual_procurements.length === 0 && <tr><td colSpan={editable ? 5 : 4} className="px-4 py-6 text-center text-text-muted">Tidak ada kebutuhan barang (murni jasa).</td></tr>}
@@ -279,8 +259,8 @@ function ActualProcurement({ project, availabilityOptions, progress, editable })
                     <input value={form.data.item_name} onChange={(e) => form.setData('item_name', e.target.value)} placeholder="Item ekstra tak terduga" className="rounded-lg border border-border px-2 py-2 text-sm md:col-span-2" />
                     <input type="number" min="0" step="0.01" value={form.data.qty} onChange={(e) => form.setData('qty', e.target.value)} placeholder="Qty" className="rounded-lg border border-border px-2 py-2 text-sm" />
                     <input value={form.data.unit} onChange={(e) => form.setData('unit', e.target.value)} placeholder="Unit" className="rounded-lg border border-border px-2 py-2 text-sm" />
-                    <input type="number" min="0" step="0.01" value={form.data.cost_price} onChange={(e) => form.setData('cost_price', e.target.value)} placeholder="Estimasi cost" className="rounded-lg border border-border px-2 py-2 text-sm" />
-                    <button disabled={form.processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white md:col-span-5">Tambah Item Ekstra</button>
+                    <CurrencyInput value={form.data.cost_price} onChange={(e) => form.setData('cost_price', e.target.value)} placeholder="Estimasi cost" className="rounded-lg border border-border px-2 py-2 text-sm" />
+                    <button disabled={form.processing} className="btn btn-primary md:col-span-5">Tambah Item Ekstra</button>
                     {Object.keys(form.errors).length > 0 && <span className="text-xs text-danger md:col-span-5">{Object.values(form.errors)[0]}</span>}
                 </form>
             )}
@@ -296,14 +276,14 @@ function VendorAssignment({ project, options, editable, canViewSow }) {
     }
 
     return (
-        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <section className="card p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 className="mb-1 font-semibold text-text">Vendor Teknisi Luar</h2>
                     <p className="text-sm text-text-muted">Tandai kalau project ini dikerjakan lewat vendor teknisi luar (di luar jangkauan tim internal) — dibutuhkan sebelum membuat SOW.</p>
                 </div>
                 {canViewSow && (
-                    <Link href={`/operational/projects/${project.id}/sow`} className="whitespace-nowrap rounded-lg border border-border px-4 py-2 text-sm font-semibold text-text">
+                    <Link href={`/operational/projects/${project.id}/sow`} className="whitespace-nowrap btn btn-outline">
                         Generate SOW
                     </Link>
                 )}
@@ -316,7 +296,7 @@ function VendorAssignment({ project, options, editable, canViewSow }) {
                         <option value="">Tidak pakai vendor luar</option>
                         {options.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
                     </select>
-                    <button onClick={save} disabled={form.processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Simpan</button>
+                    <button onClick={save} disabled={form.processing} className="btn btn-primary">Simpan</button>
                     {form.errors.vendor_id && <span className="text-xs text-danger">{form.errors.vendor_id}</span>}
                 </div>
             )}
@@ -340,7 +320,7 @@ function TechnicianTeam({ project, options, editable }) {
     }
 
     return (
-        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <section className="card p-6">
             <h2 className="mb-4 font-semibold text-text">Tim Technician</h2>
             {!editable ? (
                 <ul className="space-y-1 text-sm">
@@ -363,7 +343,7 @@ function TechnicianTeam({ project, options, editable }) {
                         ))}
                     </div>
                     {Object.keys(form.errors).length > 0 && <p className="text-xs text-danger">{Object.values(form.errors)[0]}</p>}
-                    <div className="flex justify-end"><button onClick={save} disabled={form.processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Simpan Tim</button></div>
+                    <div className="flex justify-end"><button onClick={save} disabled={form.processing} className="btn btn-primary">Simpan Tim</button></div>
                 </div>
             )}
         </section>
@@ -372,7 +352,7 @@ function TechnicianTeam({ project, options, editable }) {
 
 function CheckIns({ items }) {
     return (
-        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <section className="card p-6">
             <h2 className="font-semibold text-text">Absensi Kehadiran</h2>
             {items.length === 0 ? (
                 <p className="mt-2 text-sm text-text-muted">Belum ada teknisi yang absen.</p>
@@ -409,7 +389,7 @@ function Tasks({ project, photos = {}, editable }) {
     }
 
     return (
-        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+        <section className="card p-6">
             <h2 className="mb-4 font-semibold text-text">Task Project</h2>
             <div className="mb-4 space-y-2">
                 {project.tasks.map((t) => (
@@ -429,7 +409,7 @@ function Tasks({ project, photos = {}, editable }) {
                 {project.tasks.length === 0 && <p className="text-sm text-text-muted">Belum ada task.</p>}
             </div>
             {editable && (
-                <form onSubmit={submit} className="space-y-3 rounded-lg border border-border bg-bg/50 p-4">
+                <form onSubmit={submit} className="space-y-3 rounded-lg border border-border bg-surface-2 p-4">
                     <h3 className="font-medium text-text">{editingId ? 'Edit Task' : 'Tambah Task'}</h3>
                     <div className="grid gap-3 sm:grid-cols-3">
                         <input value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} placeholder="Judul task" className="input sm:col-span-2" />
@@ -438,8 +418,8 @@ function Tasks({ project, photos = {}, editable }) {
                     <textarea rows="2" value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} placeholder="Deskripsi" className="input" />
                     {form.errors.title && <span className="text-xs text-danger">{form.errors.title}</span>}
                     <div className="flex justify-end gap-2">
-                        {editingId && <button type="button" onClick={cancel} className="rounded-lg border border-border px-4 py-2 text-sm">Batal</button>}
-                        <button disabled={form.processing} className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{editingId ? 'Simpan' : 'Tambah'}</button>
+                        {editingId && <button type="button" onClick={cancel} className="btn btn-outline">Batal</button>}
+                        <button disabled={form.processing} className="btn btn-primary">{editingId ? 'Simpan' : 'Tambah'}</button>
                     </div>
                 </form>
             )}

@@ -91,6 +91,15 @@ class Project extends Model
             ->exists();
     }
 
+    /** Sudah absen pulang (selfie checkout). */
+    public function hasCheckedOut(User $user): bool
+    {
+        return $this->attachments()
+            ->where('category', 'checkout_selfie')
+            ->where('uploaded_by', $user->id)
+            ->exists();
+    }
+
     public function tasks(): HasMany
     {
         return $this->hasMany(ProjectTask::class);
@@ -99,6 +108,17 @@ class Project extends Model
     public function actualProcurements(): HasMany
     {
         return $this->hasMany(ActualProcurement::class);
+    }
+
+    public function procurementPayments(): HasMany
+    {
+        return $this->hasMany(ProcurementPayment::class);
+    }
+
+    /** Pengajuan pembayaran pengadaan yang aktif (paling baru). */
+    public function procurementPayment(): HasOne
+    {
+        return $this->hasOne(ProcurementPayment::class)->latestOfMany();
     }
 
     public function bastRecords(): HasMany

@@ -1,27 +1,18 @@
 import { Head, Link } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
-
-function badge(status) {
-    if (status === 'verified') return 'bg-success/10 text-success';
-    if (status === 'report_review') return 'bg-info/10 text-info';
-    return 'bg-warning/10 text-warning';
-}
+import { PageHeader, StatusBadge, EmptyState } from '../../../Components/ui';
 
 export default function Index({ surveys }) {
     return (
         <AppLayout>
             <Head title="Survey Saya" />
             <div className="mx-auto max-w-3xl space-y-5">
-                <h1 className="text-2xl font-bold text-text">Survey Saya</h1>
+                <PageHeader title="Survey Saya" />
 
-                {surveys.length === 0 && (
-                    <div className="rounded-xl border border-border bg-surface p-8 text-center text-sm text-text-muted shadow-sm">
-                        Belum ada survey yang ditugaskan kepada Anda.
-                    </div>
-                )}
+                {surveys.length === 0 && <EmptyState title="Belum ada survey yang ditugaskan kepada Anda." />}
 
                 {surveys.map((s) => (
-                    <Link key={s.id} href={`/technician/surveys/${s.id}`} className="block rounded-xl border border-border bg-surface p-5 shadow-sm hover:bg-bg/50">
+                    <Link key={s.id} href={`/technician/surveys/${s.id}`} className="block card p-5 transition hover:border-border-strong hover:shadow-md">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <div>
                                 <div className="font-semibold text-text">{s.code} · {s.site_region}</div>
@@ -29,11 +20,11 @@ export default function Index({ surveys }) {
                             </div>
                             <div className="flex items-center gap-2">
                                 {s.status === 'in_progress' && (
-                                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${s.checked_in ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
-                                        {s.checked_in ? 'Sudah absen' : 'Belum absen'}
+                                    <span className={`badge ${s.checked_out ? 'badge-success' : s.checked_in ? 'badge-primary' : 'badge-warning'}`}>
+                                        {s.checked_out ? 'Sudah absen pulang' : s.checked_in ? 'Sudah absen datang' : 'Belum absen'}
                                     </span>
                                 )}
-                                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badge(s.status)}`}>{s.status_label}</span>
+                                <StatusBadge status={s.status} label={s.status_label} />
                             </div>
                         </div>
                     </Link>
