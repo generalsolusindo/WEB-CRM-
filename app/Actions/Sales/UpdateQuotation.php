@@ -31,6 +31,7 @@ class UpdateQuotation
 
             $locked->update([
                 'notes' => $data['notes'] ?? null,
+                'terms' => $data['terms'] ?? null,
                 'agreed_dpp' => isset($data['agreed_dpp']) && $data['agreed_dpp'] !== null && $data['agreed_dpp'] !== ''
                     ? (float) $data['agreed_dpp']
                     : null,

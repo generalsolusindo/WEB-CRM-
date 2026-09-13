@@ -48,10 +48,19 @@ const MAP = {
     rejected_signature: ['danger', 'TTD Ditolak'],
     pending_admin_signature: ['warning', 'Menunggu TTD Admin'],
     pending_director_signature: ['warning', 'Menunggu TTD Direktur'],
-    // Lead
+    // Lead (type)
     lead: ['neutral', 'Lead'],
     opportunity: ['info', 'Opportunity'],
     approved: ['success', 'Disetujui'],
+    // Lead stage
+    new: ['neutral', 'Baru'],
+    qualified: ['info', 'Terkualifikasi'],
+    requirement: ['info', 'Requirement'],
+    procurement: ['warning', 'Procurement'],
+    quotation: ['warning', 'Quotation'],
+    negotiation: ['warning', 'Negosiasi'],
+    won: ['success', 'Won'],
+    lost: ['danger', 'Lost'],
 };
 
 function titleize(s) {

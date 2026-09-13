@@ -3,7 +3,7 @@ import { FiUserPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, CardHeader, Button, Info, InfoGrid, StatusBadge, EmptyState } from '../../../Components/ui';
 
-export default function Show({ contact, leads }) {
+export default function Show({ contact, leads, npwpDocumentUrl = null }) {
     function destroy() {
         if (confirm('Hapus contact ini?')) router.delete(`/sales/contacts/${contact.id}`);
     }
@@ -29,7 +29,14 @@ export default function Show({ contact, leads }) {
                     <InfoGrid>
                         <Info label="Email" value={contact.email} />
                         <Info label="Telepon" value={contact.phone} />
-                        <Info label="NPWP" value={contact.npwp} />
+                        <Info label="NPWP">
+                            {contact.npwp || '—'}
+                            {npwpDocumentUrl && (
+                                <a href={npwpDocumentUrl} target="_blank" rel="noreferrer" className="ml-2 text-xs font-medium text-primary hover:underline">
+                                    (Lihat dokumen)
+                                </a>
+                            )}
+                        </Info>
                         <Info label="Alamat" value={contact.address} />
                         <Info label="Catatan" value={contact.notes} className="sm:col-span-2" />
                     </InfoGrid>

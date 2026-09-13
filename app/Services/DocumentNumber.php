@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\BastDraft;
 use App\Models\DeliveryNote;
 use App\Models\Invoice;
 use App\Models\Quotation;
 use App\Models\SalesOrder;
+use App\Models\Sow;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -54,6 +56,18 @@ class DocumentNumber
     public function nextDeliveryNoteNumber(): string
     {
         return $this->nextSlashSequential(DeliveryNote::query(), 'GS-DO');
+    }
+
+    /** Format: {urutan}/GS-SOW/{MM}/{YYYY} — nomor urut reset tiap tahun. */
+    public function nextSowNumber(): string
+    {
+        return $this->nextSlashSequential(Sow::query(), 'GS-SOW');
+    }
+
+    /** Format: {urutan}/GS-BAST/{MM}/{YYYY} — contoh: 777/GS-BAST/06/2026, nomor urut reset tiap tahun. */
+    public function nextBastNumber(): string
+    {
+        return $this->nextSlashSequential(BastDraft::query(), 'GS-BAST');
     }
 
     public function revisionNumber(string $parentNumber, int $revisionNumber): string

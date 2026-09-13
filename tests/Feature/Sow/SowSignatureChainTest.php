@@ -4,19 +4,34 @@ namespace Tests\Feature\Sow;
 
 use App\Models\Contact;
 use App\Models\Lead;
+use App\Models\Notification;
 use App\Models\Project;
 use App\Models\Sow;
 use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class SowSignatureChainTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function administratorWithSignature(): User
+    {
+        Storage::fake('local');
+
+        return User::factory()->create([
+            'role' => 'administrator',
+            'is_active' => true,
+            'signature_path' => UploadedFile::fake()->image('sig.png')->store('administrator-signatures'),
+        ]);
+    }
+
     private function readyForSignature(): array
     {
+        $this->administratorWithSignature();
         $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
         $sales = User::factory()->create(['role' => 'sales']);
         $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
@@ -89,7 +104,7 @@ class SowSignatureChainTest extends TestCase
         $sow->refresh();
         $this->assertSame('pending_admin_signature', $sow->status);
 
-        $this->actingAs($ops)->post("/operational/sows/{$sow->id}/sign-admin", ['signature' => $this->fakeSignature()])
+        $this->actingAs($ops)->post("/operational/sows/{$sow->id}/sign-operational", ['signature' => $this->fakeSignature()])
             ->assertRedirect();
         $sow->refresh();
         $this->assertSame('pending_director_signature', $sow->status);
@@ -101,6 +116,60 @@ class SowSignatureChainTest extends TestCase
         $sow->refresh();
         $this->assertSame('completed', $sow->status);
         $this->assertNotNull($sow->director_signature);
+    }
+
+    public function test_bell_notifications_auto_clear_as_each_signer_acts_even_without_being_clicked(): void
+    {
+        ['sow' => $sow, 'ops' => $ops, 'technician' => $technician, 'vendorUser' => $vendorUser, 'hr' => $hr, 'management' => $management] = $this->readyForSignature();
+
+        // Teknisi punya notifikasi "perlu TTD" yang belum pernah diklik.
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $technician->id, 'type' => 'sow.pending_technician_signature', 'read_at' => null,
+        ]);
+
+        $this->actingAs($technician)->post("/technician/sows/{$sow->id}/sign", ['signature' => $this->fakeSignature()]);
+
+        // Begitu teknisi TTD, notifikasi lamanya otomatis clear meski tak pernah diklik —
+        // dan notifikasi baru untuk vendor muncul.
+        $this->assertNotNull(
+            Notification::where(['user_id' => $technician->id, 'type' => 'sow.pending_technician_signature'])->first()->read_at,
+        );
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $vendorUser->id, 'type' => 'sow.pending_vendor_signature', 'read_at' => null,
+        ]);
+
+        $this->actingAs($vendorUser)->post("/vendor/sows/{$sow->id}/sign", ['signature' => $this->fakeSignature()]);
+
+        $this->assertNotNull(
+            Notification::where(['user_id' => $vendorUser->id, 'type' => 'sow.pending_vendor_signature'])->first()->read_at,
+        );
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $hr->id, 'type' => 'sow.pending_hr_verification', 'read_at' => null,
+        ]);
+
+        $this->actingAs($hr)->post("/hr/sows/{$sow->id}/verify-signatures", ['approved' => true]);
+
+        $this->assertNotNull(
+            Notification::where(['user_id' => $hr->id, 'type' => 'sow.pending_hr_verification'])->first()->read_at,
+        );
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $ops->id, 'type' => 'sow.pending_admin_signature', 'read_at' => null,
+        ]);
+
+        $this->actingAs($ops)->post("/operational/sows/{$sow->id}/sign-operational", ['signature' => $this->fakeSignature()]);
+
+        $this->assertNotNull(
+            Notification::where(['user_id' => $ops->id, 'type' => 'sow.pending_admin_signature'])->first()->read_at,
+        );
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $management->id, 'type' => 'sow.pending_director_signature', 'read_at' => null,
+        ]);
+
+        $this->actingAs($management)->post("/management/sows/{$sow->id}/sign", ['signature' => $this->fakeSignature()]);
+
+        $this->assertNotNull(
+            Notification::where(['user_id' => $management->id, 'type' => 'sow.pending_director_signature'])->first()->read_at,
+        );
     }
 
     public function test_only_the_designated_technician_can_sign(): void
@@ -274,7 +343,7 @@ class SowSignatureChainTest extends TestCase
 
         $this->actingAs($vendorUser)->post("/vendor/sows/{$sow->id}/sign", ['signature' => $this->fakeSignature()])
             ->assertForbidden();
-        $this->actingAs($ops)->post("/operational/sows/{$sow->id}/sign-admin", ['signature' => $this->fakeSignature()])
+        $this->actingAs($ops)->post("/operational/sows/{$sow->id}/sign-operational", ['signature' => $this->fakeSignature()])
             ->assertForbidden();
         $this->actingAs($management)->post("/management/sows/{$sow->id}/sign", ['signature' => $this->fakeSignature()])
             ->assertForbidden();

@@ -14,7 +14,7 @@ class ActualProcurementController extends Controller
 {
     public function store(AddExtraProcurementRequest $request, Project $project): RedirectResponse
     {
-        Gate::authorize('manageResources', $project);
+        Gate::authorize('manageExtraProcurement', $project);
 
         $project->actualProcurements()->create([
             ...$request->validated(),
@@ -27,7 +27,7 @@ class ActualProcurementController extends Controller
 
     public function destroy(Project $project, ActualProcurement $actualProcurement): RedirectResponse
     {
-        Gate::authorize('manageResources', $project);
+        Gate::authorize('manageExtraProcurement', $project);
         abort_unless($actualProcurement->project_id === $project->id, 404);
 
         if ($actualProcurement->status !== ActualProcurementStatus::Pending->value

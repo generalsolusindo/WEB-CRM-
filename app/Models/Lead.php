@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\SalesOrderStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -85,6 +86,25 @@ class Lead extends Model
             : $this->latestProcurementRequest()->first();
 
         return $latest !== null && $latest->status !== 'rejected';
+    }
+
+    /**
+     * Sales Order aktif (bukan hasil addendum) milik Lead ini — dasar untuk mengajukan
+     * pengajuan tambahan (addendum) tanpa perlu Lead baru.
+     */
+    public function activeSalesOrderForAddendum(): ?SalesOrder
+    {
+        return SalesOrder::query()
+            ->whereHas('quotation', fn ($q) => $q->where('lead_id', $this->id))
+            ->whereNull('addendum_of_sales_order_id')
+            ->whereIn('status', [
+                SalesOrderStatus::Confirmed->value,
+                SalesOrderStatus::Won->value,
+                SalesOrderStatus::InProgress->value,
+                SalesOrderStatus::Completed->value,
+            ])
+            ->latest('id')
+            ->first();
     }
 
     public function meetings(): HasMany

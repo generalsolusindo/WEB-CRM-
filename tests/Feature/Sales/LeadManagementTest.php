@@ -20,13 +20,34 @@ class LeadManagementTest extends TestCase
         $response = $this->actingAs($sales)->post('/sales/leads', [
             'contact_id' => $contact->id,
             'stage' => 'new',
-            'source' => 'Referral',
+            'source' => 'website',
         ]);
 
         $lead = Lead::firstOrFail();
         $response->assertRedirectToRoute('sales.leads.show', $lead);
         $this->assertSame($sales->id, $lead->sales_id);
         $this->assertSame('lead', $lead->type);
+    }
+
+    public function test_lead_source_must_be_one_of_the_fixed_options(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
+
+        $this->actingAs($sales)->post('/sales/leads', [
+            'contact_id' => $contact->id,
+            'stage' => 'new',
+            'source' => 'Referral dari teman', // bebas teks lama — sudah tidak diterima
+        ])->assertSessionHasErrors('source');
+
+        foreach (['website', 'sponsor', 'bisnis', 'sosial_media', 'lainnya'] as $source) {
+            $contact = Contact::create(['name' => "Customer {$source}", 'created_by' => $sales->id]);
+            $this->actingAs($sales)->post('/sales/leads', [
+                'contact_id' => $contact->id,
+                'stage' => 'new',
+                'source' => $source,
+            ])->assertSessionDoesntHaveErrors('source');
+        }
     }
 
     public function test_sales_can_set_and_update_customer_pic(): void

@@ -5,11 +5,14 @@ namespace App\Actions\Operational;
 use App\Enums\SowStatus;
 use App\Models\Notification;
 use App\Models\Sow;
+use App\Services\Notifications\Notify;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class RestartSowSignatures
 {
+    public function __construct(private Notify $notify) {}
+
     public function handle(Sow $sow): Sow
     {
         return DB::transaction(function () use ($sow) {
@@ -31,6 +34,8 @@ class RestartSowSignatures
                 'hr_signature_reviewed_at' => null,
                 'hr_signature_review_notes' => null,
             ]);
+
+            $this->notify->resolve('sow.rejected_signature', $locked);
 
             if ($locked->technician) {
                 $customer = $locked->project->salesOrder?->contact?->name ?? 'customer';

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Enums\ProjectStatus;
+use App\Enums\SalesOrderStatus;
 use App\Models\Project;
 use App\Services\Operational\MaterialDeliveryStatus;
 use Illuminate\Support\Facades\Storage;
@@ -24,6 +25,7 @@ trait BuildsProjectOverview
             'customer' => $p->salesOrder?->contact?->name,
             'delegated_to' => $p->delegatedTo?->name,
             'material_status' => $p->salesOrder ? MaterialDeliveryStatus::of($p->salesOrder) : null,
+            'is_won' => $p->salesOrder?->status === SalesOrderStatus::Won->value,
         ];
     }
 
@@ -31,7 +33,7 @@ trait BuildsProjectOverview
     private function projectOverviewDetail(Project $project): array
     {
         $project->loadMissing([
-            'salesOrder:id,number,contact_id,order_type',
+            'salesOrder:id,number,contact_id,order_type,status',
             'salesOrder.contact:id,name,company_name',
             'salesOrder.lines:id,sales_order_id,category,qty',
             'technicians.technician:id,name',
@@ -53,6 +55,8 @@ trait BuildsProjectOverview
             'company' => $project->salesOrder?->contact?->company_name,
             'order_type' => $project->salesOrder?->order_type,
             'sales_order' => $project->salesOrder?->number,
+            'is_won' => $project->salesOrder?->status === SalesOrderStatus::Won->value,
+            'stage_options' => ProjectStatus::options(),
             'delegated_to' => $project->delegatedTo ? ['id' => $project->delegatedTo->id, 'name' => $project->delegatedTo->name] : null,
             'delegated_by' => $project->delegatedBy?->name,
             'delegated_at' => $project->delegated_at,

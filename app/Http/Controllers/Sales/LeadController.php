@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Sales;
 
+use App\Enums\LeadSource;
 use App\Enums\LeadStage;
 use App\Enums\LeadType;
 use App\Http\Controllers\Controller;
@@ -57,6 +58,7 @@ class LeadController extends Controller
                 'source' => $filters['source'] ?? '',
             ],
             'stageOptions' => LeadStage::options(),
+            'sourceOptions' => LeadSource::options(),
         ]);
     }
 
@@ -67,6 +69,7 @@ class LeadController extends Controller
         return Inertia::render('Sales/Leads/Form', [
             'contacts' => $this->contactOptions($request),
             'stageOptions' => $this->stageOptions([LeadStage::New]),
+            'sourceOptions' => LeadSource::options(),
             'selectedContactId' => $request->integer('contact_id') ?: null,
         ]);
     }
@@ -90,7 +93,7 @@ class LeadController extends Controller
 
         $lead->load([
             'contact:id,name,company_name,phone,email,address,npwp',
-            'requirements:id,lead_id,item_name,category,description,qty,unit,notes,created_at',
+            'requirements:id,lead_id,item_name,category,description,qty,unit,notes,created_at,submitted_at',
             'meetings' => fn ($query) => $query
                 ->select('id', 'lead_id', 'title', 'meeting_date', 'location', 'attendees', 'notes', 'created_at')
                 ->orderByDesc('meeting_date'),
@@ -171,13 +174,20 @@ class LeadController extends Controller
             ]),
         ] : null;
 
+        $hasActiveSalesOrder = $lead->activeSalesOrderForAddendum() !== null;
+        $hasNewRequirements = $lead->requirements->whereNull('submitted_at')->isNotEmpty();
+
         return Inertia::render('Sales/Leads/Show', [
             'lead' => $lead,
             'stageOptions' => LeadStage::options(),
+            'sourceOptions' => LeadSource::options(),
             'procurementRequest' => $procurementData,
             'requirementsEditable' => $lead->type === LeadType::Opportunity->value
-                && ! $lead->requirementsLocked(),
+                && (! $lead->requirementsLocked() || $hasActiveSalesOrder),
             'leadEditable' => ! $lead->requirementsLocked(),
+            'canSubmitAddendum' => $hasActiveSalesOrder && $hasNewRequirements
+                && request()->user()->can('submitAddendum', $lead),
+            'hasActiveSalesOrderForAddendum' => $hasActiveSalesOrder,
             'canDelete' => request()->user()->can('delete', $lead),
             'convertBlockReason' => $lead->type === LeadType::Lead->value
                 ? $this->convertBlocker($lead)
@@ -187,6 +197,7 @@ class LeadController extends Controller
             'surveys' => $surveys,
             'surveyRequestable' => request()->user()->can('create', [\App\Models\Survey::class, $lead]),
             'surveyDeliveryOptions' => \App\Enums\SurveyDeliveryMode::options(),
+            'unitOptions' => \App\Models\Requirement::UNITS,
         ]);
     }
 
@@ -202,6 +213,7 @@ class LeadController extends Controller
                     ? [LeadStage::Qualified, LeadStage::Requirement]
                     : [LeadStage::New, LeadStage::Qualified],
             ),
+            'sourceOptions' => LeadSource::options(),
         ]);
     }
 

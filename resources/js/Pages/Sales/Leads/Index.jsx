@@ -4,7 +4,7 @@ import { FiUserPlus, FiTarget } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Toolbar, SearchInput, FilterSelect, Button, DataTable, StatusBadge, Pagination, EmptyState } from '../../../Components/ui';
 
-export default function Index({ leads, filters, stageOptions }) {
+export default function Index({ leads, filters, stageOptions, sourceOptions = [] }) {
     const [form, setForm] = useState(filters);
     const set = (name, value) => setForm((c) => ({ ...c, [name]: value }));
 
@@ -29,7 +29,7 @@ export default function Index({ leads, filters, stageOptions }) {
         },
         { key: 'type', label: 'Tipe', render: (l) => <StatusBadge status={l.type} /> },
         { key: 'stage', label: 'Stage', render: (l) => <span className="text-text-muted">{stageOptions.find((s) => s.value === l.stage)?.label ?? l.stage}</span> },
-        { key: 'source', label: 'Source', render: (l) => <span className="text-text-muted">{l.source || '—'}</span> },
+        { key: 'source', label: 'Source', render: (l) => <span className="text-text-muted">{sourceOptions.find((s) => s.value === l.source)?.label ?? (l.source || '—')}</span> },
         { key: 'requirements_count', label: 'Requirement', align: 'right', render: (l) => <span className="tabular-nums text-text-muted">{l.requirements_count}</span> },
     ];
 
@@ -54,6 +54,10 @@ export default function Index({ leads, filters, stageOptions }) {
                         <FilterSelect value={form.stage} onChange={(v) => set('stage', v)} className="min-w-36">
                             <option value="">Semua stage</option>
                             {stageOptions.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                        </FilterSelect>
+                        <FilterSelect value={form.source} onChange={(v) => set('source', v)} className="min-w-36">
+                            <option value="">Semua source</option>
+                            {sourceOptions.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </FilterSelect>
                         <Button type="submit">Filter</Button>
                         <Button type="button" variant="outline" onClick={reset}>Reset</Button>

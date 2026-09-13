@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Sales;
 
+use App\Enums\LeadSource;
 use App\Enums\LeadStage;
 use App\Models\Contact;
 use App\Models\Lead;
@@ -27,7 +28,7 @@ class StoreLeadRequest extends FormRequest
                 ),
             ],
             'stage' => ['required', Rule::in([LeadStage::New->value])],
-            'source' => ['nullable', 'string', 'max:100'],
+            'source' => ['nullable', Rule::enum(LeadSource::class)],
             'notes' => ['nullable', 'string'],
             'pic_name' => ['nullable', 'string', 'max:255'],
             'pic_position' => ['nullable', 'string', 'max:255'],

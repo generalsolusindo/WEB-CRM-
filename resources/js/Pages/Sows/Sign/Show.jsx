@@ -4,14 +4,14 @@ import AppLayout from '../../../Layouts/AppLayout';
 import SignaturePad from '../../../Components/SignaturePad';
 import { PageHeader } from '../../../Components/ui';
 
-export default function Show({ sow, canSign, signUrl, roleLabel, backHref }) {
+export default function Show({ sow, canSign, signUrl, roleLabel, backHref, autoSign = false }) {
     const [signature, setSignature] = useState(null);
     const [processing, setProcessing] = useState(false);
 
     function submit() {
-        if (!signature) return;
+        if (!autoSign && !signature) return;
         setProcessing(true);
-        router.post(signUrl, { signature }, {
+        router.post(signUrl, autoSign ? {} : { signature }, {
             onFinish: () => setProcessing(false),
         });
     }
@@ -34,11 +34,30 @@ export default function Show({ sow, canSign, signUrl, roleLabel, backHref }) {
 
                 <Section title="Latar Belakang"><Body value={sow.background} /></Section>
                 <Section title="Ruang Lingkup Pekerjaan">
-                    <Body value={sow.scope_pre_work} />
-                    <Body value={sow.scope_other} />
+                    {(sow.scope_sections || []).length === 0 ? (
+                        <p className="text-sm text-text-muted">Belum ada sub-bab.</p>
+                    ) : (
+                        <div className="space-y-4">
+                            {sow.scope_sections.map((s, i) => (
+                                <div key={s.id}>
+                                    <h3 className="text-sm font-semibold text-text">{String.fromCharCode(65 + i)}. {s.title}</h3>
+                                    <Body value={s.content} />
+                                    {s.images?.length > 0 && (
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {s.images.map((img) => <img key={img.id} src={img.url} className="h-20 w-20 rounded-lg border border-border object-cover" />)}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </Section>
                 <Section title="Tanggung Jawab"><Body value={sow.responsibilities} /></Section>
-                <Section title="Waktu Pelaksanaan"><Body value={sow.schedule} /></Section>
+                <Section title="Waktu Pelaksanaan & Jadwal">
+                    <Info label="Estimasi Durasi Pekerjaan" value={sow.schedule_duration} />
+                    <Info label="Waktu Mulai" value={sow.schedule_start_date} />
+                    <Info label="Target Selesai" value={sow.schedule_end_date} />
+                </Section>
                 <Section title="Keselamatan Kerja (K3)"><Body value={sow.safety} /></Section>
                 <Section title="Pembayaran"><Body value={sow.payment_terms} /></Section>
                 <Section title="Output Pekerjaan"><Body value={sow.output} /></Section>
@@ -57,20 +76,33 @@ export default function Show({ sow, canSign, signUrl, roleLabel, backHref }) {
                     <div className="grid gap-4 sm:grid-cols-2">
                         <SignaturePreview label="Teknisi" name={sow.technician?.name} image={sow.signatures.technician} at={sow.signatures.technician_signed_at} />
                         <SignaturePreview label="PIC Vendor" name={sow.signatures.vendor_signed_by} image={sow.signatures.vendor} at={sow.signatures.vendor_signed_at} />
-                        <SignaturePreview label="Admin Project" name={sow.signatures.admin_signed_by} image={sow.signatures.admin} at={sow.signatures.admin_signed_at} />
-                        <SignaturePreview label="Direktur" name={sow.signatures.director_signed_by} image={sow.signatures.director} at={sow.signatures.director_signed_at} />
+                        <SignaturePreview label="Operasional" name={sow.signatures.admin_signed_by} image={sow.signatures.admin} at={sow.signatures.admin_signed_at} />
+                        <SignaturePreview label="Project Manager" name={sow.signatures.director_signed_by} image={sow.signatures.director} at={sow.signatures.director_signed_at} />
                     </div>
                 </Section>
 
                 {canSign ? (
                     <div className="space-y-3 rounded-xl border-2 border-navy/40 bg-navy/5 p-6 shadow-sm">
                         <h2 className="font-semibold text-text">Perlu Tanda Tangan Anda — {roleLabel}</h2>
-                        <SignaturePad onChange={setSignature} />
-                        <div className="flex justify-end">
-                            <button onClick={submit} disabled={!signature || processing} className="btn btn-primary">
-                                {processing ? 'Menyimpan…' : 'Tanda Tangani & Kirim'}
-                            </button>
-                        </div>
+                        {autoSign ? (
+                            <>
+                                <p className="text-sm text-text-muted">Tanda tangan akan diambil otomatis dari tanda tangan resmi Administrator.</p>
+                                <div className="flex justify-end">
+                                    <button onClick={submit} disabled={processing} className="btn btn-primary">
+                                        {processing ? 'Menyimpan…' : 'Tanda Tangani Otomatis & Kirim'}
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <SignaturePad onChange={setSignature} />
+                                <div className="flex justify-end">
+                                    <button onClick={submit} disabled={!signature || processing} className="btn btn-primary">
+                                        {processing ? 'Menyimpan…' : 'Tanda Tangani & Kirim'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 ) : (
                     <div className="card p-4 text-sm text-text-muted">

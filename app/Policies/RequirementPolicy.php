@@ -23,14 +23,19 @@ class RequirementPolicy
         return $this->isEditableBy($user, $requirement);
     }
 
+    /**
+     * Kunci per-requirement (submitted_at), bukan per-Lead — supaya requirement baru
+     * yang ditambahkan untuk pengajuan tambahan (addendum) tetap bisa diedit/dihapus
+     * sebelum disubmit, walau Lead-nya sendiri sudah pernah disubmit sebelumnya.
+     */
     private function isEditableBy(User $user, Requirement $requirement): bool
     {
         $requirement->loadMissing('lead');
 
-        return $user->role === 'sales'
+        return $requirement->submitted_at === null
+            && $user->role === 'sales'
             && $user->is_active
             && $requirement->lead->sales_id === $user->id
-            && $requirement->lead->type === LeadType::Opportunity->value
-            && ! $requirement->lead->requirementsLocked();
+            && $requirement->lead->type === LeadType::Opportunity->value;
     }
 }

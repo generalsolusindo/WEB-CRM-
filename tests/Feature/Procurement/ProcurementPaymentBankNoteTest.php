@@ -4,6 +4,7 @@ namespace Tests\Feature\Procurement;
 
 use App\Models\User;
 use App\Models\Vendor;
+use App\Models\WarehouseItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\BuildsProcurementProject;
 use Tests\TestCase;
@@ -39,6 +40,7 @@ class ProcurementPaymentBankNoteTest extends TestCase
         $project = $this->materialProject();
         $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
         $item = $project->actualProcurements()->firstOrFail();
+        $stock = WarehouseItem::create(['name' => 'Kabel LAN', 'unit' => 'meter', 'qty_on_hand' => 50]);
 
         $this->actingAs($procurement)->post("/procurement/project-procurements/{$project->id}/submit", [
             'pricing_mode' => 'itemized',
@@ -46,11 +48,14 @@ class ProcurementPaymentBankNoteTest extends TestCase
                 'id' => $item->id,
                 'from_office_stock' => true,
                 'office_stock_note' => 'stok gudang',
+                'warehouse_item_id' => $stock->id,
+                'warehouse_qty' => 5,
                 'bank_account_note' => 'coba diselundupkan',
             ]],
         ])->assertSessionHas('success');
 
         $this->assertNull($item->fresh()->bank_account_note);
+        $this->assertSame($stock->id, $item->fresh()->warehouse_item_id);
     }
 
     public function test_lump_sum_submit_stores_bank_account_note_on_payment(): void

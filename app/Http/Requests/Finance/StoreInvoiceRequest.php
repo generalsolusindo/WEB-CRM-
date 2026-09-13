@@ -26,6 +26,15 @@ class StoreInvoiceRequest extends FormRequest
             'ppn_rate' => ['nullable', 'numeric', 'min:0', 'max:100', 'decimal:0,2'],
             'pph23_enabled' => ['sometimes', 'boolean'],
             'pph23_rate' => ['nullable', 'numeric', 'min:0', 'max:10', 'decimal:0,2'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'lines' => ['nullable', 'array', 'min:1'],
+            'lines.*.sales_order_line_id' => ['nullable', 'integer', 'exists:sales_order_lines,id'],
+            'lines.*.item_name' => ['required_with:lines', 'string', 'max:255'],
+            'lines.*.category' => ['required_with:lines', Rule::in(['material', 'service'])],
+            'lines.*.qty' => ['required_with:lines', 'numeric', 'min:0.01'],
+            'lines.*.unit_price' => ['required_with:lines', 'numeric', 'min:0'],
+            'lines.*.discount_amount' => ['nullable', 'numeric', 'min:0'],
+            'lines.*.tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ];
     }
 

@@ -25,6 +25,27 @@ class ProjectDelegationTest extends TestCase
         $this->actingAs($management)->get("/management/projects/{$project->id}")->assertOk();
     }
 
+    public function test_project_overview_shows_stage_options_and_won_flag(): void
+    {
+        $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
+        $project = $this->plannedProject();
+
+        $res = $this->actingAs($management)->get("/management/projects/{$project->id}");
+        $res->assertOk();
+        $res->assertInertia(fn ($page) => $page
+            ->where('project.is_won', false)
+            ->has('project.stage_options', 7));
+
+        $project->salesOrder->update(['status' => 'won']);
+
+        $res2 = $this->actingAs($management)->get("/management/projects/{$project->id}");
+        $res2->assertInertia(fn ($page) => $page->where('project.is_won', true));
+
+        $listRes = $this->actingAs($management)->get('/management/projects');
+        $row = collect($listRes->viewData('page')['props']['projects']['data'])->firstWhere('id', $project->id);
+        $this->assertTrue($row['is_won']);
+    }
+
     public function test_management_delegates_and_revokes_project(): void
     {
         $management = User::factory()->create(['role' => 'management', 'is_active' => true]);

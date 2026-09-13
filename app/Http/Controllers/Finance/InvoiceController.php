@@ -136,6 +136,8 @@ class InvoiceController extends Controller
             $agreedDpp !== null && $agreedDpp !== '' ? (float) $agreedDpp : null,
             $ppnRate !== null && $ppnRate !== '' ? (float) $ppnRate : null,
             (bool) $request->validated('pph23_enabled'),
+            $request->validated('lines'),
+            $request->validated('notes'),
         );
 
         return redirect()->route('finance.invoices.show', $invoice)

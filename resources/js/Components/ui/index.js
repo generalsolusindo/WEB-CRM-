@@ -3,6 +3,7 @@ export { default as Card, CardHeader } from './Card';
 export { default as PageHeader } from './PageHeader';
 export { default as PillTabs } from './PillTabs';
 export { default as StatusBadge } from './StatusBadge';
+export { default as StageStepper } from './StageStepper';
 export { default as DataTable } from './DataTable';
 export { default as EmptyState } from './EmptyState';
 export { default as Modal } from './Modal';

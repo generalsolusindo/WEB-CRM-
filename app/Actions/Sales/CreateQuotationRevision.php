@@ -37,8 +37,10 @@ class CreateQuotationRevision
                 'status' => QuotationStatus::Draft->value,
                 'revision_number' => $source->revision_number + 1,
                 'parent_quotation_id' => $source->id,
+                'is_addendum' => $source->is_addendum,
                 'valid_until' => now()->addDays(10)->toDateString(),
                 'notes' => $source->notes,
+                'terms' => $source->terms,
                 'agreed_dpp' => $source->agreed_dpp,
             ]);
 

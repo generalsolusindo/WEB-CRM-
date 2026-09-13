@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Dashboard\MenuBadges;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Middleware;
@@ -60,6 +61,7 @@ class HandleInertiaRequests extends Middleware
                         ->take(10)
                         ->get(['id', 'type', 'message', 'related_type', 'related_id', 'read_at', 'created_at']),
                 ] : null,
+                'menuBadges' => $user ? app(MenuBadges::class)->for($user) : [],
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

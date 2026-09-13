@@ -10,6 +10,8 @@ use App\Models\Quotation;
 use App\Models\SalesOrder;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class MaterialDeliveryStatusTest extends TestCase
@@ -55,6 +57,7 @@ class MaterialDeliveryStatusTest extends TestCase
 
     public function test_operational_project_page_shows_partial_material_status(): void
     {
+        Storage::fake('local');
         $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
         $project = $this->projectWithTwoMaterialLines();
         $so = $project->salesOrder;
@@ -62,7 +65,9 @@ class MaterialDeliveryStatusTest extends TestCase
 
         // kirim Router lengkap (2/2), Switch belum sama sekali
         $this->actingAs($ops)->post("/operational/sales-orders/{$so->id}/delivery-notes", [
+            'delivery_method' => 'sendiri',
             'delivery_address' => 'Site A',
+            'dispatch_proof' => UploadedFile::fake()->image('bukti.jpg'),
             'lines' => [['sales_order_line_id' => $router->id, 'qty_delivered' => 2]],
         ]);
 
@@ -76,6 +81,7 @@ class MaterialDeliveryStatusTest extends TestCase
 
     public function test_management_overview_shows_complete_material_status(): void
     {
+        Storage::fake('local');
         $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
         $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
         $project = $this->projectWithTwoMaterialLines();
@@ -83,7 +89,9 @@ class MaterialDeliveryStatusTest extends TestCase
 
         foreach ($so->lines as $line) {
             $this->actingAs($ops)->post("/operational/sales-orders/{$so->id}/delivery-notes", [
+                'delivery_method' => 'sendiri',
                 'delivery_address' => 'Site A',
+                'dispatch_proof' => UploadedFile::fake()->image('bukti.jpg'),
                 'lines' => [['sales_order_line_id' => $line->id, 'qty_delivered' => $line->qty]],
             ]);
         }

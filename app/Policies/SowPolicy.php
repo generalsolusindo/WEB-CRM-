@@ -11,13 +11,18 @@ class SowPolicy
     public function viewAny(User $user): bool
     {
         return $this->isOperational($user) || $this->isHr($user)
-            || $this->isTechnician($user) || $this->isVendor($user) || $this->isManagement($user);
+            || $this->isTechnician($user) || $this->isVendor($user)
+            || $this->isManagement($user) || $this->isProjectManager($user);
     }
 
     public function view(User $user, Sow $sow): bool
     {
         if ($this->isOperational($user) || $this->isHr($user) || $this->isManagement($user)) {
             return true;
+        }
+
+        if ($this->isProjectManager($user)) {
+            return $sow->project->delegated_to === $user->id;
         }
 
         if ($this->isTechnician($user)) {
@@ -68,16 +73,28 @@ class SowPolicy
         return $this->isHr($user) && $sow->status === SowStatus::PendingHrVerification->value;
     }
 
-    /** Admin Project (Operasional) menandatangani SOW. */
+    /** Slot TTD "Operasional" (dulu "Admin Project") — otomatis pakai TTD Administrator. */
     public function signAsAdmin(User $user, Sow $sow): bool
     {
         return $this->isOperational($user) && $sow->status === SowStatus::PendingAdminSignature->value;
     }
 
-    /** Direktur (Manager) menandatangani SOW — tahap akhir. */
+    /**
+     * Slot TTD "Project Manager" (dulu "Direktur") — tahap akhir, otomatis pakai TTD
+     * Administrator. Project Manager yang didelegasikan ke project ini yang berhak,
+     * atau Management selama project belum didelegasikan ke siapa pun.
+     */
     public function signAsDirector(User $user, Sow $sow): bool
     {
-        return $this->isManagement($user) && $sow->status === SowStatus::PendingDirectorSignature->value;
+        if ($sow->status !== SowStatus::PendingDirectorSignature->value) {
+            return false;
+        }
+
+        if ($this->isProjectManager($user)) {
+            return $sow->project->delegated_to === $user->id;
+        }
+
+        return $this->isManagement($user) && $sow->project->delegated_to === null;
     }
 
     /** Operasional mengulang proses tanda tangan Teknisi & PIC Vendor setelah ditolak HR. */
@@ -109,5 +126,10 @@ class SowPolicy
     private function isManagement(User $user): bool
     {
         return $user->role === 'management' && $user->is_active;
+    }
+
+    private function isProjectManager(User $user): bool
+    {
+        return $user->role === 'project_manager' && $user->is_active;
     }
 }

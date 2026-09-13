@@ -8,11 +8,13 @@ import RequirementsPanel from './RequirementsPanel';
 import SurveyPanel from './SurveyPanel';
 
 export default function Show({
-    lead, stageOptions, procurementRequest, requirementsEditable, leadEditable, canDelete,
+    lead, stageOptions, sourceOptions = [], procurementRequest, requirementsEditable, leadEditable, canDelete,
     convertBlockReason, meetings = [], meetingsEditable = false, surveys = [],
-    surveyRequestable = false, surveyDeliveryOptions = [],
+    surveyRequestable = false, surveyDeliveryOptions = [], unitOptions = [],
+    canSubmitAddendum = false, hasActiveSalesOrderForAddendum = false,
 }) {
     const stageLabel = stageOptions.find((s) => s.value === lead.stage)?.label ?? lead.stage;
+    const sourceLabel = sourceOptions.find((s) => s.value === lead.source)?.label ?? lead.source;
     function convert() { if (confirm('Konversi lead ini menjadi opportunity?')) router.post(`/sales/leads/${lead.id}/convert`); }
     function destroy() { if (confirm('Hapus lead ini?')) router.delete(`/sales/leads/${lead.id}`); }
 
@@ -44,7 +46,7 @@ export default function Show({
                 <Card>
                     <InfoGrid>
                         <Info label="Stage" value={stageLabel} />
-                        <Info label="Source" value={lead.source} />
+                        <Info label="Source" value={sourceLabel} />
                         <Info label="Email" value={lead.contact.email} />
                         <Info label="Telepon" value={lead.contact.phone} />
                         <Info label="Alamat" value={lead.contact.address} />
@@ -54,7 +56,14 @@ export default function Show({
                 </Card>
 
                 {lead.type === 'opportunity' && <SurveyPanel leadId={lead.id} surveys={surveys} requestable={surveyRequestable} deliveryOptions={surveyDeliveryOptions} />}
-                <RequirementsPanel leadId={lead.id} requirements={lead.requirements} editable={requirementsEditable} />
+                <RequirementsPanel
+                    leadId={lead.id}
+                    requirements={lead.requirements}
+                    editable={requirementsEditable}
+                    unitOptions={unitOptions}
+                    canSubmitAddendum={canSubmitAddendum}
+                    isAddendumMode={hasActiveSalesOrderForAddendum}
+                />
                 <MeetingsPanel leadId={lead.id} meetings={meetings} editable={meetingsEditable} />
                 <ProcurementStatusPanel request={procurementRequest} />
             </div>

@@ -71,7 +71,7 @@ class ProcurementRequestFinalizeTest extends TestCase
         // Sales bisa edit requirement lagi.
         $requirement = $lead->requirements()->firstOrFail();
         $this->actingAs($sales)->put("/sales/leads/{$lead->id}/requirements/{$requirement->id}", [
-            'item_name' => 'Router Dual-WAN (revisi)', 'qty' => 2, 'unit' => 'unit',
+            'item_name' => 'Router Dual-WAN (revisi)', 'qty' => 2, 'unit' => 'set',
         ])->assertSessionHas('success');
 
         // Submit ulang -> PR BARU, PR lama tetap ada.

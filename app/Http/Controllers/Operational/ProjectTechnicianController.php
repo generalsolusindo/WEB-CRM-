@@ -16,7 +16,7 @@ class ProjectTechnicianController extends Controller
         Project $project,
         AssignProjectTechnicians $action,
     ): RedirectResponse {
-        Gate::authorize('manageResources', $project);
+        Gate::authorize('manageTechnicianTeam', $project);
 
         $action->handle(
             $project,

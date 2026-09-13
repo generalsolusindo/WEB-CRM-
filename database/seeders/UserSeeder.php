@@ -24,6 +24,7 @@ class UserSeeder extends Seeder
             'administrator',
             'project_manager',
             'hr',
+            'warehouse',
         ];
 
         foreach ($roles as $role) {

@@ -30,6 +30,12 @@ class ProjectMaterialProgress
             $project->update(['status' => ProjectStatus::WaitingResource->value]);
         }
 
+        $noneLeftPending = $items->doesntContain(fn ($i) => $i->status === ActualProcurementStatus::Pending->value);
+
+        if ($noneLeftPending) {
+            $this->notify->resolve('project_procurement.requested', $project);
+        }
+
         $allReceived = $items->every(fn ($i) => $i->status === ActualProcurementStatus::Received->value);
 
         if ($allReceived) {

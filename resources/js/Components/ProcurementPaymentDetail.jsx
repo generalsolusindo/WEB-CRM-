@@ -9,8 +9,34 @@ function money(v) {
  * Dipakai halaman persetujuan PM dan pembayaran Finance.
  * `itemActions(item)` opsional → node aksi per baris (mis. checkbox bayar).
  */
+/** Kelompokkan item per vendor (untuk mode itemized) — item stok kantor & tanpa vendor masuk kelompok tersendiri. */
+function groupByVendor(items) {
+    const groups = [];
+    const index = {};
+
+    items.forEach((it) => {
+        const key = it.from_office_stock ? 'office_stock' : (it.vendor_id ?? 'unassigned');
+        if (!(key in index)) {
+            index[key] = groups.length;
+            groups.push({
+                key,
+                label: it.from_office_stock ? 'Stok Kantor' : (it.vendor || 'Belum ada vendor'),
+                items: [],
+            });
+        }
+        groups[index[key]].items.push(it);
+    });
+
+    return groups;
+}
+
+function groupTotal(vendorItems) {
+    return vendorItems.reduce((sum, it) => sum + (it.from_office_stock ? 0 : it.line_total), 0);
+}
+
 export default function ProcurementPaymentDetail({ payment, itemActions }) {
     const overBudget = payment.totals.actual - payment.totals.estimated;
+    const grouped = payment.pricing_mode !== 'lump_sum' ? groupByVendor(payment.items) : null;
 
     return (
         <>
@@ -51,50 +77,11 @@ export default function ProcurementPaymentDetail({ payment, itemActions }) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                            {payment.items.map((it) => {
-                                const diff = it.line_total - it.estimated_total;
-                                return (
-                                    <tr key={it.id}>
-                                        <td className="px-4 py-3.5">
-                                            <div className="font-medium text-text">{it.item_name}{it.is_extra ? ' · ekstra' : ''}</div>
-                                            {it.from_office_stock && <div className="text-[11px] text-text-muted">Stok kantor{it.office_stock_note ? ` — ${it.office_stock_note}` : ''}</div>}
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-3.5 text-text-muted">{it.qty} {it.unit}</td>
-                                        <td className="px-4 py-3.5 text-text-muted">
-                                            {it.from_office_stock ? '—' : (it.vendor || (payment.pricing_mode === 'lump_sum' ? 'borongan' : '—'))}
-                                            {!it.from_office_stock && payment.pricing_mode !== 'lump_sum' && it.bank_account_note && (
-                                                <div className="text-[11px] text-text-faint">Rek: {it.bank_account_note}</div>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3.5 text-right tabular-nums text-text-muted">{it.from_office_stock ? '—' : money(it.estimated_total)}</td>
-                                        <td className="px-4 py-3.5 text-right tabular-nums">
-                                            {it.from_office_stock ? '—' : (
-                                                <>
-                                                    <span className="font-medium text-text">{money(it.line_total)}</span>
-                                                    {Math.abs(diff) > 0.5 && (
-                                                        <div className={`text-[11px] ${diff > 0 ? 'text-danger' : 'text-success'}`}>
-                                                            {diff > 0 ? '+' : '−'}{money(Math.abs(diff))}
-                                                        </div>
-                                                    )}
-                                                </>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3.5">
-                                            {it.from_office_stock
-                                                ? <span className="badge badge-neutral">Stok kantor</span>
-                                                : it.status === 'received'
-                                                    ? <span className="badge badge-success">Diterima</span>
-                                                    : it.is_paid
-                                                        ? <span className="badge badge-primary">Dibayar</span>
-                                                        : <span className="badge badge-warning">Menunggu</span>}
-                                            {it.proofs.length > 0 && (
-                                                <span className="ml-2">{it.proofs.map((p, i) => <a key={p.id} href={p.url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">bukti{it.proofs.length > 1 ? ` ${i + 1}` : ''}</a>)}</span>
-                                            )}
-                                        </td>
-                                        {itemActions && <td className="px-4 py-3.5 text-right">{itemActions(it)}</td>}
-                                    </tr>
-                                );
-                            })}
+                            {grouped
+                                ? grouped.map((group) => (
+                                    <FragmentGroup key={group.key} group={group} itemActions={itemActions} colSpan={itemActions ? 7 : 6} />
+                                ))
+                                : payment.items.map((it) => <ItemRow key={it.id} it={it} pricingMode={payment.pricing_mode} itemActions={itemActions} />)}
                         </tbody>
                         <tfoot className="border-t border-border bg-surface-2 text-text">
                             <tr>
@@ -131,5 +118,64 @@ export default function ProcurementPaymentDetail({ payment, itemActions }) {
                 </Card>
             )}
         </>
+    );
+}
+
+function FragmentGroup({ group, itemActions, colSpan }) {
+    return (
+        <>
+            <tr className="bg-primary-soft/40">
+                <td colSpan={colSpan} className="px-4 py-2 text-xs font-bold uppercase tracking-wide text-primary-strong">
+                    {group.label}
+                    {group.key !== 'office_stock' && <span className="ml-2 font-semibold normal-case text-text-muted">Subtotal {money(groupTotal(group.items))}</span>}
+                </td>
+            </tr>
+            {group.items.map((it) => <ItemRow key={it.id} it={it} pricingMode="itemized" itemActions={itemActions} />)}
+        </>
+    );
+}
+
+function ItemRow({ it, pricingMode, itemActions }) {
+    const diff = it.line_total - it.estimated_total;
+    return (
+        <tr>
+            <td className="px-4 py-3.5">
+                <div className="font-medium text-text">{it.item_name}{it.is_extra ? ' · ekstra' : ''}</div>
+                {it.from_office_stock && <div className="text-[11px] text-text-muted">Stok kantor{it.office_stock_note ? ` — ${it.office_stock_note}` : ''}</div>}
+            </td>
+            <td className="whitespace-nowrap px-4 py-3.5 text-text-muted">{it.qty} {it.unit}</td>
+            <td className="px-4 py-3.5 text-text-muted">
+                {it.from_office_stock ? '—' : (it.vendor || (pricingMode === 'lump_sum' ? 'borongan' : '—'))}
+                {!it.from_office_stock && pricingMode !== 'lump_sum' && it.bank_account_note && (
+                    <div className="text-[11px] text-text-faint">Rek: {it.bank_account_note}</div>
+                )}
+            </td>
+            <td className="px-4 py-3.5 text-right tabular-nums text-text-muted">{it.from_office_stock ? '—' : money(it.estimated_total)}</td>
+            <td className="px-4 py-3.5 text-right tabular-nums">
+                {it.from_office_stock ? '—' : (
+                    <>
+                        <span className="font-medium text-text">{money(it.line_total)}</span>
+                        {Math.abs(diff) > 0.5 && (
+                            <div className={`text-[11px] ${diff > 0 ? 'text-danger' : 'text-success'}`}>
+                                {diff > 0 ? '+' : '−'}{money(Math.abs(diff))}
+                            </div>
+                        )}
+                    </>
+                )}
+            </td>
+            <td className="px-4 py-3.5">
+                {it.from_office_stock
+                    ? <span className="badge badge-neutral">Stok kantor</span>
+                    : it.status === 'received'
+                        ? <span className="badge badge-success">Diterima</span>
+                        : it.is_paid
+                            ? <span className="badge badge-primary">Dibayar</span>
+                            : <span className="badge badge-warning">Menunggu</span>}
+                {it.proofs.length > 0 && (
+                    <span className="ml-2">{it.proofs.map((p, i) => <a key={p.id} href={p.url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary hover:underline">bukti{it.proofs.length > 1 ? ` ${i + 1}` : ''}</a>)}</span>
+                )}
+            </td>
+            {itemActions && <td className="px-4 py-3.5 text-right">{itemActions(it)}</td>}
+        </tr>
     );
 }

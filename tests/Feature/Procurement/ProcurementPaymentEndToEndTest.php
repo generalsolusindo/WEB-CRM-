@@ -33,7 +33,9 @@ class ProcurementPaymentEndToEndTest extends TestCase
     public function test_full_flow_ends_with_all_items_received_and_operational_notified(): void
     {
         $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
-        $project = $this->materialProject();
+        // Mixed — bagian akhir test ini lanjut ke assign teknisi & markReady,
+        // yang sekarang khusus tidak berlaku untuk order Material Only.
+        $project = $this->materialProject([], 'mixed');
         $this->settleProcurement($project);
 
         $payment = $project->fresh()->procurementPayment;

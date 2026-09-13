@@ -23,7 +23,12 @@ export default function Index({ quotations, filters, statusOptions }) {
     const columns = [
         {
             key: 'number', label: 'Nomor',
-            render: (q) => <span className="font-semibold text-text">{q.number ?? `QT-${String(q.id).padStart(6, '0')} / R${q.revision_number}`}</span>,
+            render: (q) => (
+                <span className="flex items-center gap-2">
+                    <span className="font-semibold text-text">{q.number ?? `QT-${String(q.id).padStart(6, '0')} / R${q.revision_number}`}</span>
+                    {q.is_addendum && <span className="rounded-full bg-info-soft px-2 py-0.5 text-[10px] font-semibold text-info">Tambahan</span>}
+                </span>
+            ),
         },
         {
             key: 'customer', label: 'Customer',

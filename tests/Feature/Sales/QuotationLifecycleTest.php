@@ -45,6 +45,44 @@ class QuotationLifecycleTest extends TestCase
         $this->assertSame($line->id, $quotationLine->procurement_request_line_id);
     }
 
+    public function test_terms_default_to_standard_text_when_left_blank(): void
+    {
+        [, $quotation] = $this->draftQuotation();
+
+        $this->assertStringContainsString('Price Include Tax', $quotation->terms);
+        $this->assertStringContainsString('Payment DP 50%', $quotation->terms);
+
+        $res = $this->actingAs($quotation->sales)->get("/sales/quotations/{$quotation->id}/print");
+        $res->assertOk()->assertSee('Price Include Tax')->assertSee('Warranty Services 1 Month');
+    }
+
+    public function test_sales_can_customize_terms_on_create_and_edit(): void
+    {
+        [$sales, $pr] = $this->readyProcurementRequest();
+        $line = $pr->lines()->firstOrFail();
+
+        $this->actingAs($sales)->post("/sales/procurement-requests/{$pr->id}/quotations", [
+            'lines' => [['procurement_request_line_id' => $line->id, 'selling_price' => 1300000]],
+            'terms' => "Harga sudah termasuk pajak\nDP 30% di muka",
+        ])->assertRedirect();
+
+        $quotation = Quotation::with('lines')->firstOrFail();
+        $this->assertSame("Harga sudah termasuk pajak\nDP 30% di muka", $quotation->terms);
+
+        $res = $this->actingAs($sales)->get("/sales/quotations/{$quotation->id}/print");
+        $res->assertOk()->assertSee('DP 30% di muka')->assertDontSee('Payment DP 50%');
+
+        $this->actingAs($sales)->put("/sales/quotations/{$quotation->id}", [
+            'terms' => 'Syarat baru saja',
+            'lines' => $quotation->lines->map(fn ($l) => [
+                'procurement_request_line_id' => $l->procurement_request_line_id,
+                'selling_price' => $l->selling_price,
+            ])->all(),
+        ])->assertRedirect();
+
+        $this->assertSame('Syarat baru saja', $quotation->fresh()->terms);
+    }
+
     public function test_quotation_print_view_renders_for_owner_only(): void
     {
         [$sales, $quotation] = $this->draftQuotation();
@@ -140,6 +178,17 @@ class QuotationLifecycleTest extends TestCase
             ->assertForbidden();
 
         $this->assertSame(1, Quotation::where('parent_quotation_id', $quotation->id)->count());
+    }
+
+    public function test_revision_inherits_custom_terms(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $quotation->update(['status' => 'sent', 'terms' => 'Syarat khusus quotation ini']);
+
+        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/revisions")->assertRedirect();
+
+        $revision = Quotation::where('parent_quotation_id', $quotation->id)->firstOrFail();
+        $this->assertSame('Syarat khusus quotation ini', $revision->terms);
     }
 
     public function test_sales_order_is_created_only_from_sent_quotation_with_derived_payment_rule(): void

@@ -45,6 +45,8 @@ class AdvanceSurveyToOperational
 
             $locked->update($attributes);
 
+            $this->notify->resolve('survey.finance_review', $locked);
+
             $customer = $locked->lead->contact?->name ?? 'customer';
 
             $this->notify->onceForEach(

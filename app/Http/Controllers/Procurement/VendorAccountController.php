@@ -11,6 +11,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -59,15 +60,18 @@ class VendorAccountController extends Controller
     {
         $data = $request->validated();
 
-        User::create([
+        $account = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
+            'nik' => $data['nik'] ?? null,
             'password' => Hash::make($data['password']),
             'role' => 'vendor',
             'vendor_id' => $data['vendor_id'],
             'is_active' => $data['is_active'] ?? true,
         ]);
+
+        $this->storeKtpDocument($request, $account);
 
         return redirect()->route('procurement.vendor-accounts.index')
             ->with('success', 'Akun PIC vendor berhasil dibuat.');
@@ -79,8 +83,9 @@ class VendorAccountController extends Controller
         abort_unless($vendorAccount->role === 'vendor', 404);
 
         return Inertia::render('Procurement/VendorAccounts/Form', [
-            'account' => $vendorAccount->only('id', 'name', 'email', 'phone', 'vendor_id', 'is_active'),
+            'account' => $vendorAccount->only('id', 'name', 'email', 'phone', 'nik', 'vendor_id', 'is_active'),
             'vendorOptions' => $this->availableVendorOptions($vendorAccount->vendor_id),
+            'ktpDocumentUrl' => $this->ktpDocumentUrl($vendorAccount),
         ]);
     }
 
@@ -94,6 +99,7 @@ class VendorAccountController extends Controller
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
+            'nik' => $data['nik'] ?? null,
             'vendor_id' => $data['vendor_id'],
             'is_active' => $data['is_active'] ?? true,
         ]);
@@ -104,8 +110,30 @@ class VendorAccountController extends Controller
 
         $vendorAccount->save();
 
+        $this->storeKtpDocument($request, $vendorAccount);
+
         return redirect()->route('procurement.vendor-accounts.index')
             ->with('success', 'Akun PIC vendor berhasil diperbarui.');
+    }
+
+    private function storeKtpDocument(Request $request, User $account): void
+    {
+        if (! $request->hasFile('ktp_document')) {
+            return;
+        }
+
+        $account->attachments()->create([
+            'category' => 'ktp_document',
+            'file_path' => $request->file('ktp_document')->store('ktp-documents'),
+            'uploaded_by' => $request->user()->id,
+        ]);
+    }
+
+    private function ktpDocumentUrl(User $account): ?string
+    {
+        $doc = $account->ktpDocument();
+
+        return $doc ? Storage::disk('local')->temporaryUrl($doc->file_path, now()->addDay()) : null;
     }
 
     /** @return array<int, array{value: int, label: string}> */

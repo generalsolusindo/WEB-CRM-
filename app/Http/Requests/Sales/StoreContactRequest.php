@@ -22,6 +22,7 @@ class StoreContactRequest extends FormRequest
             'email' => ['nullable', 'email', 'max:255'],
             'address' => ['nullable', 'string'],
             'npwp' => ['nullable', 'string', 'max:50'],
+            'npwp_document' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'notes' => ['nullable', 'string'],
         ];
     }

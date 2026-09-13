@@ -50,6 +50,19 @@ class RecordProcurementPayment
                 ]);
             }
 
+            if ($locked->pricing_mode !== 'lump_sum') {
+                $vendorIds = $locked->items
+                    ->whereIn('id', $targetIds)
+                    ->pluck('vendor_id')
+                    ->unique();
+
+                if ($vendorIds->count() > 1) {
+                    throw ValidationException::withMessages([
+                        'item_ids' => 'Item yang dipilih berasal dari vendor berbeda. Bayar dan lampirkan bukti transfer per vendor secara terpisah.',
+                    ]);
+                }
+            }
+
             $locked->items()
                 ->whereIn('id', $targetIds)
                 ->update([
@@ -102,6 +115,8 @@ class RecordProcurementPayment
                     'finance_paid_by' => $finance->id,
                     'finance_paid_at' => now(),
                 ]);
+
+                $this->notify->resolve('procurement_payment.approved_pm', $locked);
 
                 $projectNo = 'PRJ-'.str_pad((string) $locked->project_id, 6, '0', STR_PAD_LEFT);
                 if ($locked->submitted_by) {

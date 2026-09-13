@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -24,6 +25,8 @@ class User extends Authenticatable
         'name',
         'email',
         'phone',
+        'nik',
+        'signature_path',
         'password',
         'role',
         'vendor_id',
@@ -68,5 +71,19 @@ class User extends Authenticatable
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(Vendor::class);
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
+    }
+
+    /** Dokumen KTP terbaru yang diupload Procurement untuk akun vendor/teknisi ini. */
+    public function ktpDocument(): ?Attachment
+    {
+        return $this->attachments()
+            ->where('category', 'ktp_document')
+            ->latest()
+            ->first();
     }
 }

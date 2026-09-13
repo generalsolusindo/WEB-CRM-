@@ -11,6 +11,15 @@ class Requirement extends Model
     use HasFactory;
 
     /**
+     * Satuan tetap untuk kebutuhan material/jasa customer (dipilih Sales lewat dropdown).
+     *
+     * @var list<string>
+     */
+    public const UNITS = [
+        'meter', 'node', 'rol', 'batang', 'pasang', 'titik', 'set', 'pack', 'core', 'kilo',
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -24,6 +33,7 @@ class Requirement extends Model
         'unit',
         'notes',
         'created_by',
+        'submitted_at',
     ];
 
     /**
@@ -35,6 +45,7 @@ class Requirement extends Model
     {
         return [
             'qty' => 'decimal:2',
+            'submitted_at' => 'datetime',
         ];
     }
 

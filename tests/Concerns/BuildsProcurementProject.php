@@ -25,7 +25,7 @@ trait BuildsProcurementProject
      *
      * @param  array<int, array{item_name?: string, qty?: int|float, unit?: string, cost_price?: int|float}>  $items
      */
-    protected function materialProject(array $items = []): Project
+    protected function materialProject(array $items = [], string $orderType = 'material_only'): Project
     {
         $items = $items ?: [['item_name' => 'Router', 'qty' => 2, 'unit' => 'unit', 'cost_price' => 1000000]];
 
@@ -71,11 +71,12 @@ trait BuildsProcurementProject
             'manager_review_status' => 'approved',
         ]);
 
-        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload('material_only'));
+        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload($orderType));
         $so = SalesOrder::firstOrFail();
 
         $finance = User::factory()->create(['role' => 'finance']);
-        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'full']);
+        $invoicePhase = $orderType === 'material_only' ? 'full' : 'dp';
+        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => $invoicePhase]);
         $invoice = Invoice::firstOrFail();
         $this->actingAs($finance)->post("/finance/invoices/{$invoice->id}/payments", [
             'amount_paid' => (float) $invoice->amount + (float) $invoice->tax_amount,

@@ -9,7 +9,7 @@ function money(v) {
 
 const CONTROL = 'w-full rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-xs outline-none transition focus:border-primary disabled:bg-bg disabled:text-text-muted';
 
-export default function Show({ project, items, payment, editable, canConfirm, canReceiveAll, history = [], vendors, catalog }) {
+export default function Show({ project, items, payment, editable, canConfirm, canReceiveAll, history = [], vendors, catalog, warehouseItems = [] }) {
     const { data, setData, post, processing, errors, transform } = useForm({
         pricing_mode: payment?.pricing_mode ?? 'itemized',
         lump_sum_vendor_id: payment?.lump_sum_vendor_id ?? '',
@@ -19,6 +19,8 @@ export default function Show({ project, items, payment, editable, canConfirm, ca
             id: it.id,
             from_office_stock: it.from_office_stock,
             office_stock_note: it.office_stock_note ?? '',
+            warehouse_item_id: it.warehouse_item_id ?? '',
+            warehouse_qty: it.warehouse_qty != null ? String(it.warehouse_qty) : '',
             vendor_id: it.vendor_id ?? '',
             cost_price: it.cost_price != null ? String(Number(it.cost_price)) : '',
             bank_account_note: it.bank_account_note ?? '',
@@ -34,6 +36,8 @@ export default function Show({ project, items, payment, editable, canConfirm, ca
             vendor_id: l.from_office_stock || l.vendor_id === '' ? null : Number(l.vendor_id),
             cost_price: l.from_office_stock || l.cost_price === '' ? null : Number(l.cost_price),
             bank_account_note: l.from_office_stock ? null : l.bank_account_note,
+            warehouse_item_id: l.from_office_stock && l.warehouse_item_id !== '' ? Number(l.warehouse_item_id) : null,
+            warehouse_qty: l.from_office_stock && l.warehouse_qty !== '' ? Number(l.warehouse_qty) : null,
         })),
     }));
 
@@ -49,6 +53,10 @@ export default function Show({ project, items, payment, editable, canConfirm, ca
         if (!p) return;
         const v = vendors.find((x) => String(x.id) === String(p.vendor_id));
         setLine(i, { vendor_id: String(p.vendor_id), cost_price: String(Number(p.price)), bank_account_note: v?.bank_account_note ?? '' });
+    }
+
+    function pickWarehouseItem(i, value) {
+        setLine(i, { warehouse_item_id: value });
     }
 
     function pickLumpSumVendor(value) {
@@ -73,6 +81,8 @@ export default function Show({ project, items, payment, editable, canConfirm, ca
                 id: l.id,
                 from_office_stock: l.from_office_stock,
                 office_stock_note: l.office_stock_note,
+                warehouse_item_id: l.from_office_stock && l.warehouse_item_id !== '' ? Number(l.warehouse_item_id) : null,
+                warehouse_qty: l.from_office_stock && l.warehouse_qty !== '' ? Number(l.warehouse_qty) : null,
                 vendor_id: l.from_office_stock || l.vendor_id === '' ? null : Number(l.vendor_id),
                 cost_price: l.from_office_stock || l.cost_price === '' ? null : Number(l.cost_price),
                 bank_account_note: l.from_office_stock ? null : l.bank_account_note,
@@ -182,9 +192,28 @@ export default function Show({ project, items, payment, editable, canConfirm, ca
                                                     </label>
                                                 )}
                                                 {rowEditable && line.from_office_stock && (
-                                                    <input value={line.office_stock_note} onChange={(e) => setLine(i, { office_stock_note: e.target.value })} placeholder="catatan (opsional)" className={`mt-1 ${CONTROL}`} />
+                                                    <div className="mt-1 space-y-1">
+                                                        <select value={line.warehouse_item_id} onChange={(e) => pickWarehouseItem(i, e.target.value)} className={CONTROL}>
+                                                            <option value="">— pilih barang gudang —</option>
+                                                            {warehouseItems.map((w) => (
+                                                                <option key={w.id} value={w.id}>{w.name} (stok {w.qty_on_hand} {w.unit})</option>
+                                                            ))}
+                                                        </select>
+                                                        <input
+                                                            type="number" min="1" value={line.warehouse_qty}
+                                                            onChange={(e) => setLine(i, { warehouse_qty: e.target.value })}
+                                                            placeholder="Jumlah dipakai"
+                                                            className={CONTROL}
+                                                        />
+                                                        <input value={line.office_stock_note} onChange={(e) => setLine(i, { office_stock_note: e.target.value })} placeholder="catatan (opsional)" className={CONTROL} />
+                                                    </div>
                                                 )}
-                                                {!rowEditable && it.from_office_stock && <div className="text-[11px] text-text-muted">Stok kantor{it.office_stock_note ? ` — ${it.office_stock_note}` : ''}</div>}
+                                                {!rowEditable && it.from_office_stock && (
+                                                    <div className="text-[11px] text-text-muted">
+                                                        Stok kantor{it.warehouse_item_name ? ` — ${it.warehouse_item_name} (${it.warehouse_qty} ${it.warehouse_item_unit})` : ''}
+                                                        {it.office_stock_note ? ` · ${it.office_stock_note}` : ''}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="whitespace-nowrap px-4 py-3.5 text-text-muted">{it.qty} {it.unit}</td>
                                             <td className="min-w-48 px-4 py-3.5">

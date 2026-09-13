@@ -51,6 +51,12 @@ class LeadPolicy
         return $this->owns($user, $lead);
     }
 
+    /** Ajukan tambahan (addendum) — Sales pemilik opportunity, kapan saja setelah Lead ini pernah Won. */
+    public function submitAddendum(User $user, Lead $lead): bool
+    {
+        return $this->owns($user, $lead);
+    }
+
     /** Manager menunjuk/mengganti Project Manager untuk sebuah opportunity. */
     public function delegate(User $user, Lead $lead): bool
     {

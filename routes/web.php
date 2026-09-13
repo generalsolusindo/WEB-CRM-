@@ -18,6 +18,7 @@ use App\Http\Controllers\ProjectManager\OpportunityController as ProjectManagerO
 use App\Http\Controllers\ProjectManager\ProjectController as ProjectManagerProjectController;
 use App\Http\Controllers\ProjectManager\ProcurementPaymentController as ProjectManagerProcurementPaymentController;
 use App\Http\Controllers\ProjectManager\QuotationController as ProjectManagerQuotationController;
+use App\Http\Controllers\ProjectManager\SowController as ProjectManagerSowController;
 use App\Http\Controllers\Operational\ActualProcurementController;
 use App\Http\Controllers\Operational\BastDraftController;
 use App\Http\Controllers\Operational\BastVerificationController;
@@ -41,6 +42,7 @@ use App\Http\Controllers\Technician\TaskController as TechnicianTaskController;
 use App\Http\Controllers\Procurement\VendorController;
 use App\Http\Controllers\Procurement\VendorProductController;
 use App\Http\Controllers\Vendor\SowController as VendorSowController;
+use App\Http\Controllers\Warehouse\WarehouseItemController;
 use App\Http\Controllers\Sales\ContactController;
 use App\Http\Controllers\Sales\LeadController;
 use App\Http\Controllers\Sales\LeadReportController;
@@ -51,6 +53,7 @@ use App\Http\Controllers\Sales\QuotationRevisionController;
 use App\Http\Controllers\Sales\RequirementController;
 use App\Http\Controllers\Sales\LeadSurveyController;
 use App\Http\Controllers\Sales\SalesOrderController;
+use App\Http\Controllers\Sales\SubmitAddendumController;
 use App\Http\Controllers\Sales\SubmitProcurementRequestController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -74,6 +77,8 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('admin')->name('admin.')->middleware('role:administrator')->group(function () {
         Route::resource('taxes', TaxController::class)->except('show');
+        Route::get('signature', [\App\Http\Controllers\Admin\SignatureController::class, 'edit'])->name('signature.edit');
+        Route::post('signature', [\App\Http\Controllers\Admin\SignatureController::class, 'update'])->name('signature.update');
     });
 
     Route::prefix('management')->name('management.')->middleware('role:management')->group(function () {
@@ -112,6 +117,9 @@ Route::middleware('auth')->group(function () {
         Route::get('procurement-payments', [ProjectManagerProcurementPaymentController::class, 'index'])->name('procurement-payments.index');
         Route::get('procurement-payments/{procurementPayment}', [ProjectManagerProcurementPaymentController::class, 'show'])->name('procurement-payments.show');
         Route::post('procurement-payments/{procurementPayment}/review', [ProjectManagerProcurementPaymentController::class, 'review'])->name('procurement-payments.review');
+        Route::get('sows', [ProjectManagerSowController::class, 'index'])->name('sows.index');
+        Route::get('sows/{sow}', [ProjectManagerSowController::class, 'show'])->name('sows.show');
+        Route::post('sows/{sow}/sign', [ProjectManagerSowController::class, 'sign'])->name('sows.sign');
     });
 
     Route::prefix('hr')->name('hr.')->middleware('role:hr')->group(function () {
@@ -125,6 +133,18 @@ Route::middleware('auth')->group(function () {
         Route::get('sows', [VendorSowController::class, 'index'])->name('sows.index');
         Route::get('sows/{sow}', [VendorSowController::class, 'show'])->name('sows.show');
         Route::post('sows/{sow}/sign', [VendorSowController::class, 'sign'])->name('sows.sign');
+    });
+
+    Route::prefix('warehouse')->name('warehouse.')->group(function () {
+        // Procurement juga boleh lihat stok (read-only) supaya bisa cek ketersediaan saat sourcing.
+        Route::get('items', [WarehouseItemController::class, 'index'])
+            ->name('items.index')
+            ->middleware('role:warehouse,procurement');
+
+        Route::middleware('role:warehouse')->group(function () {
+            Route::resource('items', WarehouseItemController::class)->except('index', 'show');
+            Route::post('items/{item}/adjust', [WarehouseItemController::class, 'adjust'])->name('items.adjust');
+        });
     });
 
     Route::prefix('procurement')->name('procurement.')->middleware('role:procurement')->group(function () {
@@ -254,8 +274,20 @@ Route::middleware('auth')->group(function () {
             ->name('projects.sow.submit');
         Route::get('projects/{project}/sow/print', [SowController::class, 'print'])
             ->name('projects.sow.print');
-        Route::post('sows/{sow}/sign-admin', [SowController::class, 'signAdmin'])
-            ->name('sows.sign-admin');
+        Route::post('projects/{project}/sow/scope-sections', [SowController::class, 'storeScopeSection'])
+            ->name('projects.sow.scope-sections.store');
+        Route::put('projects/{project}/sow/scope-sections/{scopeSection}', [SowController::class, 'updateScopeSection'])
+            ->name('projects.sow.scope-sections.update');
+        Route::delete('projects/{project}/sow/scope-sections/{scopeSection}', [SowController::class, 'destroyScopeSection'])
+            ->name('projects.sow.scope-sections.destroy');
+        Route::post('projects/{project}/sow/scope-sections/{scopeSection}/move', [SowController::class, 'moveScopeSection'])
+            ->name('projects.sow.scope-sections.move');
+        Route::post('projects/{project}/sow/scope-sections/{scopeSection}/images', [SowController::class, 'storeScopeImage'])
+            ->name('projects.sow.scope-sections.images.store');
+        Route::delete('projects/{project}/sow/scope-sections/{scopeSection}/images/{image}', [SowController::class, 'destroyScopeImage'])
+            ->name('projects.sow.scope-sections.images.destroy');
+        Route::post('sows/{sow}/sign-operational', [SowController::class, 'signOperational'])
+            ->name('sows.sign-operational');
         Route::post('sows/{sow}/restart-signatures', [SowController::class, 'restartSignatures'])
             ->name('sows.restart-signatures');
         Route::post('projects/{project}/actual-procurements', [ActualProcurementController::class, 'store'])
@@ -284,6 +316,8 @@ Route::middleware('auth')->group(function () {
             ->name('delivery-notes.show');
         Route::get('delivery-notes/{deliveryNote}/pdf', [DeliveryNoteController::class, 'pdf'])
             ->name('delivery-notes.pdf');
+        Route::post('delivery-notes/{deliveryNote}/received-proof', [DeliveryNoteController::class, 'uploadReceivedProof'])
+            ->name('delivery-notes.received-proof');
         Route::resource('projects', ProjectController::class)->only(['index', 'show']);
     });
 
@@ -292,6 +326,8 @@ Route::middleware('auth')->group(function () {
         Route::post('leads/{lead}/convert', [LeadController::class, 'convert'])->name('leads.convert');
         Route::post('leads/{lead}/submit-procurement', SubmitProcurementRequestController::class)
             ->name('leads.submit-procurement');
+        Route::post('leads/{lead}/submit-addendum', SubmitAddendumController::class)
+            ->name('leads.submit-addendum');
         Route::post('leads/{lead}/requirements', [RequirementController::class, 'store'])
             ->name('leads.requirements.store');
         Route::put('leads/{lead}/requirements/{requirement}', [RequirementController::class, 'update'])
@@ -313,6 +349,10 @@ Route::middleware('auth')->group(function () {
         Route::get('reports/leads', LeadReportController::class)->name('reports.leads');
         Route::get('quotations/{quotation}/print', [QuotationController::class, 'print'])
             ->name('quotations.print');
+        Route::get('quotations/{quotation}/pdf', [QuotationController::class, 'pdf'])
+            ->name('quotations.pdf');
+        Route::post('quotations/{quotation}/send-whatsapp', [QuotationController::class, 'sendWhatsapp'])
+            ->name('quotations.send-whatsapp');
         Route::get('procurement-requests/{procurementRequest}/quotations/create', [QuotationController::class, 'create'])
             ->name('procurement-requests.quotations.create');
         Route::post('procurement-requests/{procurementRequest}/quotations', [QuotationController::class, 'store'])
@@ -340,4 +380,9 @@ Route::middleware('auth')->group(function () {
 // Unduhan invoice untuk customer via tautan bertanda tangan (tanpa login).
 Route::get('invoice/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])
     ->name('invoices.pdf.public')
+    ->middleware('signed');
+
+// Unduhan quotation untuk customer via tautan bertanda tangan (tanpa login).
+Route::get('quotation/{quotation}/pdf', [QuotationController::class, 'downloadPdf'])
+    ->name('quotations.pdf.public')
     ->middleware('signed');

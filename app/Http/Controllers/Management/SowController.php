@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Management;
 use App\Actions\Sow\SignSow;
 use App\Http\Controllers\Concerns\BuildsSowReview;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Management\SignSowRequest;
 use App\Models\Sow;
+use App\Services\AdministratorSignature;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -16,12 +16,14 @@ class SowController extends Controller
 {
     use BuildsSowReview;
 
+    /** Antrean tanda tangan Management — hanya project yang belum didelegasikan ke Project Manager mana pun. */
     public function index(): Response
     {
         Gate::authorize('viewAny', Sow::class);
 
         $sows = Sow::query()
             ->where('status', \App\Enums\SowStatus::PendingDirectorSignature->value)
+            ->whereHas('project', fn ($q) => $q->whereNull('delegated_to'))
             ->with('project.salesOrder.contact:id,name')
             ->latest()
             ->paginate(15)
@@ -39,15 +41,18 @@ class SowController extends Controller
         return Inertia::render('Sows/Sign/Show', [
             'sow' => $this->sowDetail($sow),
             'canSign' => request()->user()->can('signAsDirector', $sow),
+            'autoSign' => true,
             'signUrl' => "/management/sows/{$sow->id}/sign",
-            'roleLabel' => 'Direktur',
+            'roleLabel' => 'Project Manager',
             'backHref' => '/management/sows',
         ]);
     }
 
-    public function sign(SignSowRequest $request, Sow $sow, SignSow $action): RedirectResponse
+    public function sign(Sow $sow, SignSow $action, AdministratorSignature $administratorSignature): RedirectResponse
     {
-        $action->handle($sow, $request->user(), 'director', $request->validated('signature'));
+        Gate::authorize('signAsDirector', $sow);
+
+        $action->handle($sow, request()->user(), 'director', $administratorSignature->dataUrl());
 
         return redirect()->route('management.sows.index')->with('success', 'SOW berhasil ditanda tangani — dokumen selesai.');
     }

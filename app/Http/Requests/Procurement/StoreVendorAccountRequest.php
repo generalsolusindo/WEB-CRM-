@@ -20,6 +20,8 @@ class StoreVendorAccountRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:50'],
+            'nik' => ['nullable', 'string', 'max:50'],
+            'ktp_document' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'password' => ['required', 'confirmed', Password::min(8)],
             'vendor_id' => [
                 'required',

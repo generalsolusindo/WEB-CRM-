@@ -1,6 +1,6 @@
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, Card, CardHeader, Field, Input, Textarea, FormActions } from '../../../Components/ui';
+import { PageHeader, Card, CardHeader, Field, Input, Select, Textarea, FormActions } from '../../../Components/ui';
 
 function Alert({ text }) {
     return <div className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">{text}</div>;
@@ -8,9 +8,12 @@ function Alert({ text }) {
 
 export default function Create({ salesOrder, defaultAddress, lines }) {
     const { data, setData, post, processing, errors, transform } = useForm({
+        delivery_method: 'ekspedisi',
         delivery_address: defaultAddress ?? '',
         shipper_name: '',
+        tracking_number: '',
         approved_by_name: '',
+        dispatch_proof: null,
         lines: lines.map((l) => ({ ...l, qty_delivered: l.qty_remaining, checked: true })),
     });
 
@@ -27,8 +30,10 @@ export default function Create({ salesOrder, defaultAddress, lines }) {
 
     function submit(e) {
         e.preventDefault();
-        post(`/operational/sales-orders/${salesOrder.id}/delivery-notes`);
+        post(`/operational/sales-orders/${salesOrder.id}/delivery-notes`, { forceFormData: true });
     }
+
+    const isEkspedisi = data.delivery_method === 'ekspedisi';
 
     return (
         <AppLayout>
@@ -45,17 +50,40 @@ export default function Create({ salesOrder, defaultAddress, lines }) {
 
                 <form onSubmit={submit} className="space-y-5">
                     <Card className="space-y-4">
+                        <Field label="Metode Pengiriman" required error={errors.delivery_method}>
+                            <Select value={data.delivery_method} onChange={(e) => setData('delivery_method', e.target.value)}>
+                                <option value="ekspedisi">Ekspedisi</option>
+                                <option value="sendiri">Diantar Sendiri</option>
+                            </Select>
+                        </Field>
                         <Field label="Alamat Pengiriman" required hint="Default dari alamat customer, bisa diubah sesuai lokasi pengiriman." error={errors.delivery_address}>
                             <Textarea rows={3} value={data.delivery_address} onChange={(e) => setData('delivery_address', e.target.value)} />
                         </Field>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Shipper (opsional)">
-                                <Input value={data.shipper_name} onChange={(e) => setData('shipper_name', e.target.value)} placeholder="nama pengirim" />
+                            <Field label={isEkspedisi ? 'Nama Ekspedisi (opsional)' : 'Nama Pengantar (opsional)'} error={errors.shipper_name}>
+                                <Input value={data.shipper_name} onChange={(e) => setData('shipper_name', e.target.value)} placeholder={isEkspedisi ? 'contoh: JNE, J&T' : 'nama yang mengantar'} />
                             </Field>
-                            <Field label="Approved by (opsional)">
-                                <Input value={data.approved_by_name} onChange={(e) => setData('approved_by_name', e.target.value)} placeholder="nama yang menyetujui" />
-                            </Field>
+                            {isEkspedisi && (
+                                <Field label="Nomor Resi (opsional)" error={errors.tracking_number}>
+                                    <Input value={data.tracking_number} onChange={(e) => setData('tracking_number', e.target.value)} placeholder="nomor resi" />
+                                </Field>
+                            )}
                         </div>
+                        <Field label="Approved by (opsional)" error={errors.approved_by_name}>
+                            <Input value={data.approved_by_name} onChange={(e) => setData('approved_by_name', e.target.value)} placeholder="nama yang menyetujui" />
+                        </Field>
+                        <Field
+                            label={isEkspedisi ? 'Bukti Serah ke Kurir' : 'Bukti Barang Dibawa'}
+                            required
+                            error={errors.dispatch_proof}
+                            hint="Wajib — foto resi/tanda terima saat barang diserahkan ke kurir, atau foto barang saat dibawa kalau diantar sendiri."
+                        >
+                            <input
+                                type="file" accept=".jpg,.jpeg,.png"
+                                onChange={(e) => setData('dispatch_proof', e.target.files[0] ?? null)}
+                                className="block w-full text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong"
+                            />
+                        </Field>
                     </Card>
 
                     <Card padded={false}>

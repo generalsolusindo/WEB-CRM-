@@ -69,6 +69,8 @@ class SourceSurvey
                 return $locked;
             }
 
+            $this->notify->resolve('survey.requested', $locked);
+
             $customer = $locked->lead->contact?->name ?? 'customer';
 
             if ($next === SurveyStatus::FinanceReview->value) {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Sales;
 
+use App\Enums\LeadSource;
 use App\Enums\LeadStage;
 use App\Http\Controllers\Controller;
 use App\Models\Lead;
@@ -41,7 +42,10 @@ class LeadReportController extends Controller
             ->groupBy('source_label')
             ->orderByDesc('total')
             ->get()
-            ->map(fn ($row) => ['label' => $row->source_label, 'total' => (int) $row->total]);
+            ->map(fn ($row) => [
+                'label' => LeadSource::tryFrom($row->source_label)?->label() ?? $row->source_label,
+                'total' => (int) $row->total,
+            ]);
 
         $totalLeads = (clone $base)->count();
         $opportunities = (clone $base)->where('type', 'opportunity')->count();

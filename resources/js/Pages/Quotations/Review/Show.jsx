@@ -21,7 +21,12 @@ export default function Show({ quotation, canReview, role }) {
             <Head title={quotation.number} />
             <div className="mx-auto max-w-5xl space-y-5">
                 <PageHeader
-                    title={quotation.number}
+                    title={(
+                        <span className="flex flex-wrap items-center gap-3">
+                            {quotation.number}
+                            {quotation.is_addendum && <span className="rounded-full bg-info-soft px-2.5 py-1 text-xs font-semibold text-info">Tambahan (Addendum)</span>}
+                        </span>
+                    )}
                     subtitle={`${quotation.company || quotation.customer} · Sales: ${quotation.sales}`}
                     back={{ href: base, label: 'Kembali' }}
                 />

@@ -203,13 +203,30 @@ class RequirementHandoffTest extends TestCase
     }
 
     /** @return array<string, mixed> */
+    public function test_requirement_unit_must_be_one_of_the_fixed_options(): void
+    {
+        [$sales, $lead] = $this->makeLead('opportunity');
+
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/requirements", [
+            ...$this->requirementData(),
+            'unit' => 'pcs', // bebas teks lama — sudah tidak diterima
+        ])->assertSessionHasErrors('unit');
+
+        foreach (Requirement::UNITS as $unit) {
+            $this->actingAs($sales)->post("/sales/leads/{$lead->id}/requirements", [
+                ...$this->requirementData(),
+                'unit' => $unit,
+            ])->assertSessionDoesntHaveErrors('unit');
+        }
+    }
+
     private function requirementData(): array
     {
         return [
             'item_name' => 'Router Enterprise',
             'description' => 'Dual WAN',
             'qty' => 2,
-            'unit' => 'unit',
+            'unit' => 'set',
             'notes' => 'Urgent',
         ];
     }

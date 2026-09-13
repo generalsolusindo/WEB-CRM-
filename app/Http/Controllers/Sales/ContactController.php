@@ -10,6 +10,7 @@ use App\Models\Lead;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -52,9 +53,11 @@ class ContactController extends Controller
     public function store(StoreContactRequest $request): RedirectResponse
     {
         $contact = Contact::create([
-            ...$request->validated(),
+            ...$request->safe()->except('npwp_document'),
             'created_by' => $request->user()->id,
         ]);
+
+        $this->storeNpwpDocument($request, $contact);
 
         return redirect()->route('sales.contacts.show', $contact)
             ->with('success', 'Contact berhasil dibuat.');
@@ -73,6 +76,7 @@ class ContactController extends Controller
         return Inertia::render('Sales/Contacts/Show', [
             'contact' => $contact,
             'leads' => $leads,
+            'npwpDocumentUrl' => $this->npwpDocumentUrl($contact),
         ]);
     }
 
@@ -80,15 +84,40 @@ class ContactController extends Controller
     {
         Gate::authorize('update', $contact);
 
-        return Inertia::render('Sales/Contacts/Form', ['contact' => $contact]);
+        return Inertia::render('Sales/Contacts/Form', [
+            'contact' => $contact,
+            'npwpDocumentUrl' => $this->npwpDocumentUrl($contact),
+        ]);
     }
 
     public function update(UpdateContactRequest $request, Contact $contact): RedirectResponse
     {
-        $contact->update($request->validated());
+        $contact->update($request->safe()->except('npwp_document'));
+
+        $this->storeNpwpDocument($request, $contact);
 
         return redirect()->route('sales.contacts.show', $contact)
             ->with('success', 'Contact berhasil diperbarui.');
+    }
+
+    private function storeNpwpDocument(StoreContactRequest $request, Contact $contact): void
+    {
+        if (! $request->hasFile('npwp_document')) {
+            return;
+        }
+
+        $contact->attachments()->create([
+            'category' => 'npwp_document',
+            'file_path' => $request->file('npwp_document')->store('npwp-documents'),
+            'uploaded_by' => $request->user()->id,
+        ]);
+    }
+
+    private function npwpDocumentUrl(Contact $contact): ?string
+    {
+        $doc = $contact->npwpDocument();
+
+        return $doc ? Storage::disk('local')->temporaryUrl($doc->file_path, now()->addDay()) : null;
     }
 
     public function destroy(Contact $contact): RedirectResponse

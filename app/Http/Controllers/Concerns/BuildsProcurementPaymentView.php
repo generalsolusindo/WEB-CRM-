@@ -58,6 +58,7 @@ trait BuildsProcurementPaymentView
                 'is_extra' => $item->requested_by !== null,
                 'from_office_stock' => $item->from_office_stock,
                 'office_stock_note' => $item->office_stock_note,
+                'vendor_id' => $item->vendor_id,
                 'vendor' => $item->vendor?->name,
                 'bank_account_note' => $item->bank_account_note,
                 'cost_price' => $item->cost_price,

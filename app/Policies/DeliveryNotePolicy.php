@@ -33,6 +33,15 @@ class DeliveryNotePolicy
         return $deliveryNote->status === 'sent' && $this->isProjectLeader($user, $deliveryNote);
     }
 
+    /**
+     * Bukti diterima customer — opsional, diupload Operational kapan saja
+     * (dokumentasi tambahan, tidak menggantikan alur `receive` teknisi di atas).
+     */
+    public function uploadReceivedProof(User $user, DeliveryNote $deliveryNote): bool
+    {
+        return $this->isOperational($user);
+    }
+
     private function isOperational(User $user): bool
     {
         return $user->role === 'operational' && $user->is_active;

@@ -10,6 +10,7 @@ function money(v) {
 export default function Show({ project, approvalDocs = [], bastRecords, taskPhotos, checkIns = [], materialStatus, procurementProgress, statusOptions, availabilityOptions, technicianOptions, vendorOptions = [], changeRequestTypes, permissions }) {
     const number = `PRJ-${String(project.id).padStart(6, '0')}`;
     const so = project.sales_order;
+    const isMaterialOnly = so.order_type === 'material_only';
 
     return (
         <AppLayout>
@@ -23,7 +24,7 @@ export default function Show({ project, approvalDocs = [], bastRecords, taskPhot
                         <>
                             {permissions.markReady && <Button onClick={() => router.post(`/operational/projects/${project.id}/ready`)} className="bg-success text-white hover:bg-success">Tandai Siap</Button>}
                             {permissions.start && <Button onClick={() => router.post(`/operational/projects/${project.id}/start`)}>Mulai Project</Button>}
-                            {permissions.completeDirect && <Button onClick={() => { if (confirm('Selesaikan project ini? (Material Only, tanpa BAST)')) router.post(`/operational/projects/${project.id}/complete`); }} className="bg-success text-white hover:bg-success">Selesaikan Project</Button>}
+                            {permissions.completeDirect && <Button onClick={() => { if (confirm('Selesaikan project ini? Semua barang sudah dikonfirmasi terkirim penuh. (Material Only, tanpa BAST)')) router.post(`/operational/projects/${project.id}/complete`); }} className="bg-success text-white hover:bg-success">Selesaikan Project</Button>}
                         </>
                     )}
                 />
@@ -41,7 +42,11 @@ export default function Show({ project, approvalDocs = [], bastRecords, taskPhot
                 <section className="flex items-center justify-between card p-6">
                     <div>
                         <h2 className="font-semibold text-text">Delivery Note</h2>
-                        <p className="text-sm text-text-muted">Pengiriman material ke lokasi project ini.</p>
+                        <p className="text-sm text-text-muted">
+                            {isMaterialOnly
+                                ? 'Project Material Only — cukup kirim semua barang lewat Delivery Note, tanpa teknisi/task/BAST.'
+                                : 'Pengiriman material ke lokasi project ini.'}
+                        </p>
                         {materialStatus && materialStatus.total > 0 && (
                             <span className={`badge mt-2 inline-block ${materialStatus.is_complete ? 'badge-success' : 'badge-warning'}`}>
                                 Status Material: {materialStatus.complete} dari {materialStatus.total} item lengkap terkirim
@@ -55,22 +60,26 @@ export default function Show({ project, approvalDocs = [], bastRecords, taskPhot
 
                 <Planning project={project} canPlan={permissions.plan} />
                 <VendorAssignment project={project} options={vendorOptions} editable={permissions.assignVendor} canViewSow={permissions.viewSow} />
-                <ActualProcurement project={project} availabilityOptions={availabilityOptions} progress={procurementProgress} editable={permissions.manageResources} />
-                <TechnicianTeam project={project} options={technicianOptions} editable={permissions.manageResources} />
-                {permissions.manageBastDraft && (
-                    <section className="flex items-center justify-between card p-6">
-                        <div>
-                            <h2 className="font-semibold text-text">Generate BAST</h2>
-                            <p className="text-sm text-text-muted">Siapkan draft cetakan BAST untuk dibawa teknisi ke lapangan.</p>
-                        </div>
-                        <Link href={`/operational/projects/${project.id}/bast-draft`} className="btn btn-outline">
-                            Buka Form BAST
-                        </Link>
-                    </section>
+                <ActualProcurement project={project} availabilityOptions={availabilityOptions} progress={procurementProgress} editable={permissions.manageExtraProcurement} />
+                {!isMaterialOnly && (
+                    <>
+                        <TechnicianTeam project={project} options={technicianOptions} editable={permissions.manageTechnicianTeam} />
+                        {permissions.manageBastDraft && (
+                            <section className="flex items-center justify-between card p-6">
+                                <div>
+                                    <h2 className="font-semibold text-text">Generate BAST</h2>
+                                    <p className="text-sm text-text-muted">Siapkan draft cetakan BAST untuk dibawa teknisi ke lapangan.</p>
+                                </div>
+                                <Link href={`/operational/projects/${project.id}/bast-draft`} className="btn btn-outline">
+                                    Buka Form BAST
+                                </Link>
+                            </section>
+                        )}
+                        <CheckIns items={checkIns} />
+                        <Tasks project={project} photos={taskPhotos} editable={permissions.manageTasks} />
+                        <BastSection project={project} records={bastRecords} canVerify={permissions.verifyBast} />
+                    </>
                 )}
-                <CheckIns items={checkIns} />
-                <Tasks project={project} photos={taskPhotos} editable={permissions.manageTasks} />
-                <BastSection project={project} records={bastRecords} canVerify={permissions.verifyBast} />
                 <ChangeRequests project={project} types={changeRequestTypes} editable={permissions.manageChangeRequests} />
             </div>
         </AppLayout>

@@ -2,7 +2,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, Field, Input, Select, Textarea, FormActions } from '../../../Components/ui';
 
-export default function Form({ lead = null, contacts, stageOptions, selectedContactId = null }) {
+export default function Form({ lead = null, contacts, stageOptions, sourceOptions = [], selectedContactId = null }) {
     const editing = Boolean(lead);
     const { data, setData, post, put, processing, errors } = useForm({
         contact_id: lead?.contact_id ?? selectedContactId ?? '',
@@ -47,7 +47,13 @@ export default function Form({ lead = null, contacts, stageOptions, selectedCont
                         </Field>
 
                         <Field label="Source" error={errors.source}>
-                            <Input value={data.source} onChange={(e) => setData('source', e.target.value)} placeholder="Referral, Website, Telepon, dll." />
+                            <Select value={data.source} onChange={(e) => setData('source', e.target.value)}>
+                                <option value="">— pilih source —</option>
+                                {sourceOptions.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                {data.source && !sourceOptions.some((s) => s.value === data.source) && (
+                                    <option value={data.source}>{data.source} (lama)</option>
+                                )}
+                            </Select>
                         </Field>
 
                         <div>

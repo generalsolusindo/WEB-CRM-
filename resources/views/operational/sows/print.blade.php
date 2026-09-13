@@ -2,7 +2,6 @@
     $forPdf = $forPdf ?? false;
     $dots = fn (?string $v, int $min = 20) => $v !== null && $v !== '' ? $v : str_repeat('.', $min);
     $vendor = $project->vendor;
-    $materials = $project->actualProcurements;
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -57,45 +56,45 @@
             </div>
         @endif
 
-        <h2>3. PENGADAAN MATERIAL</h2>
-        @if($materials->isEmpty())
+        <h2>3. RUANG LINGKUP PEKERJAAN</h2>
+        @if($sow->scopeSections->isEmpty())
             <p class="body-text">.................................................</p>
         @else
-            <ul>
-                @foreach($materials as $m)
-                    <li>{{ $m->item_name }} — {{ $m->qty }} {{ $m->unit }}</li>
+            @foreach($sow->scopeSections as $i => $section)
+                <p style="font-weight:700; margin-top:8px;">{{ chr(65 + $i) }}. {{ $section->title }}</p>
+                <p class="body-text">{{ $dots($section->content, 20) }}</p>
+                @foreach($scopeSectionImageUrls->get($section->id, collect()) as $url)
+                    <img src="{{ $url }}" style="max-width:100%; margin: 6px 0;">
                 @endforeach
-            </ul>
+            @endforeach
         @endif
 
-        <h2>4. PERSIAPAN & PRA-PEKERJAAN (PRE-WORK)</h2>
-        <p class="body-text">{{ $dots($sow->scope_pre_work, 40) }}</p>
-
-        <h2>5. RUANG LINGKUP PEKERJAAN LAINNYA</h2>
-        <p class="body-text">{{ $dots($sow->scope_other, 40) }}</p>
-
-        <h2>6. TANGGUNG JAWAB</h2>
+        <h2>4. TANGGUNG JAWAB</h2>
         <p class="body-text">{{ $dots($sow->responsibilities, 40) }}</p>
 
-        <h2>7. WAKTU PELAKSANAAN & JADWAL</h2>
-        <p class="body-text">{{ $dots($sow->schedule, 40) }}</p>
+        <h2>5. WAKTU PELAKSANAAN & JADWAL</h2>
+        <table class="meta">
+            <tr><td class="label">Estimasi Durasi Pekerjaan</td><td>: {{ $dots($sow->schedule_duration, 20) }}</td></tr>
+            <tr><td class="label">Waktu Mulai</td><td>: {{ $sow->schedule_start_date?->locale('id')->translatedFormat('d F Y') ?: str_repeat('.', 20) }}</td></tr>
+            <tr><td class="label">Target Selesai</td><td>: {{ $sow->schedule_end_date?->locale('id')->translatedFormat('d F Y') ?: str_repeat('.', 20) }}</td></tr>
+        </table>
 
-        <h2>8. KESELAMATAN KERJA (K3)</h2>
+        <h2>6. KESELAMATAN KERJA (K3)</h2>
         <p class="body-text">{{ $dots($sow->safety, 40) }}</p>
 
-        <h2>9. PEMBAYARAN</h2>
+        <h2>7. PEMBAYARAN</h2>
         <p class="body-text">{{ $dots($sow->payment_terms, 40) }}</p>
 
-        <h2>10. OUTPUT PEKERJAAN</h2>
+        <h2>8. OUTPUT PEKERJAAN</h2>
         <p class="body-text">{{ $dots($sow->output, 40) }}</p>
 
-        <h2>11. GARANSI LAYANAN TEKNISI</h2>
+        <h2>9. GARANSI LAYANAN TEKNISI</h2>
         <p class="body-text">{{ $dots($sow->warranty, 40) }}</p>
 
-        <h2>12. CATATAN</h2>
+        <h2>10. CATATAN</h2>
         <p class="body-text">{{ $dots($sow->notes, 40) }}</p>
 
-        <h2>13. PIC & KONTAK</h2>
+        <h2>11. PIC & KONTAK</h2>
         <table class="meta">
             <tr><td class="label">PIC Vendor</td><td>: {{ $dots($vendor?->contact_person, 30) }} ({{ $dots($vendor?->phone, 15) }})</td></tr>
             <tr><td class="label">Team Teknisi Site</td><td>: {{ $dots($sow->technician?->name, 30) }} ({{ $dots($sow->technician?->phone, 15) }})</td></tr>
@@ -105,7 +104,7 @@
             <tr><td class="label">PIC Client</td><td>: {{ $dots($sow->client_pic_name, 30) }} ({{ $dots($sow->client_pic_phone, 15) }})</td></tr>
         </table>
 
-        <h2>14. PENUTUP</h2>
+        <h2>12. PENUTUP</h2>
         <p class="body-text">{{ $dots($sow->closing, 40) }}</p>
 
         <p style="margin-top:20px; font-weight:700;">PENUGASAN</p>
@@ -114,8 +113,8 @@
             <tr>
                 <td class="role">Teknisi</td>
                 <td class="role">PIC Vendor</td>
-                <td class="role">Admin Project</td>
-                <td class="role">Direktur</td>
+                <td class="role">Operasional</td>
+                <td class="role">Project Manager</td>
             </tr>
             <tr>
                 <td class="space">@if($sow->technician_signature)<img src="{{ $sow->technician_signature }}" style="max-height:55px;">@endif</td>

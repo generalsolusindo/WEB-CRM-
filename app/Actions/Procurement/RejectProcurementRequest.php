@@ -5,6 +5,7 @@ namespace App\Actions\Procurement;
 use App\Enums\LeadStage;
 use App\Enums\ProcurementRequestStatus;
 use App\Models\ProcurementRequest;
+use App\Models\Requirement;
 use App\Services\Notifications\Notify;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -35,6 +36,10 @@ class RejectProcurementRequest
                 'status' => ProcurementRequestStatus::Rejected->value,
                 'rejection_reason' => $reason,
             ]);
+
+            // Buka lagi requirement yang ikut PR ini supaya Sales bisa revisi & submit ulang.
+            Requirement::whereIn('id', $locked->lines()->pluck('requirement_id'))
+                ->update(['submitted_at' => null]);
 
             if ($locked->lead->stage === LeadStage::Procurement->value) {
                 $locked->lead->update(['stage' => LeadStage::Requirement->value]);

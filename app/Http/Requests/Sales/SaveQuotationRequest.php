@@ -32,6 +32,7 @@ class SaveQuotationRequest extends FormRequest
     {
         return [
             'notes' => ['nullable', 'string'],
+            'terms' => ['nullable', 'string', 'max:4000'],
             'agreed_dpp' => ['nullable', 'numeric', 'min:0', 'decimal:0,2'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.procurement_request_line_id' => ['required', 'integer', 'distinct'],

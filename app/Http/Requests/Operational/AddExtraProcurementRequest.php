@@ -10,7 +10,7 @@ class AddExtraProcurementRequest extends FormRequest
     {
         $project = $this->route('project');
 
-        return $project && ($this->user()?->can('manageResources', $project) ?? false);
+        return $project && ($this->user()?->can('manageExtraProcurement', $project) ?? false);
     }
 
     /** @return array<string, mixed> */

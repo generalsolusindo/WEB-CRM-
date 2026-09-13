@@ -7,6 +7,7 @@ use App\Actions\Procurement\ReviewProcurementPayment;
 use App\Models\Project;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Models\WarehouseItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\BuildsProcurementProject;
 use Tests\TestCase;
@@ -98,6 +99,7 @@ class ProjectResourcesTest extends TestCase
         ]);
         $item = $project->actualProcurements()->firstOrFail();
         $pm = User::find($project->delegated_to);
+        $stock = WarehouseItem::create(['name' => 'Router Mikrotik', 'unit' => 'unit', 'qty_on_hand' => 3]);
 
         $this->actingAs($this->procurement)->post("/procurement/project-procurements/{$project->id}/submit", [
             'pricing_mode' => 'itemized',
@@ -105,18 +107,23 @@ class ProjectResourcesTest extends TestCase
                 'id' => $item->id,
                 'from_office_stock' => true,
                 'office_stock_note' => 'ambil dari gudang',
+                'warehouse_item_id' => $stock->id,
+                'warehouse_qty' => 1,
             ]],
         ])->assertSessionHas('success');
 
         $item->refresh();
         $this->assertTrue($item->from_office_stock);
         $this->assertSame('pending', $item->status);
+        // Belum dipotong saat submit — baru dipotong saat PM approve.
+        $this->assertSame(3, $stock->fresh()->qty_on_hand);
 
         $payment = $project->fresh()->procurementPayment;
         app(ReviewProcurementPayment::class)->handle($payment, $pm, true, null);
 
         $this->assertSame('confirmed', $payment->fresh()->status->value);
         $this->assertSame('received', $item->fresh()->status);
+        $this->assertSame(2, $stock->fresh()->qty_on_hand);
         $this->assertDatabaseHas('notifications', [
             'user_id' => $this->ops->id,
             'type' => 'project_procurement.ready',
@@ -148,9 +155,31 @@ class ProjectResourcesTest extends TestCase
             ->assertSessionHas('error');
     }
 
+    public function test_operational_can_add_extra_item_while_project_is_in_progress_but_not_after_completed(): void
+    {
+        $project = $this->materialProject([], 'mixed');
+        $project->update(['status' => 'in_progress']);
+
+        $this->actingAs($this->ops)->post("/operational/projects/{$project->id}/actual-procurements", [
+            'item_name' => 'Kabel tambahan mendadak', 'qty' => 10, 'unit' => 'meter', 'cost_price' => 15000,
+        ])->assertSessionHas('success');
+        $this->assertDatabaseHas('actual_procurements', ['project_id' => $project->id, 'item_name' => 'Kabel tambahan mendadak']);
+
+        $project->update(['status' => 'verification']);
+        $this->actingAs($this->ops)->post("/operational/projects/{$project->id}/actual-procurements", [
+            'item_name' => 'Item saat verifikasi', 'qty' => 1, 'unit' => 'unit', 'cost_price' => 5000,
+        ])->assertSessionHas('success');
+
+        $project->update(['status' => 'completed']);
+        $this->actingAs($this->ops)->post("/operational/projects/{$project->id}/actual-procurements", [
+            'item_name' => 'Item setelah selesai', 'qty' => 1, 'unit' => 'unit', 'cost_price' => 5000,
+        ])->assertForbidden();
+        $this->assertDatabaseMissing('actual_procurements', ['project_id' => $project->id, 'item_name' => 'Item setelah selesai']);
+    }
+
     public function test_assign_technicians_requires_exactly_one_leader(): void
     {
-        $project = $this->materialProject();
+        $project = $this->materialProject([], 'mixed');
         $t1 = User::factory()->create(['role' => 'technician', 'is_active' => true]);
         $t2 = User::factory()->create(['role' => 'technician', 'is_active' => true]);
 
@@ -166,7 +195,8 @@ class ProjectResourcesTest extends TestCase
 
     public function test_mark_ready_needs_all_items_received_plus_task_and_leader(): void
     {
-        $project = $this->materialProject();
+        // Mixed — punya barang & butuh teknisi/task, beda dari Material Only yang skip semua ini.
+        $project = $this->materialProject([], 'mixed');
         $tech = User::factory()->create(['role' => 'technician', 'is_active' => true]);
 
         $this->actingAs($this->ops)->post("/operational/projects/{$project->id}/tasks", ['title' => 'Instalasi']);
@@ -186,7 +216,7 @@ class ProjectResourcesTest extends TestCase
 
     public function test_pure_service_project_can_be_ready_without_procurement(): void
     {
-        $project = $this->materialProject();
+        $project = $this->materialProject([], 'service_only');
         $project->actualProcurements()->delete(); // murni jasa
         $tech = User::factory()->create(['role' => 'technician', 'is_active' => true]);
 

@@ -1,4 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
+import { useEffect } from 'react';
 import { FiFileText } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, Field, Input, Textarea, Button } from '../../../Components/ui';
@@ -15,6 +16,12 @@ export default function BastDraft({ project, draft, hasDraft }) {
         leader_name: draft.leader_name ?? '',
         leader_position: draft.leader_position ?? '',
     });
+
+    useEffect(() => {
+        if (draft.number && !form.data.number) {
+            form.setData('number', draft.number);
+        }
+    }, [draft.number]);
 
     function submit(e) {
         e.preventDefault();
@@ -35,7 +42,7 @@ export default function BastDraft({ project, draft, hasDraft }) {
                     <Card className="space-y-5">
                         <div className="grid gap-5 sm:grid-cols-2">
                             <Field label="Nomor BAST" error={form.errors.number}>
-                                <Input value={form.data.number} onChange={(e) => form.setData('number', e.target.value)} placeholder="Diisi manual" />
+                                <Input value={form.data.number} onChange={(e) => form.setData('number', e.target.value)} placeholder="Terisi otomatis setelah disimpan" />
                             </Field>
                             <Field label="Tanggal Pelaksanaan" error={form.errors.event_date}>
                                 <Input type="date" value={form.data.event_date} onChange={(e) => form.setData('event_date', e.target.value)} />

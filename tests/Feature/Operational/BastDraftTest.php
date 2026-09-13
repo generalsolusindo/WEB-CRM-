@@ -119,6 +119,23 @@ class BastDraftTest extends TestCase
         $this->assertDatabaseHas('bast_drafts', ['project_id' => $project->id, 'job_title' => 'Sudah Direvisi']);
     }
 
+    public function test_bast_number_is_auto_generated_when_left_blank_on_first_save(): void
+    {
+        [$project, $ops] = $this->projectWithLead();
+        $leader = User::factory()->create(['role' => 'technician', 'is_active' => true]);
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/technicians", [
+            'technician_ids' => [$leader->id],
+            'leader_id' => $leader->id,
+        ]);
+
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/bast-draft", [
+            'job_title' => 'Instalasi Awal',
+        ]);
+
+        $expected = '1/GS-BAST/'.now()->format('m').'/'.now()->year;
+        $this->assertDatabaseHas('bast_drafts', ['project_id' => $project->id, 'number' => $expected]);
+    }
+
     public function test_other_roles_cannot_access_bast_draft(): void
     {
         [$project] = $this->projectWithLead();

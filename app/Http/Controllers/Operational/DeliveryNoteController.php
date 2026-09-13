@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Operational;
 use App\Actions\Operational\CreateDeliveryNote;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Operational\StoreDeliveryNoteRequest;
+use App\Http\Requests\Operational\UploadDeliveryReceivedProofRequest;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteLine;
 use App\Models\SalesOrder;
@@ -68,9 +69,12 @@ class DeliveryNoteController extends Controller
             $salesOrder,
             $request->user(),
             $request->validated('lines'),
+            $request->validated('delivery_method'),
             $request->validated('delivery_address'),
             $request->validated('shipper_name'),
+            $request->validated('tracking_number'),
             $request->validated('approved_by_name'),
+            $request->file('dispatch_proof'),
         );
 
         return redirect()->route('operational.delivery-notes.show', $deliveryNote)
@@ -88,11 +92,24 @@ class DeliveryNoteController extends Controller
             'lines',
             'receivedBy:id,name',
             'creator:id,name',
+            'attachments',
         ]);
 
         return Inertia::render('Operational/DeliveryNotes/Show', [
             'deliveryNote' => $this->payload($deliveryNote),
+            'canUploadReceivedProof' => request()->user()->can('uploadReceivedProof', $deliveryNote),
         ]);
+    }
+
+    public function uploadReceivedProof(UploadDeliveryReceivedProofRequest $request, DeliveryNote $deliveryNote): RedirectResponse
+    {
+        $deliveryNote->attachments()->create([
+            'category' => 'delivery_received_proof',
+            'file_path' => $request->file('proof')->store('delivery-proofs'),
+            'uploaded_by' => $request->user()->id,
+        ]);
+
+        return back()->with('success', 'Bukti barang diterima customer tersimpan.');
     }
 
     public function pdf(DeliveryNote $deliveryNote): \Illuminate\Http\Response
@@ -114,17 +131,28 @@ class DeliveryNoteController extends Controller
     /** @return array<string, mixed> */
     private function payload(DeliveryNote $deliveryNote): array
     {
+        $dispatchProof = $deliveryNote->attachments->firstWhere('category', 'delivery_dispatch_proof');
+        $receivedProof = $deliveryNote->attachments->firstWhere('category', 'delivery_received_proof');
+
         return [
             'id' => $deliveryNote->id,
             'number' => $deliveryNote->number,
             'status' => $deliveryNote->status,
+            'delivery_method' => $deliveryNote->delivery_method,
             'delivery_address' => $deliveryNote->delivery_address,
             'shipper_name' => $deliveryNote->shipper_name,
+            'tracking_number' => $deliveryNote->tracking_number,
             'approved_by_name' => $deliveryNote->approved_by_name,
             'created_by' => $deliveryNote->creator?->name,
             'created_at' => $deliveryNote->created_at,
             'received_by' => $deliveryNote->receivedBy?->name,
             'received_at' => $deliveryNote->received_at,
+            'dispatch_proof_url' => $dispatchProof
+                ? \Illuminate\Support\Facades\Storage::disk('local')->temporaryUrl($dispatchProof->file_path, now()->addDay())
+                : null,
+            'received_proof_url' => $receivedProof
+                ? \Illuminate\Support\Facades\Storage::disk('local')->temporaryUrl($receivedProof->file_path, now()->addDay())
+                : null,
             'sales_order' => [
                 'id' => $deliveryNote->salesOrder->id,
                 'number' => $deliveryNote->salesOrder->number,

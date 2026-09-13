@@ -5,6 +5,7 @@ namespace App\Actions\Sales;
 use App\Models\Notification;
 use App\Models\Quotation;
 use App\Models\User;
+use App\Services\Notifications\Notify;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -14,6 +15,8 @@ use Illuminate\Validation\ValidationException;
  */
 class ReviewQuotation
 {
+    public function __construct(private Notify $notify) {}
+
     public function handle(Quotation $quotation, User $reviewer, string $reviewerRole, bool $approved, ?string $notes): Quotation
     {
         return DB::transaction(function () use ($quotation, $reviewer, $reviewerRole, $approved, $notes) {
@@ -41,6 +44,8 @@ class ReviewQuotation
                     'pm_reviewed_at' => now(),
                     'pm_review_notes' => $notes,
                 ]);
+
+                $this->notify->resolve('quotation.pending_pm_review', $locked);
             } else {
                 if ($locked->pm_review_status !== 'approved') {
                     throw ValidationException::withMessages(['quotation' => 'Menunggu verifikasi Project Manager terlebih dahulu.']);
@@ -56,12 +61,7 @@ class ReviewQuotation
                     'manager_review_notes' => $notes,
                 ]);
 
-                Notification::query()
-                    ->where('type', 'quotation.pending_manager_review')
-                    ->where('related_type', $locked->getMorphClass())
-                    ->where('related_id', $locked->id)
-                    ->whereNull('read_at')
-                    ->update(['read_at' => now()]);
+                $this->notify->resolve('quotation.pending_manager_review', $locked);
             }
 
             $this->notifyOutcome($locked, $reviewerRole, $approved, $notes);

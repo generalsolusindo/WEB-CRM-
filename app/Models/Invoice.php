@@ -33,6 +33,7 @@ class Invoice extends Model
         'pph23_recorded_at',
         'pph23_recorded_by',
         'due_date',
+        'notes',
         'whatsapp_sent_at',
         'whatsapp_sent_by',
         'created_by',

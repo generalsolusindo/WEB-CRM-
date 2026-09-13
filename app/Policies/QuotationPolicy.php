@@ -48,6 +48,14 @@ class QuotationPolicy
         return $this->update($user, $quotation) && $quotation->isFullyApproved();
     }
 
+    /** Kirim tautan PDF quotation ke WhatsApp customer — sekaligus menandai terkirim bila masih draft. */
+    public function sendWhatsapp(User $user, Quotation $quotation): bool
+    {
+        return $this->owns($user, $quotation)
+            && $quotation->isFullyApproved()
+            && in_array($quotation->status, [QuotationStatus::Draft->value, QuotationStatus::Sent->value], true);
+    }
+
     public function reviewAsPm(User $user, Quotation $quotation): bool
     {
         return $this->isProjectManager($user)

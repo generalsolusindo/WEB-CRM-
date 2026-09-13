@@ -13,7 +13,16 @@ export default function Index({ projects, filters, statusOptions, role }) {
     const tabs = [{ value: '', label: 'Semua' }, ...statusOptions.map((o) => ({ value: o.value, label: o.label }))];
 
     const columns = [
-        { key: 'number', label: 'Nomor', render: (p) => <span className="font-medium text-text">{p.number}</span> },
+        {
+            key: 'number',
+            label: 'Nomor',
+            render: (p) => (
+                <span className="flex items-center gap-2">
+                    <span className="font-medium text-text">{p.number}</span>
+                    {p.is_won && <StatusBadge status="won" label="Won" />}
+                </span>
+            ),
+        },
         { key: 'customer', label: 'Customer', render: (p) => p.customer || '—' },
         { key: 'status', label: 'Status', render: (p) => <StatusBadge status={p.status} label={p.status_label} /> },
         {

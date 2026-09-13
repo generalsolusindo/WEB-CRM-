@@ -12,6 +12,7 @@ use App\Services\DocumentNumber;
 use App\Services\Notifications\Notify;
 use App\Services\Sales\AgreedDpp;
 use App\Services\Sales\LinePricing;
+use App\Support\QuotationDefaults;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -57,8 +58,10 @@ class CreateQuotation
                 'status' => QuotationStatus::Draft->value,
                 'revision_number' => 1,
                 'parent_quotation_id' => null,
+                'is_addendum' => $request->is_addendum,
                 'valid_until' => now()->addDays(10)->toDateString(),
                 'notes' => $data['notes'] ?? null,
+                'terms' => ($data['terms'] ?? '') !== '' ? $data['terms'] : QuotationDefaults::terms(),
                 'agreed_dpp' => isset($data['agreed_dpp']) && $data['agreed_dpp'] !== null && $data['agreed_dpp'] !== ''
                     ? (float) $data['agreed_dpp']
                     : null,
@@ -74,6 +77,8 @@ class CreateQuotation
             }
 
             $request->lead->update(['stage' => LeadStage::Quotation->value]);
+
+            $this->notify->resolve('procurement_request.ready', $request);
 
             $pm = $request->lead->delegatedTo;
             if ($pm) {

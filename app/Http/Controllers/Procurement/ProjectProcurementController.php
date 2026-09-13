@@ -68,6 +68,7 @@ class ProjectProcurementController extends Controller
             'salesOrder.contact:id,name,company_name',
             'actualProcurements' => fn ($q) => $q->orderBy('id'),
             'actualProcurements.vendor:id,name',
+            'actualProcurements.warehouseItem:id,name,unit,qty_on_hand',
             'procurementPayment.lumpSumVendor:id,name',
             'procurementPayment.pmReviewedBy:id,name',
             'procurementPayment.financePaidBy:id,name',
@@ -99,6 +100,11 @@ class ProjectProcurementController extends Controller
                 'cost_price' => $item->cost_price,
                 'from_office_stock' => $item->from_office_stock,
                 'office_stock_note' => $item->office_stock_note,
+                'warehouse_item_id' => $item->warehouse_item_id,
+                'warehouse_qty' => $item->warehouse_qty,
+                'warehouse_item_name' => $item->warehouseItem?->name,
+                'warehouse_item_unit' => $item->warehouseItem?->unit,
+                'warehouse_item_stock' => $item->warehouseItem?->qty_on_hand,
                 'bank_account_note' => $item->bank_account_note,
                 'is_paid' => $item->is_paid,
                 'status' => $item->status,
@@ -138,6 +144,9 @@ class ProjectProcurementController extends Controller
                 ->with('vendor:id,name,bank_account_note')
                 ->orderBy('item_name')
                 ->get(['id', 'vendor_id', 'item_name', 'price', 'unit']),
+            'warehouseItems' => \App\Models\WarehouseItem::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'unit', 'qty_on_hand']),
         ]);
     }
 
@@ -169,6 +178,8 @@ class ProjectProcurementController extends Controller
             $item->update([
                 'from_office_stock' => $office,
                 'office_stock_note' => $office ? ($input['office_stock_note'] ?? null) : null,
+                'warehouse_item_id' => $office ? ($input['warehouse_item_id'] ?? null) : null,
+                'warehouse_qty' => $office ? ($input['warehouse_qty'] ?? null) : null,
                 'vendor_id' => $office ? null : ($input['vendor_id'] ?? null),
                 'cost_price' => $office ? 0 : ($input['cost_price'] ?? 0),
                 'bank_account_note' => $office ? null : ($input['bank_account_note'] ?? null),

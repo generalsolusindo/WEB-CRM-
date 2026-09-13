@@ -31,8 +31,7 @@ export default function Login() {
                         style={{
                             backgroundImage: 'radial-gradient(currentColor 1px, transparent 1px)',
                             backgroundSize: '22px 22px',
-                        }}
-                    />
+                        }}/>
 
                     <div className="relative w-fit rounded-xl bg-white p-4 shadow-lg">
                         <img src="/images/logo-gs.png" alt="General Solusindo" className="h-11 w-auto" />

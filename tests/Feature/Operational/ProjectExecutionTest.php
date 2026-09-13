@@ -14,6 +14,8 @@ use App\Models\SalesOrder;
 use App\Models\User;
 use App\Services\Sales\SalesOrderSettlement;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ProjectExecutionTest extends TestCase
@@ -105,8 +107,24 @@ class ProjectExecutionTest extends TestCase
         $mixed->update(['status' => 'in_progress']);
         $this->actingAs($this->ops)->post("/operational/projects/{$mixed->id}/complete")->assertForbidden();
 
+        // Material Only sekarang skip teknisi/task/BAST sama sekali — readyProject()
+        // meninggalkannya di WaitingResource begitu barang procurement diterima.
+        Storage::fake('local');
         $material = $this->readyProject('material_only');
-        $material->update(['status' => 'in_progress']);
+        $this->assertSame('waiting_resource', $material->status);
+
+        // Belum ada Delivery Note sama sekali — belum boleh selesai.
+        $this->actingAs($this->ops)->post("/operational/projects/{$material->id}/complete")->assertForbidden();
+
+        $so = $material->salesOrder;
+        $line = $so->lines()->first();
+        $this->actingAs($this->ops)->post("/operational/sales-orders/{$so->id}/delivery-notes", [
+            'delivery_method' => 'sendiri',
+            'delivery_address' => 'Site A',
+            'dispatch_proof' => UploadedFile::fake()->image('bukti.jpg'),
+            'lines' => [['sales_order_line_id' => $line->id, 'qty_delivered' => $line->qty]],
+        ]);
+
         $this->actingAs($this->ops)->post("/operational/projects/{$material->id}/complete")
             ->assertSessionHas('success');
         $this->assertSame('completed', $material->fresh()->status);
@@ -169,6 +187,13 @@ class ProjectExecutionTest extends TestCase
         $project->actualProcurements()->update([
             'cost_price' => 1000, 'is_paid' => true, 'status' => 'received', 'received_at' => now(),
         ]);
+
+        if ($orderType === 'material_only') {
+            // Material Only tidak lewat teknisi/task/markReady sama sekali.
+            $project->update(['status' => 'waiting_resource']);
+
+            return $project->fresh();
+        }
 
         $tech = User::factory()->create(['role' => 'technician', 'is_active' => true]);
         $this->actingAs($this->ops)->post("/operational/projects/{$project->id}/tasks", ['title' => 'Instalasi']);

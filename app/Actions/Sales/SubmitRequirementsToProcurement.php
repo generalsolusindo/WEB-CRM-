@@ -32,7 +32,7 @@ class SubmitRequirementsToProcurement
                 ]);
             }
 
-            $requirements = $lockedLead->requirements()->orderBy('id')->get();
+            $requirements = $lockedLead->requirements()->whereNull('submitted_at')->orderBy('id')->get();
 
             if ($requirements->isEmpty()) {
                 throw ValidationException::withMessages([
@@ -61,6 +61,7 @@ class SubmitRequirementsToProcurement
                 ]);
             }
 
+            $lockedLead->requirements()->whereIn('id', $requirements->pluck('id'))->update(['submitted_at' => now()]);
             $lockedLead->update(['stage' => LeadStage::Procurement->value]);
 
             return $procurementRequest;

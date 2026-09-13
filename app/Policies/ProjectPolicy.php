@@ -2,10 +2,12 @@
 
 namespace App\Policies;
 
+use App\Enums\ActualProcurementStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\SowStatus;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\Operational\MaterialDeliveryStatus;
 
 class ProjectPolicy
 {
@@ -57,17 +59,42 @@ class ProjectPolicy
     }
 
     /**
+     * Tambah/hapus item pengadaan ekstra — dibuka lebih lebar dari manageResources
+     * (yang mengatur penugasan teknisi) karena kebutuhan tambahan material
+     * seringkali baru ketahuan justru saat project sudah berjalan di lapangan.
+     * Ditutup hanya setelah project benar-benar Selesai.
+     */
+    public function manageExtraProcurement(User $user, Project $project): bool
+    {
+        return $this->isOperational($user) && $project->status !== ProjectStatus::Completed->value;
+    }
+
+    /**
+     * Assign/ubah tim technician — dipisah dari manageResources supaya bisa
+     * ditutup untuk project Material Only tanpa mengganggu pengelolaan
+     * actual_procurements (yang tetap perlu Operational untuk kedua tipe order).
+     */
+    public function manageTechnicianTeam(User $user, Project $project): bool
+    {
+        return $this->manageResources($user, $project)
+            && $project->salesOrder?->order_type !== 'material_only';
+    }
+
+    /**
      * Kelola daftar task — selama project belum selesai (termasuk saat rework).
+     * Tidak berlaku untuk Material Only — tidak ada pekerjaan on-site untuk order jenis ini.
      */
     public function manageTasks(User $user, Project $project): bool
     {
         return $this->isOperational($user)
-            && $project->status !== ProjectStatus::Completed->value;
+            && $project->status !== ProjectStatus::Completed->value
+            && $project->salesOrder?->order_type !== 'material_only';
     }
 
     public function markReady(User $user, Project $project): bool
     {
         return $this->isOperational($user)
+            && $project->salesOrder?->order_type !== 'material_only'
             && in_array($project->status, [
                 ProjectStatus::Planning->value,
                 ProjectStatus::WaitingResource->value,
@@ -77,6 +104,7 @@ class ProjectPolicy
     public function start(User $user, Project $project): bool
     {
         return $this->isOperational($user)
+            && $project->salesOrder?->order_type !== 'material_only'
             && $project->status === ProjectStatus::Ready->value;
     }
 
@@ -90,13 +118,29 @@ class ProjectPolicy
     }
 
     /**
-     * Selesaikan langsung tanpa BAST — sementara hanya untuk order Material Only.
+     * Selesaikan project Material Only — tanpa teknisi/task/BAST sama sekali.
+     * Cukup begitu semua barang procurement sudah diterima DAN semua baris
+     * material Sales Order sudah terkirim penuh (Delivery Note).
      */
     public function completeDirect(User $user, Project $project): bool
     {
-        return $this->isOperational($user)
-            && $project->status === ProjectStatus::InProgress->value
-            && $project->salesOrder?->order_type === 'material_only';
+        if (! $this->isOperational($user) || $project->salesOrder?->order_type !== 'material_only') {
+            return false;
+        }
+
+        if (! in_array($project->status, [
+            ProjectStatus::WaitingResource->value,
+            ProjectStatus::Ready->value,
+            ProjectStatus::InProgress->value,
+        ], true)) {
+            return false;
+        }
+
+        if ($project->actualProcurements()->where('status', '!=', ActualProcurementStatus::Received->value)->exists()) {
+            return false;
+        }
+
+        return MaterialDeliveryStatus::of($project->salesOrder)['is_complete'];
     }
 
     public function manageChangeRequests(User $user, Project $project): bool

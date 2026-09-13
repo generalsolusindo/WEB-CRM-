@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Contact extends Model
 {
@@ -38,6 +39,20 @@ class Contact extends Model
     public function leads(): HasMany
     {
         return $this->hasMany(Lead::class);
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(Attachment::class, 'attachable');
+    }
+
+    /** Dokumen NPWP terbaru yang diupload — kalau ada beberapa, ambil yang paling baru. */
+    public function npwpDocument(): ?Attachment
+    {
+        return $this->attachments()
+            ->where('category', 'npwp_document')
+            ->latest()
+            ->first();
     }
 
     /**

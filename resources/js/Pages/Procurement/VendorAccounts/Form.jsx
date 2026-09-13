@@ -2,12 +2,14 @@ import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, Field, Input, Select, FormActions } from '../../../Components/ui';
 
-export default function Form({ account = null, vendorOptions = [] }) {
+export default function Form({ account = null, vendorOptions = [], ktpDocumentUrl = null }) {
     const editing = Boolean(account);
     const { data, setData, post, put, processing, errors } = useForm({
         name: account?.name ?? '',
         email: account?.email ?? '',
         phone: account?.phone ?? '',
+        nik: account?.nik ?? '',
+        ktp_document: null,
         password: '',
         password_confirmation: '',
         vendor_id: account?.vendor_id ?? '',
@@ -16,7 +18,8 @@ export default function Form({ account = null, vendorOptions = [] }) {
 
     function submit(e) {
         e.preventDefault();
-        editing ? put(`/procurement/vendor-accounts/${account.id}`) : post('/procurement/vendor-accounts');
+        const options = { forceFormData: true };
+        editing ? put(`/procurement/vendor-accounts/${account.id}`, options) : post('/procurement/vendor-accounts', options);
     }
 
     return (
@@ -39,6 +42,21 @@ export default function Form({ account = null, vendorOptions = [] }) {
                             </Field>
                             <Field label="Telepon" error={errors.phone}>
                                 <Input value={data.phone} onChange={(e) => setData('phone', e.target.value)} />
+                            </Field>
+                            <Field label="NIK" error={errors.nik} hint="Nomor Induk Kependudukan PIC vendor (opsional).">
+                                <Input value={data.nik} onChange={(e) => setData('nik', e.target.value)} />
+                            </Field>
+                            <Field label="Dokumen KTP (opsional)" error={errors.ktp_document}>
+                                <input
+                                    type="file" accept=".jpg,.jpeg,.png,.pdf"
+                                    onChange={(e) => setData('ktp_document', e.target.files[0] ?? null)}
+                                    className="block w-full text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong"
+                                />
+                                {ktpDocumentUrl && (
+                                    <a href={ktpDocumentUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs font-medium text-primary hover:underline">
+                                        Lihat dokumen KTP saat ini
+                                    </a>
+                                )}
                             </Field>
                             <Field label="Vendor" required error={errors.vendor_id}>
                                 <Select value={data.vendor_id} onChange={(e) => setData('vendor_id', e.target.value)}>

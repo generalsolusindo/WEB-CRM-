@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Sow extends Model
@@ -24,6 +25,9 @@ class Sow extends Model
         'scope_other',
         'responsibilities',
         'schedule',
+        'schedule_duration',
+        'schedule_start_date',
+        'schedule_end_date',
         'safety',
         'payment_terms',
         'output',
@@ -60,6 +64,8 @@ class Sow extends Model
     protected function casts(): array
     {
         return [
+            'schedule_start_date' => 'date:Y-m-d',
+            'schedule_end_date' => 'date:Y-m-d',
             'submitted_at' => 'datetime',
             'hr_content_reviewed_at' => 'datetime',
             'technician_signed_at' => 'datetime',
@@ -98,6 +104,12 @@ class Sow extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /** Sub-bab Ruang Lingkup Pekerjaan, berurutan sesuai `position`. */
+    public function scopeSections(): HasMany
+    {
+        return $this->hasMany(SowScopeSection::class)->orderBy('position');
     }
 
     public function technician(): BelongsTo

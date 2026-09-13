@@ -45,6 +45,37 @@ class OpportunityDelegationTest extends TestCase
         $this->assertNotNull($lead->delegated_at);
     }
 
+    public function test_management_filters_opportunities_by_stage(): void
+    {
+        $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
+        $qualified = $this->opportunity();
+        $won = $this->opportunity();
+        $won->update(['stage' => 'won']);
+
+        $res = $this->actingAs($management)->get('/management/opportunities?stage=won');
+        $res->assertOk();
+        $ids = collect($res->viewData('page')['props']['opportunities']['data'])->pluck('id')->all();
+        $this->assertSame([$won->id], $ids);
+
+        $unfiltered = $this->actingAs($management)->get('/management/opportunities');
+        $allIds = collect($unfiltered->viewData('page')['props']['opportunities']['data'])->pluck('id')->all();
+        $this->assertContains($qualified->id, $allIds);
+        $this->assertContains($won->id, $allIds);
+    }
+
+    public function test_opportunity_stage_is_labeled_correctly(): void
+    {
+        $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
+        $lead = $this->opportunity();
+        $lead->update(['stage' => 'won']);
+
+        $res = $this->actingAs($management)->get("/management/opportunities/{$lead->id}");
+        $res->assertOk();
+        $res->assertInertia(fn ($page) => $page
+            ->where('opportunity.stage', 'won')
+            ->where('opportunity.stage_label', 'Won'));
+    }
+
     public function test_pm_only_sees_opportunities_delegated_to_them(): void
     {
         $management = User::factory()->create(['role' => 'management', 'is_active' => true]);

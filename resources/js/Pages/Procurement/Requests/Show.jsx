@@ -13,7 +13,7 @@ function Alert({ text }) {
     return <div className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">{text}</div>;
 }
 
-export default function Show({ procurementRequest: pr, editable, canStart, canFinalize, availabilityOptions, taxes, catalog }) {
+export default function Show({ procurementRequest: pr, editable, canStart, canFinalize, hasNpwp = false, npwpDocumentUrl = null, availabilityOptions, taxes, catalog }) {
     const number = `PR-${String(pr.id).padStart(6, '0')}`;
     const [rejectOpen, setRejectOpen] = useState(false);
     const rejectForm = useForm({ rejection_reason: '' });
@@ -87,6 +87,17 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
                         </>
                     )}
                 />
+
+                {hasNpwp && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/25 bg-primary-soft px-4 py-3 text-sm font-medium text-primary-strong">
+                        <span>💡 Customer ini punya NPWP — kemungkinan kebutuhan ini perlu dikenakan PPN. Pilih pajak PPN di tiap baris sesuai kebutuhan.</span>
+                        {npwpDocumentUrl && (
+                            <a href={npwpDocumentUrl} target="_blank" rel="noreferrer" className="font-semibold underline">
+                                Lihat dokumen NPWP
+                            </a>
+                        )}
+                    </div>
+                )}
 
                 {pr.status === 'rejected' && pr.rejection_reason && <Alert text={`Ditolak: ${pr.rejection_reason}`} />}
                 {errors.procurement_request && <Alert text={errors.procurement_request} />}

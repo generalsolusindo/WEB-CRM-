@@ -10,6 +10,8 @@ use App\Models\Quotation;
 use App\Models\SalesOrder;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class DeliveryNoteTest extends TestCase
@@ -59,15 +61,19 @@ class DeliveryNoteTest extends TestCase
 
     public function test_operational_creates_delivery_note_with_material_lines_only(): void
     {
+        Storage::fake('local');
         $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
         $so = $this->mixedSalesOrder();
         $router = $so->lines->firstWhere('item_name', 'Router');
         $switch = $so->lines->firstWhere('item_name', 'Switch');
 
         $res = $this->actingAs($ops)->post("/operational/sales-orders/{$so->id}/delivery-notes", [
+            'delivery_method' => 'ekspedisi',
             'delivery_address' => 'Site A, Jakarta',
             'shipper_name' => 'Budi',
+            'tracking_number' => 'JNE123456',
             'approved_by_name' => 'Rina',
+            'dispatch_proof' => UploadedFile::fake()->image('resi.jpg'),
             'lines' => [
                 ['sales_order_line_id' => $router->id, 'qty_delivered' => 2],
                 ['sales_order_line_id' => $switch->id, 'qty_delivered' => 1],
@@ -78,6 +84,9 @@ class DeliveryNoteTest extends TestCase
         $dn = DeliveryNote::with('lines')->firstOrFail();
         $this->assertMatchesRegularExpression('#^\d+/GS-DO/\d{2}/\d{4}$#', $dn->number);
         $this->assertSame('Site A, Jakarta', $dn->delivery_address);
+        $this->assertSame('ekspedisi', $dn->delivery_method);
+        $this->assertSame('JNE123456', $dn->tracking_number);
+        $this->assertTrue($dn->hasDispatchProof());
         $this->assertSame(2, $dn->lines->count());
 
         $routerLine = $dn->lines->firstWhere('item_name', 'Router');
@@ -95,17 +104,22 @@ class DeliveryNoteTest extends TestCase
 
     public function test_second_delivery_note_carries_previous_balance(): void
     {
+        Storage::fake('local');
         $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
         $so = $this->mixedSalesOrder();
         $switch = $so->lines->firstWhere('item_name', 'Switch');
 
         $this->actingAs($ops)->post("/operational/sales-orders/{$so->id}/delivery-notes", [
+            'delivery_method' => 'sendiri',
             'delivery_address' => 'Site A',
+            'dispatch_proof' => UploadedFile::fake()->image('bukti1.jpg'),
             'lines' => [['sales_order_line_id' => $switch->id, 'qty_delivered' => 1]],
         ]);
 
         $this->actingAs($ops)->post("/operational/sales-orders/{$so->id}/delivery-notes", [
+            'delivery_method' => 'sendiri',
             'delivery_address' => 'Site A',
+            'dispatch_proof' => UploadedFile::fake()->image('bukti2.jpg'),
             'lines' => [['sales_order_line_id' => $switch->id, 'qty_delivered' => 3]],
         ])->assertRedirect();
 
@@ -118,12 +132,15 @@ class DeliveryNoteTest extends TestCase
 
     public function test_cannot_deliver_more_than_remaining_balance(): void
     {
+        Storage::fake('local');
         $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
         $so = $this->mixedSalesOrder();
         $router = $so->lines->firstWhere('item_name', 'Router');
 
         $this->actingAs($ops)->post("/operational/sales-orders/{$so->id}/delivery-notes", [
+            'delivery_method' => 'sendiri',
             'delivery_address' => 'Site A',
+            'dispatch_proof' => UploadedFile::fake()->image('bukti.jpg'),
             'lines' => [['sales_order_line_id' => $router->id, 'qty_delivered' => 5]],
         ])->assertSessionHasErrors('lines');
 
@@ -132,14 +149,63 @@ class DeliveryNoteTest extends TestCase
 
     public function test_service_lines_cannot_be_delivered(): void
     {
+        Storage::fake('local');
         $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
         $so = $this->mixedSalesOrder();
         $jasa = $so->lines->firstWhere('item_name', 'Jasa Instalasi');
 
         $this->actingAs($ops)->post("/operational/sales-orders/{$so->id}/delivery-notes", [
+            'delivery_method' => 'sendiri',
             'delivery_address' => 'Site A',
+            'dispatch_proof' => UploadedFile::fake()->image('bukti.jpg'),
             'lines' => [['sales_order_line_id' => $jasa->id, 'qty_delivered' => 1]],
         ])->assertSessionHasErrors('lines');
+    }
+
+    public function test_operational_can_upload_optional_received_proof_anytime(): void
+    {
+        Storage::fake('local');
+        $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
+        $so = $this->mixedSalesOrder();
+        $router = $so->lines->firstWhere('item_name', 'Router');
+
+        $this->actingAs($ops)->post("/operational/sales-orders/{$so->id}/delivery-notes", [
+            'delivery_method' => 'sendiri',
+            'delivery_address' => 'Site A',
+            'dispatch_proof' => UploadedFile::fake()->image('bukti.jpg'),
+            'lines' => [['sales_order_line_id' => $router->id, 'qty_delivered' => 2]],
+        ]);
+        $dn = DeliveryNote::firstOrFail();
+        $this->assertFalse($dn->hasReceivedProof());
+
+        $this->actingAs($ops)->post("/operational/delivery-notes/{$dn->id}/received-proof", [
+            'proof' => UploadedFile::fake()->image('diterima.jpg'),
+        ])->assertRedirect();
+
+        $this->assertTrue($dn->hasReceivedProof());
+        // Status "sent" tidak berubah — bukti diterima customer sifatnya dokumentasi tambahan saja.
+        $this->assertSame('sent', $dn->fresh()->status);
+    }
+
+    public function test_non_operational_cannot_upload_received_proof(): void
+    {
+        Storage::fake('local');
+        $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
+        $so = $this->mixedSalesOrder();
+        $router = $so->lines->firstWhere('item_name', 'Router');
+
+        $this->actingAs($ops)->post("/operational/sales-orders/{$so->id}/delivery-notes", [
+            'delivery_method' => 'sendiri',
+            'delivery_address' => 'Site A',
+            'dispatch_proof' => UploadedFile::fake()->image('bukti.jpg'),
+            'lines' => [['sales_order_line_id' => $router->id, 'qty_delivered' => 2]],
+        ]);
+        $dn = DeliveryNote::firstOrFail();
+
+        $sales = User::factory()->create(['role' => 'sales']);
+        $this->actingAs($sales)->post("/operational/delivery-notes/{$dn->id}/received-proof", [
+            'proof' => UploadedFile::fake()->image('diterima.jpg'),
+        ])->assertForbidden();
     }
 
     public function test_non_operational_cannot_create_delivery_note(): void

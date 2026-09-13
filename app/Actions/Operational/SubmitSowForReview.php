@@ -6,11 +6,14 @@ use App\Enums\SowStatus;
 use App\Models\Notification;
 use App\Models\Sow;
 use App\Models\User;
+use App\Services\Notifications\Notify;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class SubmitSowForReview
 {
+    public function __construct(private Notify $notify) {}
+
     public function handle(Sow $sow): Sow
     {
         return DB::transaction(function () use ($sow) {
@@ -37,6 +40,8 @@ class SubmitSowForReview
                 'status' => SowStatus::PendingHrReview->value,
                 'submitted_at' => now(),
             ]);
+
+            $this->notify->resolve('sow.rejected_by_hr', $locked);
 
             $customer = $locked->project->salesOrder?->contact?->name ?? 'customer';
 

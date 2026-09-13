@@ -102,6 +102,11 @@ export default function Show({ invoice, payments, totals, totalPaid, customerHas
                         <Info label="Total Dibayar (kas)" value={money(totalPaid)} />
                         <Info label="Sisa" value={money(payable - totalPaid)} />
                     </InfoGrid>
+                    {invoice.notes && (
+                        <div className="mt-3 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm">
+                            <span className="font-semibold text-text">Catatan Finance:</span> <span className="whitespace-pre-line text-text-muted">{invoice.notes}</span>
+                        </div>
+                    )}
                 </Card>
 
                 {settlement && (

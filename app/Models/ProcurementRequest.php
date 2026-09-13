@@ -22,11 +22,26 @@ class ProcurementRequest extends Model
         'requested_by',
         'notes',
         'rejection_reason',
+        'is_addendum',
+        'addendum_of_sales_order_id',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_addendum' => 'boolean',
+        ];
+    }
 
     public function lead(): BelongsTo
     {
         return $this->belongsTo(Lead::class);
+    }
+
+    /** Sales Order berjalan yang menjadi dasar submission tambahan ini (hanya terisi bila is_addendum). */
+    public function addendumOfSalesOrder(): BelongsTo
+    {
+        return $this->belongsTo(SalesOrder::class, 'addendum_of_sales_order_id');
     }
 
     public function requestedBy(): BelongsTo

@@ -9,6 +9,7 @@ use App\Models\DeliveryNoteLine;
 use App\Models\SalesOrder;
 use App\Models\User;
 use App\Services\DocumentNumber;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -23,11 +24,17 @@ class CreateDeliveryNote
         SalesOrder $salesOrder,
         User $user,
         array $lines,
+        string $deliveryMethod,
         string $deliveryAddress,
         ?string $shipperName,
+        ?string $trackingNumber,
         ?string $approvedByName,
+        UploadedFile $dispatchProof,
     ): DeliveryNote {
-        return DB::transaction(function () use ($salesOrder, $user, $lines, $deliveryAddress, $shipperName, $approvedByName) {
+        return DB::transaction(function () use (
+            $salesOrder, $user, $lines, $deliveryMethod, $deliveryAddress,
+            $shipperName, $trackingNumber, $approvedByName, $dispatchProof,
+        ) {
             $order = SalesOrder::query()
                 ->with('lines')
                 ->whereKey($salesOrder->id)
@@ -66,11 +73,19 @@ class CreateDeliveryNote
                 'number' => $this->documentNumber->nextDeliveryNoteNumber(),
                 'sales_order_id' => $order->id,
                 'invoice_id' => $invoice?->id,
+                'delivery_method' => $deliveryMethod,
                 'delivery_address' => $deliveryAddress,
                 'shipper_name' => $shipperName,
+                'tracking_number' => $trackingNumber,
                 'approved_by_name' => $approvedByName,
                 'status' => 'sent',
                 'created_by' => $user->id,
+            ]);
+
+            $deliveryNote->attachments()->create([
+                'category' => 'delivery_dispatch_proof',
+                'file_path' => $dispatchProof->store('delivery-proofs'),
+                'uploaded_by' => $user->id,
             ]);
 
             foreach ($submitted as $soLineId => $input) {

@@ -13,7 +13,16 @@ export default function Index({ quotations, role }) {
     const isMgmt = role === 'management';
 
     const columns = [
-        { key: 'number', label: 'Nomor', render: (q) => <span className="font-medium text-text">{q.number}</span> },
+        {
+            key: 'number',
+            label: 'Nomor',
+            render: (q) => (
+                <span className="flex items-center gap-2">
+                    <span className="font-medium text-text">{q.number}</span>
+                    {q.is_addendum && <span className="rounded-full bg-info-soft px-2 py-0.5 text-[10px] font-semibold text-info">Tambahan</span>}
+                </span>
+            ),
+        },
         { key: 'customer', label: 'Customer', render: (q) => q.company || q.customer || '—' },
         { key: 'sales', label: 'Sales', render: (q) => q.sales },
         { key: 'status', label: 'Status', render: (q) => <ReviewBadge status={isMgmt ? q.manager_review_status : q.pm_review_status} /> },

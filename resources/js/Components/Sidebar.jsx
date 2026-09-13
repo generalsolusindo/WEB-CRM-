@@ -5,7 +5,7 @@ import { getMenuForUser } from '../config/menuConfig';
 const ROLE_LABEL = {
     sales: 'Sales', procurement: 'Procurement', operational: 'Operasional', technician: 'Teknisi',
     finance: 'Finance', management: 'Manajemen', administrator: 'Administrator',
-    project_manager: 'Project Manager', hr: 'HR', vendor: 'Vendor',
+    project_manager: 'Project Manager', hr: 'HR', vendor: 'Vendor', warehouse: 'Gudang',
 };
 
 /** Cocokkan item menu dengan URL aktif — exact, prefix path, atau query-string yang sama. */
@@ -23,6 +23,7 @@ export default function Sidebar() {
     const { auth } = usePage().props;
     const url = usePage().url;
     const items = getMenuForUser(auth);
+    const menuBadges = auth?.menuBadges ?? {};
     const user = auth?.user;
     const initial = user?.name?.charAt(0)?.toUpperCase() ?? '?';
 
@@ -40,6 +41,7 @@ export default function Sidebar() {
                     const Icon = item.icon;
                     const disabled = item.href === '#';
                     const active = isActive(item.href, url);
+                    const badge = menuBadges[item.href] ?? 0;
 
                     if (disabled) {
                         return (
@@ -62,11 +64,11 @@ export default function Sidebar() {
                         >
                             <Icon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-white' : 'text-text-faint group-hover:text-text'}`} />
                             <span className="truncate">{item.label}</span>
-                            {item.badge != null && (
-                                <span className={`ml-auto rounded-full px-1.5 py-0.5 text-[11px] font-bold ${
-                                    active ? 'bg-white/20 text-white' : 'bg-primary-soft text-primary-strong'
+                            {badge > 0 && (
+                                <span className={`ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
+                                    active ? 'bg-white text-navy' : 'bg-danger text-white'
                                 }`}>
-                                    {item.badge}
+                                    {badge}
                                 </span>
                             )}
                         </Link>

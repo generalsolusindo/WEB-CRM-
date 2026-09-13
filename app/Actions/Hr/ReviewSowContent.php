@@ -6,11 +6,14 @@ use App\Enums\SowStatus;
 use App\Models\Notification;
 use App\Models\Sow;
 use App\Models\User;
+use App\Services\Notifications\Notify;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ReviewSowContent
 {
+    public function __construct(private Notify $notify) {}
+
     public function handle(Sow $sow, User $reviewer, bool $approved, ?string $notes): Sow
     {
         return DB::transaction(function () use ($sow, $reviewer, $approved, $notes) {
@@ -27,6 +30,8 @@ class ReviewSowContent
                 'hr_content_reviewed_at' => now(),
                 'hr_content_review_notes' => $notes,
             ]);
+
+            $this->notify->resolve('sow.pending_hr_review', $locked);
 
             $customer = $locked->project->salesOrder?->contact?->name ?? 'customer';
 

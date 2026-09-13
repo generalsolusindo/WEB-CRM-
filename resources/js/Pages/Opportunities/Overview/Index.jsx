@@ -1,10 +1,16 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, DataTable, StatusBadge, EmptyState, Pagination } from '../../../Components/ui';
+import { PageHeader, DataTable, StatusBadge, EmptyState, Pagination, PillTabs } from '../../../Components/ui';
 
-export default function Index({ opportunities, role }) {
+export default function Index({ opportunities, filters = {}, stageOptions = [], role }) {
     const base = role === 'management' ? '/management/opportunities' : '/project-manager/opportunities';
     const isMgmt = role === 'management';
+
+    function setStage(stage) {
+        router.get(base, stage ? { stage } : {}, { preserveState: true, replace: true });
+    }
+
+    const tabs = [{ value: '', label: 'Semua' }, ...stageOptions.map((o) => ({ value: o.value, label: o.label }))];
 
     const columns = [
         { key: 'code', label: 'Kode', render: (o) => <span className="font-medium text-text">{o.code}</span> },
@@ -30,6 +36,7 @@ export default function Index({ opportunities, role }) {
                         ? 'Monitoring semua opportunity — tunjuk Project Manager untuk tiap opportunity di sini.'
                         : 'Opportunity yang didelegasikan Manager kepada Anda.'}
                 />
+                <PillTabs tabs={tabs} value={filters.stage || ''} onChange={setStage} />
                 <DataTable
                     columns={columns}
                     rows={opportunities.data}

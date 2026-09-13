@@ -3,6 +3,8 @@ import { useState } from 'react';
 import {
     FiFilePlus, FiEdit3, FiClock, FiAward, FiArrowRight, FiCheckCircle,
     FiUserPlus, FiFileText, FiShoppingCart, FiBarChart2, FiUserCheck,
+    FiAlertCircle, FiCreditCard, FiTruck, FiClipboard, FiPackage, FiTool,
+    FiCalendar, FiCheckSquare,
 } from 'react-icons/fi';
 import AppLayout from '../Layouts/AppLayout';
 import { getMenuForUser } from '../config/menuConfig';
@@ -19,36 +21,15 @@ export default function Dashboard({ salesActions = null, procurementActions = nu
             <Head title="Dashboard" />
             {salesActions && <SalesDashboard data={salesActions} />}
             {managementOverview && (
-                <div className="mx-auto max-w-5xl space-y-4">
-                    <ManagementOverview data={managementOverview} />
+                <div className="mx-auto max-w-6xl space-y-6">
+                    <ManagementOverview data={managementOverview} menuBadges={auth?.menuBadges ?? {}} />
                 </div>
             )}
-            {procurementActions && (
-                <LegacyActions groups={[
-                    ['PR baru masuk — belum dikerjakan', procurementActions.submitted],
-                    ['PR sedang dicari — belum Ready', procurementActions.searching],
-                    ['Pengadaan project belum selesai', procurementActions.project_procurement ?? []],
-                ]} />
-            )}
-            {operationalActions && (
-                <LegacyActions groups={[
-                    ['Sales Order siap dibuat Project', operationalActions.needs_project],
-                    ['Project tahap Perencanaan', operationalActions.planning],
-                    ['Project menunggu barang', operationalActions.waiting_resource],
-                    ['BAST menunggu verifikasi', operationalActions.bast_to_verify],
-                ]} />
-            )}
-            {financeActions && (
-                <LegacyActions groups={[
-                    ['SO baru — perlu Invoice Muka', financeActions.needs_upfront_invoice],
-                    ['Invoice masih Draft', financeActions.draft],
-                    ['Invoice terkirim belum lunas', financeActions.unpaid_sent],
-                    ['Invoice jatuh tempo', financeActions.overdue],
-                    ['SO siap Invoice Pelunasan', financeActions.ready_for_final],
-                ]} />
-            )}
+            {procurementActions && <ProcurementDashboard data={procurementActions} />}
+            {operationalActions && <OperationalDashboard data={operationalActions} />}
+            {financeActions && <FinanceDashboard data={financeActions} />}
             {!salesActions && !managementOverview && !procurementActions && !operationalActions && !financeActions && (
-                <GenericDashboard auth={auth} />
+                <GenericDashboard auth={auth} menuBadges={auth?.menuBadges ?? {}} />
             )}
         </AppLayout>
     );
@@ -61,9 +42,10 @@ const TONE = {
     amber: 'bg-warning-soft text-warning',
     rose: 'bg-danger-soft text-danger',
     green: 'bg-success-soft text-success',
+    slate: 'bg-surface-2 text-text-muted',
 };
-const DOT = { blue: 'bg-primary', amber: 'bg-warning', rose: 'bg-danger', green: 'bg-success' };
-const BAR = { blue: 'bg-primary', amber: 'bg-warning', rose: 'bg-danger', green: 'bg-success' };
+const DOT = { blue: 'bg-primary', amber: 'bg-warning', rose: 'bg-danger', green: 'bg-success', slate: 'bg-text-faint' };
+const BAR = { blue: 'bg-primary', amber: 'bg-warning', rose: 'bg-danger', green: 'bg-success', slate: 'bg-text-faint' };
 
 function SalesDashboard({ data }) {
     const groups = [
@@ -95,7 +77,7 @@ function SalesDashboard({ data }) {
             </section>
 
             {/* KPI */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <Kpi icon={FiFilePlus} tone="blue" label="Perlu Quotation" value={groups[0].items.length} href="/sales/leads" />
                 <Kpi icon={FiEdit3} tone="amber" label="Quotation Draft" value={groups[1].items.length} href="/sales/quotations?status=draft" />
                 <Kpi icon={FiClock} tone="rose" label="Sent > 7 hari" value={groups[2].items.length} href="/sales/quotations?status=sent" />
@@ -149,6 +131,332 @@ function SalesDashboard({ data }) {
                             <Shortcut icon={FiShoppingCart} href="/sales/sales-orders">Sales Orders</Shortcut>
                             <Shortcut icon={FiUserCheck} href="/sales/contacts">Kontak</Shortcut>
                             <Shortcut icon={FiBarChart2} href="/sales/reports/leads">Laporan Lead</Shortcut>
+                        </div>
+                    </div>
+
+                    {total > 0 && (
+                        <div className="card p-5">
+                            <h3 className="text-sm font-bold tracking-tight text-text">Distribusi Tindak Lanjut</h3>
+                            <div className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-bg">
+                                {groups.filter((g) => g.items.length > 0).map((g) => (
+                                    <div key={g.key} className={BAR[g.tone]} style={{ width: `${(g.items.length / total) * 100}%` }} />
+                                ))}
+                            </div>
+                            <div className="mt-3 space-y-1.5">
+                                {groups.map((g) => (
+                                    <div key={g.key} className="flex items-center gap-2 text-xs">
+                                        <span className={`h-2 w-2 rounded-full ${DOT[g.tone]}`} />
+                                        <span className="flex-1 text-text-muted">{g.label}</span>
+                                        <span className="font-semibold text-text">{g.items.length}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ─────────────────────────── Finance ─────────────────────────── */
+
+function FinanceDashboard({ data }) {
+    const groups = [
+        { key: 'upfront', label: 'Perlu Invoice Muka', tone: 'blue', icon: FiFilePlus, items: data.needs_upfront_invoice ?? [] },
+        { key: 'draft', label: 'Invoice Draft', tone: 'amber', icon: FiEdit3, items: data.draft ?? [] },
+        { key: 'unpaid', label: 'Belum Lunas', tone: 'slate', icon: FiClock, items: data.unpaid_sent ?? [] },
+        { key: 'overdue', label: 'Jatuh Tempo', tone: 'rose', icon: FiAlertCircle, items: data.overdue ?? [] },
+        { key: 'final', label: 'Siap Pelunasan', tone: 'green', icon: FiCheckCircle, items: data.ready_for_final ?? [] },
+    ];
+    const total = groups.reduce((s, g) => s + g.items.length, 0);
+    const flat = groups.flatMap((g) => g.items.map((it) => ({ ...it, group: g.key, groupLabel: g.label, tone: g.tone })));
+
+    const [filter, setFilter] = useState('all');
+    const shown = filter === 'all' ? flat : flat.filter((i) => i.group === filter);
+
+    return (
+        <div className="mx-auto max-w-6xl space-y-6">
+            <section className="flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-navy via-navy to-primary p-7 text-white shadow-md">
+                <div>
+                    <p className="text-sm font-medium text-white/65">Ringkasan hari ini</p>
+                    <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                        {total > 0 ? `${total} hal butuh tindak lanjut` : 'Semua sudah tertangani 🎉'}
+                    </h1>
+                    <p className="mt-1 text-sm text-white/70">Invoice, penagihan, dan pelunasan dalam satu pandangan.</p>
+                </div>
+                <Link href="/finance/invoices" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-navy transition hover:bg-white/90">
+                    <FiFileText className="h-4 w-4" /> Semua Invoice
+                </Link>
+            </section>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                {groups.map((g) => (
+                    <Kpi key={g.key} icon={g.icon} tone={g.tone} label={g.label} value={g.items.length} href="/finance/invoices" />
+                ))}
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
+                <div className="card flex flex-col overflow-hidden p-0 lg:col-span-2 lg:min-h-[26rem]">
+                    <div className="border-b border-border px-5 pb-3 pt-4">
+                        <h2 className="text-base font-bold tracking-tight text-text">Perlu Tindak Lanjut</h2>
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                            <FilterPill active={filter === 'all'} onClick={() => setFilter('all')}>Semua <span className="opacity-60">{total}</span></FilterPill>
+                            {groups.map((g) => (
+                                <FilterPill key={g.key} active={filter === g.key} onClick={() => setFilter(g.key)}>
+                                    {g.label} <span className="opacity-60">{g.items.length}</span>
+                                </FilterPill>
+                            ))}
+                        </div>
+                    </div>
+
+                    {shown.length === 0 ? (
+                        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-14 text-center">
+                            <FiCheckCircle className="h-8 w-8 text-success" />
+                            <p className="text-sm font-medium text-text">Tidak ada yang perlu ditindaklanjuti.</p>
+                            <p className="text-xs text-text-muted">Semua invoice & penagihan sudah tertangani.</p>
+                        </div>
+                    ) : (
+                        <ul className="flex-1">
+                            {shown.map((item, i) => (
+                                <li key={i}>
+                                    <Link href={item.href} className="flex items-center gap-3 border-b border-border px-5 py-3.5 transition last:border-0 hover:bg-bg">
+                                        <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[item.tone]}`} />
+                                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-text">{item.label}</span>
+                                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${TONE[item.tone]}`}>{item.groupLabel}</span>
+                                        <FiArrowRight className="h-4 w-4 shrink-0 text-text-faint" />
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+
+                <div className="space-y-6">
+                    <div className="card p-5">
+                        <h3 className="text-sm font-bold tracking-tight text-text">Pintasan</h3>
+                        <div className="mt-3 space-y-1">
+                            <Shortcut icon={FiFileText} href="/finance/invoices">Invoice</Shortcut>
+                            <Shortcut icon={FiClipboard} href="/finance/surveys">Survey</Shortcut>
+                            <Shortcut icon={FiCreditCard} href="/finance/payments">Pembayaran</Shortcut>
+                            <Shortcut icon={FiTruck} href="/finance/procurement-payments">Pembayaran Vendor</Shortcut>
+                        </div>
+                    </div>
+
+                    {total > 0 && (
+                        <div className="card p-5">
+                            <h3 className="text-sm font-bold tracking-tight text-text">Distribusi Tindak Lanjut</h3>
+                            <div className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-bg">
+                                {groups.filter((g) => g.items.length > 0).map((g) => (
+                                    <div key={g.key} className={BAR[g.tone]} style={{ width: `${(g.items.length / total) * 100}%` }} />
+                                ))}
+                            </div>
+                            <div className="mt-3 space-y-1.5">
+                                {groups.map((g) => (
+                                    <div key={g.key} className="flex items-center gap-2 text-xs">
+                                        <span className={`h-2 w-2 rounded-full ${DOT[g.tone]}`} />
+                                        <span className="flex-1 text-text-muted">{g.label}</span>
+                                        <span className="font-semibold text-text">{g.items.length}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ─────────────────────────── Procurement ─────────────────────────── */
+
+function ProcurementDashboard({ data }) {
+    const groups = [
+        { key: 'submitted', label: 'PR Baru Masuk', tone: 'blue', icon: FiClipboard, href: '/procurement/procurement-requests', items: data.submitted ?? [] },
+        { key: 'searching', label: 'Sedang Dicari', tone: 'amber', icon: FiClock, href: '/procurement/procurement-requests', items: data.searching ?? [] },
+        { key: 'project', label: 'Pengadaan Project', tone: 'rose', icon: FiTruck, href: '/procurement/project-procurements', items: data.project_procurement ?? [] },
+    ];
+    const total = groups.reduce((s, g) => s + g.items.length, 0);
+    const flat = groups.flatMap((g) => g.items.map((it) => ({ ...it, group: g.key, groupLabel: g.label, tone: g.tone })));
+
+    const [filter, setFilter] = useState('all');
+    const shown = filter === 'all' ? flat : flat.filter((i) => i.group === filter);
+
+    return (
+        <div className="mx-auto max-w-6xl space-y-6">
+            <section className="flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-navy via-navy to-primary p-7 text-white shadow-md">
+                <div>
+                    <p className="text-sm font-medium text-white/65">Ringkasan hari ini</p>
+                    <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                        {total > 0 ? `${total} hal butuh tindak lanjut` : 'Semua sudah tertangani 🎉'}
+                    </h1>
+                    <p className="mt-1 text-sm text-white/70">Procurement request, sourcing, dan pengadaan project dalam satu pandangan.</p>
+                </div>
+                <Link href="/procurement/procurement-requests" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-navy transition hover:bg-white/90">
+                    <FiClipboard className="h-4 w-4" /> Semua Procurement Request
+                </Link>
+            </section>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {groups.map((g) => (
+                    <Kpi key={g.key} icon={g.icon} tone={g.tone} label={g.label} value={g.items.length} href={g.href} />
+                ))}
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
+                <div className="card flex flex-col overflow-hidden p-0 lg:col-span-2 lg:min-h-[26rem]">
+                    <div className="border-b border-border px-5 pb-3 pt-4">
+                        <h2 className="text-base font-bold tracking-tight text-text">Perlu Tindak Lanjut</h2>
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                            <FilterPill active={filter === 'all'} onClick={() => setFilter('all')}>Semua <span className="opacity-60">{total}</span></FilterPill>
+                            {groups.map((g) => (
+                                <FilterPill key={g.key} active={filter === g.key} onClick={() => setFilter(g.key)}>
+                                    {g.label} <span className="opacity-60">{g.items.length}</span>
+                                </FilterPill>
+                            ))}
+                        </div>
+                    </div>
+
+                    {shown.length === 0 ? (
+                        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-14 text-center">
+                            <FiCheckCircle className="h-8 w-8 text-success" />
+                            <p className="text-sm font-medium text-text">Tidak ada yang perlu ditindaklanjuti.</p>
+                            <p className="text-xs text-text-muted">Semua procurement request & pengadaan sudah tertangani.</p>
+                        </div>
+                    ) : (
+                        <ul className="flex-1">
+                            {shown.map((item, i) => (
+                                <li key={i}>
+                                    <Link href={item.href} className="flex items-center gap-3 border-b border-border px-5 py-3.5 transition last:border-0 hover:bg-bg">
+                                        <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[item.tone]}`} />
+                                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-text">{item.label}</span>
+                                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${TONE[item.tone]}`}>{item.groupLabel}</span>
+                                        <FiArrowRight className="h-4 w-4 shrink-0 text-text-faint" />
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+
+                <div className="space-y-6">
+                    <div className="card p-5">
+                        <h3 className="text-sm font-bold tracking-tight text-text">Pintasan</h3>
+                        <div className="mt-3 space-y-1">
+                            <Shortcut icon={FiClipboard} href="/procurement/procurement-requests">Procurement Request</Shortcut>
+                            <Shortcut icon={FiTruck} href="/procurement/project-procurements">Pengadaan Project</Shortcut>
+                            <Shortcut icon={FiPackage} href="/procurement/vendors">Vendor &amp; Katalog Produk</Shortcut>
+                            <Shortcut icon={FiClipboard} href="/procurement/surveys">Survey</Shortcut>
+                            <Shortcut icon={FiTool} href="/procurement/technicians">Surveyor &amp; Teknisi</Shortcut>
+                            <Shortcut icon={FiUserCheck} href="/procurement/vendor-accounts">Akun PIC Vendor</Shortcut>
+                        </div>
+                    </div>
+
+                    {total > 0 && (
+                        <div className="card p-5">
+                            <h3 className="text-sm font-bold tracking-tight text-text">Distribusi Tindak Lanjut</h3>
+                            <div className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-bg">
+                                {groups.filter((g) => g.items.length > 0).map((g) => (
+                                    <div key={g.key} className={BAR[g.tone]} style={{ width: `${(g.items.length / total) * 100}%` }} />
+                                ))}
+                            </div>
+                            <div className="mt-3 space-y-1.5">
+                                {groups.map((g) => (
+                                    <div key={g.key} className="flex items-center gap-2 text-xs">
+                                        <span className={`h-2 w-2 rounded-full ${DOT[g.tone]}`} />
+                                        <span className="flex-1 text-text-muted">{g.label}</span>
+                                        <span className="font-semibold text-text">{g.items.length}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ─────────────────────────── Operational ─────────────────────────── */
+
+function OperationalDashboard({ data }) {
+    const groups = [
+        { key: 'needs_project', label: 'SO Siap Dibuat Project', tone: 'blue', icon: FiFilePlus, href: '/operational/projects', items: data.needs_project ?? [] },
+        { key: 'planning', label: 'Project Perencanaan', tone: 'amber', icon: FiCalendar, href: '/operational/projects', items: data.planning ?? [] },
+        { key: 'waiting_resource', label: 'Menunggu Barang', tone: 'rose', icon: FiTruck, href: '/operational/projects?status=waiting_resource', items: data.waiting_resource ?? [] },
+        { key: 'bast', label: 'BAST Menunggu Verifikasi', tone: 'green', icon: FiCheckSquare, href: '/operational/projects?status=verification', items: data.bast_to_verify ?? [] },
+    ];
+    const total = groups.reduce((s, g) => s + g.items.length, 0);
+    const flat = groups.flatMap((g) => g.items.map((it) => ({ ...it, group: g.key, groupLabel: g.label, tone: g.tone })));
+
+    const [filter, setFilter] = useState('all');
+    const shown = filter === 'all' ? flat : flat.filter((i) => i.group === filter);
+
+    return (
+        <div className="mx-auto max-w-6xl space-y-6">
+            <section className="flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-navy via-navy to-primary p-7 text-white shadow-md">
+                <div>
+                    <p className="text-sm font-medium text-white/65">Ringkasan hari ini</p>
+                    <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                        {total > 0 ? `${total} hal butuh tindak lanjut` : 'Semua sudah tertangani 🎉'}
+                    </h1>
+                    <p className="mt-1 text-sm text-white/70">Project, resource, dan BAST dalam satu pandangan.</p>
+                </div>
+                <Link href="/operational/projects" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-navy transition hover:bg-white/90">
+                    <FiCalendar className="h-4 w-4" /> Semua Project
+                </Link>
+            </section>
+
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {groups.map((g) => (
+                    <Kpi key={g.key} icon={g.icon} tone={g.tone} label={g.label} value={g.items.length} href={g.href} />
+                ))}
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
+                <div className="card flex flex-col overflow-hidden p-0 lg:col-span-2 lg:min-h-[26rem]">
+                    <div className="border-b border-border px-5 pb-3 pt-4">
+                        <h2 className="text-base font-bold tracking-tight text-text">Perlu Tindak Lanjut</h2>
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                            <FilterPill active={filter === 'all'} onClick={() => setFilter('all')}>Semua <span className="opacity-60">{total}</span></FilterPill>
+                            {groups.map((g) => (
+                                <FilterPill key={g.key} active={filter === g.key} onClick={() => setFilter(g.key)}>
+                                    {g.label} <span className="opacity-60">{g.items.length}</span>
+                                </FilterPill>
+                            ))}
+                        </div>
+                    </div>
+
+                    {shown.length === 0 ? (
+                        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-14 text-center">
+                            <FiCheckCircle className="h-8 w-8 text-success" />
+                            <p className="text-sm font-medium text-text">Tidak ada yang perlu ditindaklanjuti.</p>
+                            <p className="text-xs text-text-muted">Semua project & BAST sudah tertangani.</p>
+                        </div>
+                    ) : (
+                        <ul className="flex-1">
+                            {shown.map((item, i) => (
+                                <li key={i}>
+                                    <Link href={item.href} className="flex items-center gap-3 border-b border-border px-5 py-3.5 transition last:border-0 hover:bg-bg">
+                                        <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[item.tone]}`} />
+                                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-text">{item.label}</span>
+                                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${TONE[item.tone]}`}>{item.groupLabel}</span>
+                                        <FiArrowRight className="h-4 w-4 shrink-0 text-text-faint" />
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+
+                <div className="space-y-6">
+                    <div className="card p-5">
+                        <h3 className="text-sm font-bold tracking-tight text-text">Pintasan</h3>
+                        <div className="mt-3 space-y-1">
+                            <Shortcut icon={FiCalendar} href="/operational/projects">Semua Project</Shortcut>
+                            <Shortcut icon={FiTruck} href="/operational/projects?status=waiting_resource">Menunggu Barang</Shortcut>
+                            <Shortcut icon={FiCheckSquare} href="/operational/projects?status=verification">Verifikasi BAST</Shortcut>
+                            <Shortcut icon={FiClipboard} href="/operational/surveys">Survey</Shortcut>
                         </div>
                     </div>
 
@@ -245,38 +553,97 @@ function LegacyActions({ groups }) {
     );
 }
 
-function GenericDashboard({ auth }) {
+const ROLE_TAGLINE = {
+    technician: 'Cek tugas, survey, dan SOW kamu di sini.',
+    hr: 'Review SOW yang menunggu persetujuanmu.',
+    project_manager: 'Verifikasi quotation dan pengadaan project yang kamu delegasikan.',
+    vendor: 'Lihat dan tanda tangani SOW project kamu.',
+    administrator: 'Kelola user dan master data sistem.',
+    warehouse: 'Kelola stok barang gudang di sini.',
+};
+
+const KPI_TONE_CYCLE = ['blue', 'amber', 'rose', 'green'];
+
+function GenericDashboard({ auth, menuBadges = {} }) {
+    const role = auth?.user?.role;
     const items = getMenuForUser(auth).filter((i) => i.href !== '#' && i.href !== '/dashboard');
+    const withCount = items.filter((i) => Object.prototype.hasOwnProperty.call(menuBadges, i.href));
+    const withoutCount = items.filter((i) => !Object.prototype.hasOwnProperty.call(menuBadges, i.href));
+    const total = withCount.reduce((s, i) => s + (menuBadges[i.href] || 0), 0);
+
     return (
-        <div className="mx-auto max-w-3xl space-y-6">
-            <section className="rounded-3xl bg-gradient-to-br from-navy via-navy to-primary p-7 text-white shadow-md">
-                <p className="text-sm font-medium text-white/65">Selamat datang</p>
-                <h1 className="mt-1.5 text-2xl font-bold tracking-tight">{auth?.user?.name}</h1>
+        <div className="mx-auto max-w-6xl space-y-6">
+            <section className="flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-navy via-navy to-primary p-7 text-white shadow-md">
+                <div>
+                    <p className="text-sm font-medium text-white/65">Ringkasan hari ini</p>
+                    <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                        {withCount.length === 0
+                            ? auth?.user?.name
+                            : total > 0 ? `${total} hal butuh tindak lanjut` : 'Semua sudah tertangani 🎉'}
+                    </h1>
+                    <p className="mt-1 text-sm text-white/70">{ROLE_TAGLINE[role] ?? 'Selamat bekerja hari ini.'}</p>
+                </div>
             </section>
-            <div className="grid gap-3 sm:grid-cols-2">
-                {items.map((item, i) => {
-                    const Icon = item.icon;
-                    return (
-                        <Link key={i} href={item.href} className="card group flex items-center gap-3 p-4 transition hover:-translate-y-0.5 hover:shadow-md">
-                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
-                                <Icon className="h-5 w-5" />
-                            </span>
-                            <span className="flex-1 text-sm font-semibold text-text">{item.label}</span>
-                            <FiArrowRight className="h-4 w-4 text-text-faint transition group-hover:translate-x-0.5" />
-                        </Link>
-                    );
-                })}
-            </div>
+
+            {withCount.length > 0 && (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    {withCount.map((item, i) => (
+                        <Kpi
+                            key={item.href}
+                            icon={item.icon}
+                            tone={KPI_TONE_CYCLE[i % KPI_TONE_CYCLE.length]}
+                            label={item.label}
+                            value={menuBadges[item.href] || 0}
+                            href={item.href}
+                        />
+                    ))}
+                </div>
+            )}
+
+            {withoutCount.length > 0 && (
+                <div className="card max-w-sm p-5">
+                    <h3 className="text-sm font-bold tracking-tight text-text">Pintasan</h3>
+                    <div className="mt-3 space-y-1">
+                        {withoutCount.map((item) => (
+                            <Shortcut key={item.href} icon={item.icon} href={item.href}>{item.label}</Shortcut>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
 /* ───────────────────── Management overview (tak diubah) ───────────────────── */
 
-function ManagementOverview({ data }) {
+function ManagementOverview({ data, menuBadges = {} }) {
+    const total = (menuBadges['/management/quotations'] || 0) + (menuBadges['/management/sows'] || 0);
+
     return (
-        <div className="space-y-4">
-            <h2 className="text-lg font-bold tracking-tight text-text">Ringkasan Monitoring</h2>
+        <div className="space-y-6">
+            <section className="flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-navy via-navy to-primary p-7 text-white shadow-md">
+                <div>
+                    <p className="text-sm font-medium text-white/65">Ringkasan hari ini</p>
+                    <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                        {total > 0 ? `${total} hal butuh tindak lanjut` : 'Semua sudah tertangani 🎉'}
+                    </h1>
+                    <p className="mt-1 text-sm text-white/70">Ringkasan monitoring lintas-departemen, read-only.</p>
+                </div>
+                {total > 0 && (
+                    <div className="flex gap-2">
+                        {(menuBadges['/management/quotations'] || 0) > 0 && (
+                            <Link href="/management/quotations" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-navy transition hover:bg-white/90">
+                                <FiFileText className="h-4 w-4" /> Verifikasi Quotation ({menuBadges['/management/quotations']})
+                            </Link>
+                        )}
+                        {(menuBadges['/management/sows'] || 0) > 0 && (
+                            <Link href="/management/sows" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-navy transition hover:bg-white/90">
+                                <FiFileText className="h-4 w-4" /> SOW Menunggu TTD ({menuBadges['/management/sows']})
+                            </Link>
+                        )}
+                    </div>
+                )}
+            </section>
             <StatSection title="Sales">
                 <StatGrid items={data.sales.leads_by_stage} />
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">

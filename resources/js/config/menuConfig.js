@@ -13,9 +13,11 @@ import {
     FiCreditCard,
     FiUserCheck,
     FiDatabase,
+    FiEdit3,
     FiCheckCircle,
     FiPercent,
     FiBarChart2,
+    FiBox,
 } from 'react-icons/fi';
 
 /**
@@ -39,6 +41,7 @@ const menuConfig = {
         { label: 'Survey', href: '/procurement/surveys', icon: FiClipboard },
         { label: 'Surveyor & Teknisi', href: '/procurement/technicians', icon: FiTool },
         { label: 'Akun PIC Vendor', href: '/procurement/vendor-accounts', icon: FiUserCheck },
+        { label: 'Stok Gudang', href: '/warehouse/items', icon: FiBox },
     ],
     operational: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
@@ -73,12 +76,14 @@ const menuConfig = {
         { label: 'Verifikasi Quotation', href: '/project-manager/quotations', icon: FiFileText },
         { label: 'Persetujuan Pengadaan', href: '/project-manager/procurement-payments', icon: FiCheckSquare },
         { label: 'Project Saya', href: '/project-manager/projects', icon: FiCalendar },
+        { label: 'SOW Menunggu TTD', href: '/project-manager/sows', icon: FiFileText },
     ],
     administrator: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
         { label: 'Manajemen User', href: '#', icon: FiUserCheck },
         { label: 'Master Data', href: '#', icon: FiDatabase },
         { label: 'Master Data · Pajak', href: '/admin/taxes', icon: FiPercent },
+        { label: 'Tanda Tangan', href: '/admin/signature', icon: FiEdit3 },
     ],
     hr: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
@@ -87,6 +92,10 @@ const menuConfig = {
     vendor: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
         { label: 'SOW', href: '/vendor/sows', icon: FiFileText },
+    ],
+    warehouse: [
+        { label: 'Dashboard', href: '/dashboard', icon: FiHome },
+        { label: 'Stok Barang', href: '/warehouse/items', icon: FiBox },
     ],
 };
 

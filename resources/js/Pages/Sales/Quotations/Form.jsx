@@ -31,13 +31,14 @@ function initialLine(line, taxes) {
     };
 }
 
-export default function Form({ procurementRequest = null, quotation = null, taxes = [] }) {
+export default function Form({ procurementRequest = null, quotation = null, taxes = [], defaultTerms = '' }) {
     const editing = Boolean(quotation);
     const sourceLines = editing ? quotation.lines : procurementRequest.lines;
     const customer = editing ? quotation.contact : procurementRequest.lead.contact;
 
     const { data, setData, post, put, processing, errors, transform } = useForm({
         notes: quotation?.notes ?? '',
+        terms: quotation?.terms ?? defaultTerms,
         agreed_dpp: quotation?.agreed_dpp != null ? String(Number(quotation.agreed_dpp)) : '',
         lines: sourceLines.map((l) => initialLine(l, taxes)),
     });
@@ -154,6 +155,10 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                             </div>
                             <label className="text-sm font-medium text-text sm:col-span-2">Catatan <span className="font-normal text-text-muted">(opsional — tampil sebagai catatan tambahan di dokumen)</span>
                                 <textarea rows="2" value={data.notes} onChange={(e) => setData('notes', e.target.value)} className="input" />
+                            </label>
+                            <label className="text-sm font-medium text-text sm:col-span-2">Syarat &amp; Ketentuan <span className="font-normal text-text-muted">(tampil di cetakan quotation, satu baris per poin — sudah terisi default, bisa diedit bebas)</span>
+                                <textarea rows="6" value={data.terms} onChange={(e) => setData('terms', e.target.value)} className="input" />
+                                {errors.terms && <span className="text-xs text-danger">{errors.terms}</span>}
                             </label>
                             <label className="text-sm font-medium text-text sm:col-span-2">Nilai DPP disepakati <span className="font-normal text-text-muted">(opsional — harga nett hasil negosiasi)</span>
                                 <CurrencyInput value={data.agreed_dpp} onChange={(e) => setData('agreed_dpp', e.target.value)} placeholder="mis. 10.000.000 — kosongkan untuk pakai diskon per-baris" className="input" />

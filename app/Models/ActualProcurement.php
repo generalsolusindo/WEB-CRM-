@@ -25,6 +25,8 @@ class ActualProcurement extends Model
         'estimated_cost',
         'from_office_stock',
         'office_stock_note',
+        'warehouse_item_id',
+        'warehouse_qty',
         'is_paid',
         'paid_at',
         'status',
@@ -41,6 +43,7 @@ class ActualProcurement extends Model
             'cost_price' => 'decimal:2',
             'estimated_cost' => 'decimal:2',
             'from_office_stock' => 'boolean',
+            'warehouse_qty' => 'integer',
             'is_paid' => 'boolean',
             'paid_at' => 'datetime',
             'purchased_at' => 'datetime',
@@ -61,6 +64,11 @@ class ActualProcurement extends Model
     public function vendorProduct(): BelongsTo
     {
         return $this->belongsTo(VendorProduct::class);
+    }
+
+    public function warehouseItem(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseItem::class);
     }
 
     public function requestedBy(): BelongsTo

@@ -10,6 +10,7 @@ use App\Http\Requests\Operational\AssignProjectVendorRequest;
 use App\Http\Requests\Operational\PlanningRequest;
 use App\Models\Project;
 use App\Models\User;
+use App\Services\Notifications\Notify;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -125,6 +126,8 @@ class ProjectController extends Controller
             'permissions' => [
                 'plan' => $user->can('update', $project),
                 'manageResources' => $user->can('manageResources', $project),
+                'manageExtraProcurement' => $user->can('manageExtraProcurement', $project),
+                'manageTechnicianTeam' => $user->can('manageTechnicianTeam', $project),
                 'manageTasks' => $user->can('manageTasks', $project),
                 'markReady' => $user->can('markReady', $project),
                 'start' => $user->can('start', $project),
@@ -153,16 +156,20 @@ class ProjectController extends Controller
         return back()->with('success', $vendorId ? 'Project ditandai dikerjakan lewat vendor.' : 'Penandaan vendor luar dibatalkan.');
     }
 
-    public function planning(PlanningRequest $request, Project $project): RedirectResponse
+    public function planning(PlanningRequest $request, Project $project, Notify $notify): RedirectResponse
     {
         Gate::authorize('update', $project);
 
+        $wasDraft = $project->status === ProjectStatus::Draft->value;
+
         $project->update([
             ...$request->validated(),
-            'status' => $project->status === ProjectStatus::Draft->value
-                ? ProjectStatus::Planning->value
-                : $project->status,
+            'status' => $wasDraft ? ProjectStatus::Planning->value : $project->status,
         ]);
+
+        if ($wasDraft) {
+            $notify->resolve('invoice.upfront_paid', $project);
+        }
 
         return back()->with('success', 'Planning project tersimpan.');
     }
@@ -188,17 +195,27 @@ class ProjectController extends Controller
         return back()->with('success', 'Project dimulai.');
     }
 
-    // TODO: alur final Material Only masih tentatif — sementara Operational menyelesaikan
-    // langsung tanpa BAST.
+    /** Selesaikan project Material Only — cukup barang diterima & terkirim penuh, tanpa teknisi/task/BAST. */
     public function complete(Project $project): RedirectResponse
     {
-        Gate::authorize('completeDirect', $project->loadMissing('salesOrder'));
+        Gate::authorize('completeDirect', $project->loadMissing('salesOrder', 'actualProcurements'));
 
         DB::transaction(function () use ($project) {
-            $locked = Project::query()->with('salesOrder')->whereKey($project->id)->lockForUpdate()->firstOrFail();
+            $locked = Project::query()
+                ->with('salesOrder.lines', 'actualProcurements')
+                ->whereKey($project->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
             abort_unless(
-                $locked->status === ProjectStatus::InProgress->value
-                    && $locked->salesOrder->order_type === 'material_only',
+                $locked->salesOrder->order_type === 'material_only'
+                    && in_array($locked->status, [
+                        ProjectStatus::WaitingResource->value,
+                        ProjectStatus::Ready->value,
+                        ProjectStatus::InProgress->value,
+                    ], true)
+                    && $locked->actualProcurements->every(fn ($i) => $i->status === ActualProcurementStatus::Received->value)
+                    && \App\Services\Operational\MaterialDeliveryStatus::of($locked->salesOrder)['is_complete'],
                 409,
             );
             $locked->update(['status' => ProjectStatus::Completed->value]);

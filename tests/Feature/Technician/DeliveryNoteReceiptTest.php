@@ -11,6 +11,8 @@ use App\Models\Quotation;
 use App\Models\SalesOrder;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class DeliveryNoteReceiptTest extends TestCase
@@ -57,6 +59,7 @@ class DeliveryNoteReceiptTest extends TestCase
     /** @return array{Project, User, User} [project, leader, member] */
     private function projectWithDeliveryNote(): array
     {
+        Storage::fake('local');
         $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
         $sales = User::factory()->create(['role' => 'sales']);
         $contact = Contact::create(['name' => 'Customer', 'address' => 'Jl. Contoh', 'created_by' => $sales->id]);
@@ -73,11 +76,13 @@ class DeliveryNoteReceiptTest extends TestCase
         ]);
         $quotation = Quotation::latest('id')->firstOrFail();
         $quotation->update(['status' => 'sent']);
-        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload('material_only'));
+        // Mixed — project Material Only sekarang tidak pakai tim teknisi sama sekali
+        // (Operational langsung Delivery Note + selesai, tanpa konfirmasi teknisi).
+        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload('mixed'));
         $so = SalesOrder::with('lines')->latest('id')->firstOrFail();
 
         $finance = User::factory()->create(['role' => 'finance']);
-        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'full']);
+        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'dp']);
         $invoice = $so->invoices()->latest('id')->firstOrFail();
         $this->actingAs($finance)->post("/finance/invoices/{$invoice->id}/payments", [
             'amount_paid' => (float) $invoice->amount + (float) $invoice->tax_amount,
@@ -92,7 +97,9 @@ class DeliveryNoteReceiptTest extends TestCase
         ]);
 
         $this->actingAs($ops)->post("/operational/sales-orders/{$so->id}/delivery-notes", [
+            'delivery_method' => 'sendiri',
             'delivery_address' => 'Site A',
+            'dispatch_proof' => UploadedFile::fake()->image('bukti.jpg'),
             'lines' => [['sales_order_line_id' => $so->lines->first()->id, 'qty_delivered' => 2]],
         ]);
 

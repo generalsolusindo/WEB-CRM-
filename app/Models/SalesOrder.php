@@ -20,6 +20,7 @@ class SalesOrder extends Model
     protected $fillable = [
         'number',
         'quotation_id',
+        'addendum_of_sales_order_id',
         'contact_id',
         'order_type',
         'payment_rule',
@@ -45,6 +46,18 @@ class SalesOrder extends Model
     public function quotation(): BelongsTo
     {
         return $this->belongsTo(Quotation::class);
+    }
+
+    /** Sales Order asal (yang sedang/sudah berjalan) yang menjadi dasar tambahan ini. */
+    public function addendumOfSalesOrder(): BelongsTo
+    {
+        return $this->belongsTo(SalesOrder::class, 'addendum_of_sales_order_id');
+    }
+
+    /** Daftar Sales Order tambahan (addendum) yang lahir dari Sales Order ini. */
+    public function addenda(): HasMany
+    {
+        return $this->hasMany(SalesOrder::class, 'addendum_of_sales_order_id');
     }
 
     public function contact(): BelongsTo

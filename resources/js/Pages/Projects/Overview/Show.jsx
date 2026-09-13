@@ -1,6 +1,6 @@
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, StatusBadge } from '../../../Components/ui';
+import { PageHeader, StatusBadge, StageStepper } from '../../../Components/ui';
 
 export default function Show({ project, canDelegate, projectManagerOptions = [] }) {
     const delegateForm = useForm({ project_manager_id: project.delegated_to?.id ?? '' });
@@ -17,10 +17,21 @@ export default function Show({ project, canDelegate, projectManagerOptions = [] 
             <Head title={project.number} />
             <div className="mx-auto max-w-3xl space-y-5">
                 <PageHeader
-                    title={<span className="flex items-center gap-3">{project.number} <StatusBadge status={project.status} label={project.status_label} /></span>}
+                    title={(
+                        <span className="flex flex-wrap items-center gap-3">
+                            {project.number}
+                            <StatusBadge status={project.status} label={project.status_label} />
+                            {project.is_won && <StatusBadge status="won" label="Deal Won" />}
+                        </span>
+                    )}
                     subtitle={`${project.customer} · ${project.company || 'Tanpa perusahaan'} · ${project.sales_order}`}
                     back={{ href: backHref, label: 'Kembali' }}
                 />
+
+                <section className="card p-6">
+                    <h2 className="mb-4 font-semibold text-text">Progress Project</h2>
+                    <StageStepper stages={project.stage_options} current={project.status} />
+                </section>
 
                 <section className="grid gap-x-6 gap-y-4 card p-6 sm:grid-cols-2">
                     <Info label="Tipe Order" value={project.order_type} />

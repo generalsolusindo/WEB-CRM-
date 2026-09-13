@@ -5,11 +5,14 @@ namespace App\Actions\Operational;
 use App\Enums\ActualProcurementStatus;
 use App\Enums\ProjectStatus;
 use App\Models\Project;
+use App\Services\Notifications\Notify;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class MarkProjectReady
 {
+    public function __construct(private Notify $notify) {}
+
     public function handle(Project $project): Project
     {
         return DB::transaction(function () use ($project) {
@@ -52,6 +55,8 @@ class MarkProjectReady
             }
 
             $locked->update(['status' => ProjectStatus::Ready->value]);
+
+            $this->notify->resolve('project_procurement.ready', $locked);
 
             return $locked;
         });

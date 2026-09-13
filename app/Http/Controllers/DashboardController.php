@@ -334,4 +334,5 @@ class DashboardController extends Controller
             'ready_to_win' => $readyToWin,
         ];
     }
+
 }

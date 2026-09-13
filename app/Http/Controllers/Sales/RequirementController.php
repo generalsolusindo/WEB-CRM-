@@ -21,7 +21,7 @@ class RequirementController extends Controller
             return back()->with('error', 'Lead harus dikonversi menjadi opportunity sebelum menambah requirement.');
         }
 
-        if ($lead->requirementsLocked()) {
+        if ($lead->requirementsLocked() && ! $lead->activeSalesOrderForAddendum()) {
             return back()->with('error', 'Requirement sudah dikunci karena telah dikirim ke Procurement.');
         }
 

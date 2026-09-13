@@ -20,7 +20,7 @@ class StoreRequirementRequest extends FormRequest
             'category' => ['nullable', \Illuminate\Validation\Rule::in(['material', 'service', 'reimburse'])],
             'description' => ['nullable', 'string'],
             'qty' => ['required', 'numeric', 'gt:0', 'decimal:0,2'],
-            'unit' => ['required', 'string', 'max:50'],
+            'unit' => ['required', \Illuminate\Validation\Rule::in(Requirement::UNITS)],
             'notes' => ['nullable', 'string'],
         ];
     }

@@ -5,7 +5,9 @@ namespace Tests\Feature\Procurement;
 use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class TechnicianAccountTest extends TestCase
@@ -102,6 +104,46 @@ class TechnicianAccountTest extends TestCase
                 'password' => 'rahasia123', 'password_confirmation' => 'rahasia123',
             ])->assertForbidden();
         }
+    }
+
+    public function test_procurement_can_upload_ktp_and_nik_when_creating_technician_account(): void
+    {
+        Storage::fake('local');
+
+        $this->actingAs($this->procurement())->post('/procurement/technicians', [
+            'name' => 'Budi Surveyor',
+            'email' => 'budi-ktp@ho.test',
+            'password' => 'rahasia123',
+            'password_confirmation' => 'rahasia123',
+            'nik' => '3201234567890003',
+            'ktp_document' => UploadedFile::fake()->image('ktp.jpg'),
+        ])->assertRedirect();
+
+        $user = User::where('email', 'budi-ktp@ho.test')->firstOrFail();
+        $this->assertSame('3201234567890003', $user->nik);
+        $this->assertNotNull($user->ktpDocument());
+        $this->assertDatabaseHas('attachments', [
+            'attachable_type' => User::class,
+            'attachable_id' => $user->id,
+            'category' => 'ktp_document',
+        ]);
+    }
+
+    public function test_procurement_can_replace_ktp_document_when_updating_technician_account(): void
+    {
+        Storage::fake('local');
+        $tech = User::factory()->create(['role' => 'technician']);
+
+        $this->actingAs($this->procurement())->put("/procurement/technicians/{$tech->id}", [
+            'name' => $tech->name,
+            'email' => $tech->email,
+            'nik' => '3201234567890004',
+            'ktp_document' => UploadedFile::fake()->image('ktp-updated.jpg'),
+        ])->assertRedirect();
+
+        $tech->refresh();
+        $this->assertSame('3201234567890004', $tech->nik);
+        $this->assertNotNull($tech->ktpDocument());
     }
 
     public function test_vendor_survey_flags_persist(): void

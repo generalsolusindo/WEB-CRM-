@@ -78,6 +78,71 @@ class ProcurementPaymentPayTest extends TestCase
         $this->assertDatabaseHas('notifications', ['type' => 'procurement_payment.paid']);
     }
 
+    public function test_finance_cannot_pay_items_from_different_vendors_in_one_submission(): void
+    {
+        $project = $this->materialProject([
+            ['item_name' => 'Router', 'qty' => 1, 'unit' => 'unit', 'cost_price' => 800000],
+            ['item_name' => 'Switch', 'qty' => 1, 'unit' => 'unit', 'cost_price' => 500000],
+        ]);
+        $vendorA = Vendor::create(['name' => 'Vendor A']);
+        $vendorB = Vendor::create(['name' => 'Vendor B']);
+        $items = $project->actualProcurements()->orderBy('id')->get();
+        $items[0]->update(['vendor_id' => $vendorA->id]);
+        $items[1]->update(['vendor_id' => $vendorB->id]);
+
+        $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
+        $pm = User::find($project->delegated_to);
+        $payment = app(SubmitProcurementPayment::class)->handle($project->fresh(), $procurement, ['pricing_mode' => 'itemized']);
+        app(ReviewProcurementPayment::class)->handle($payment, $pm, true, null);
+
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+
+        $this->actingAs($finance)->post("/finance/procurement-payments/{$payment->id}/pay", [
+            'item_ids' => $items->pluck('id')->all(),
+            'proof' => UploadedFile::fake()->create('tf.pdf', 20, 'application/pdf'),
+        ])->assertSessionHasErrors('item_ids');
+
+        $this->assertFalse($items[0]->fresh()->is_paid);
+        $this->assertFalse($items[1]->fresh()->is_paid);
+    }
+
+    public function test_finance_pays_each_vendor_separately_with_own_proof(): void
+    {
+        $project = $this->materialProject([
+            ['item_name' => 'Router', 'qty' => 1, 'unit' => 'unit', 'cost_price' => 800000],
+            ['item_name' => 'Switch', 'qty' => 1, 'unit' => 'unit', 'cost_price' => 500000],
+        ]);
+        $vendorA = Vendor::create(['name' => 'Vendor A']);
+        $vendorB = Vendor::create(['name' => 'Vendor B']);
+        $items = $project->actualProcurements()->orderBy('id')->get();
+        $items[0]->update(['vendor_id' => $vendorA->id]);
+        $items[1]->update(['vendor_id' => $vendorB->id]);
+
+        $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
+        $pm = User::find($project->delegated_to);
+        $payment = app(SubmitProcurementPayment::class)->handle($project->fresh(), $procurement, ['pricing_mode' => 'itemized']);
+        app(ReviewProcurementPayment::class)->handle($payment, $pm, true, null);
+
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+
+        $this->actingAs($finance)->post("/finance/procurement-payments/{$payment->id}/pay", [
+            'item_ids' => [$items[0]->id],
+            'proof' => UploadedFile::fake()->create('vendor-a.pdf', 20, 'application/pdf'),
+        ])->assertSessionHas('success');
+
+        $this->assertTrue($items[0]->fresh()->is_paid);
+        $this->assertFalse($items[1]->fresh()->is_paid);
+        $this->assertSame('approved_pm', $payment->fresh()->status->value);
+
+        $this->actingAs($finance)->post("/finance/procurement-payments/{$payment->id}/pay", [
+            'item_ids' => [$items[1]->id],
+            'proof' => UploadedFile::fake()->create('vendor-b.pdf', 20, 'application/pdf'),
+        ])->assertSessionHas('success');
+
+        $this->assertTrue($items[1]->fresh()->is_paid);
+        $this->assertSame('paid', $payment->fresh()->status->value);
+    }
+
     public function test_non_finance_cannot_pay(): void
     {
         $project = $this->materialProject();

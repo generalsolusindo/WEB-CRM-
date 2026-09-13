@@ -101,7 +101,7 @@ class LineCategoryTest extends TestCase
         ]);
 
         $this->actingAs($sales)->post("/sales/leads/{$lead->id}/requirements", [
-            'item_name' => 'Instalasi CCTV', 'category' => 'service', 'qty' => 1, 'unit' => 'paket',
+            'item_name' => 'Instalasi CCTV', 'category' => 'service', 'qty' => 1, 'unit' => 'set',
         ])->assertRedirect();
 
         $this->assertSame('service', $lead->requirements()->firstOrFail()->category);
@@ -129,7 +129,7 @@ class LineCategoryTest extends TestCase
         ]);
 
         $this->actingAs($sales)->post("/sales/leads/{$lead->id}/requirements", [
-            'item_name' => 'Transport Tim', 'category' => 'reimburse', 'qty' => 1, 'unit' => 'lot',
+            'item_name' => 'Transport Tim', 'category' => 'reimburse', 'qty' => 1, 'unit' => 'set',
         ])->assertRedirect();
         $this->assertSame('reimburse', $lead->requirements()->firstOrFail()->category);
 

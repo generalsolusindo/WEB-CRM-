@@ -11,6 +11,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -59,15 +60,18 @@ class TechnicianAccountController extends Controller
     {
         $data = $request->validated();
 
-        User::create([
+        $technician = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
+            'nik' => $data['nik'] ?? null,
             'password' => Hash::make($data['password']),
             'role' => 'technician',
             'vendor_id' => $data['vendor_id'] ?? null,
             'is_active' => $data['is_active'] ?? true,
         ]);
+
+        $this->storeKtpDocument($request, $technician);
 
         return redirect()->route('procurement.technicians.index')
             ->with('success', 'Akun teknisi/surveyor berhasil dibuat.');
@@ -79,8 +83,9 @@ class TechnicianAccountController extends Controller
         abort_unless($technician->role === 'technician', 404);
 
         return Inertia::render('Procurement/Technicians/Form', [
-            'technician' => $technician->only('id', 'name', 'email', 'phone', 'vendor_id', 'is_active'),
+            'technician' => $technician->only('id', 'name', 'email', 'phone', 'nik', 'vendor_id', 'is_active'),
             'vendorOptions' => $this->vendorOptions(),
+            'ktpDocumentUrl' => $this->ktpDocumentUrl($technician),
         ]);
     }
 
@@ -94,6 +99,7 @@ class TechnicianAccountController extends Controller
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
+            'nik' => $data['nik'] ?? null,
             'vendor_id' => $data['vendor_id'] ?? null,
             'is_active' => $data['is_active'] ?? true,
         ]);
@@ -103,6 +109,8 @@ class TechnicianAccountController extends Controller
         }
 
         $technician->save();
+
+        $this->storeKtpDocument($request, $technician);
 
         return redirect()->route('procurement.technicians.index')
             ->with('success', 'Akun teknisi/surveyor berhasil diperbarui.');
@@ -116,5 +124,25 @@ class TechnicianAccountController extends Controller
             ->get(['id', 'name'])
             ->map(fn (Vendor $vendor) => ['value' => $vendor->id, 'label' => $vendor->name])
             ->all();
+    }
+
+    private function storeKtpDocument(Request $request, User $account): void
+    {
+        if (! $request->hasFile('ktp_document')) {
+            return;
+        }
+
+        $account->attachments()->create([
+            'category' => 'ktp_document',
+            'file_path' => $request->file('ktp_document')->store('ktp-documents'),
+            'uploaded_by' => $request->user()->id,
+        ]);
+    }
+
+    private function ktpDocumentUrl(User $account): ?string
+    {
+        $doc = $account->ktpDocument();
+
+        return $doc ? Storage::disk('local')->temporaryUrl($doc->file_path, now()->addDay()) : null;
     }
 }

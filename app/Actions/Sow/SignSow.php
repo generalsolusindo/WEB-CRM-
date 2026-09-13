@@ -6,16 +6,22 @@ use App\Enums\SowStatus;
 use App\Models\Notification;
 use App\Models\Sow;
 use App\Models\User;
+use App\Services\Notifications\Notify;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Menangani keempat tahap tanda tangan digital SOW: Teknisi, PIC Vendor,
- * Admin Project (Operasional), dan Direktur (Manager) — satu action generik
- * supaya urutan status & notifikasi konsisten di satu tempat.
+ * Operasional (slot "admin"), dan Project Manager (slot "director") — satu
+ * action generik supaya urutan status & notifikasi konsisten di satu tempat.
+ * Dua slot internal terakhir memakai TTD tersimpan milik Administrator
+ * (lihat App\Services\AdministratorSignature), bukan gambar tanda tangan
+ * langsung dari penandatangan.
  */
 class SignSow
 {
+    public function __construct(private Notify $notify) {}
+
     public function handle(Sow $sow, User $signer, string $role, string $signature): Sow
     {
         return DB::transaction(function () use ($sow, $signer, $role, $signature) {
@@ -43,6 +49,14 @@ class SignSow
             };
 
             $locked->update(['status' => $nextStatus, ...$signatureFields]);
+
+            $pendingType = match ($role) {
+                'technician' => 'sow.pending_technician_signature',
+                'vendor' => 'sow.pending_vendor_signature',
+                'admin' => 'sow.pending_admin_signature',
+                'director' => 'sow.pending_director_signature',
+            };
+            $this->notify->resolve($pendingType, $locked, $role === 'technician' ? $signer : null);
 
             $customer = $locked->project->salesOrder?->contact?->name ?? 'customer';
 
@@ -79,11 +93,16 @@ class SignSow
         }
     }
 
+    /** Notifikasi ke Project Manager yang didelegasikan, atau ke semua Management bila belum didelegasikan. */
     private function notifyManagement(Sow $sow, string $customer): void
     {
-        foreach (User::query()->where('role', 'management')->where('is_active', true)->get() as $manager) {
+        $recipients = $sow->project->delegated_to
+            ? User::query()->where('id', $sow->project->delegated_to)->where('is_active', true)->get()
+            : User::query()->where('role', 'management')->where('is_active', true)->get();
+
+        foreach ($recipients as $recipient) {
             Notification::updateOrCreate(
-                ['user_id' => $manager->id, 'type' => 'sow.pending_director_signature', 'related_type' => $sow->getMorphClass(), 'related_id' => $sow->id],
+                ['user_id' => $recipient->id, 'type' => 'sow.pending_director_signature', 'related_type' => $sow->getMorphClass(), 'related_id' => $sow->id],
                 ['message' => "SOW {$sow->number} ({$customer}) menunggu tanda tangan Anda.", 'is_sent' => true, 'read_at' => null],
             );
         }

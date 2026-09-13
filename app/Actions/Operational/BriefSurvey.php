@@ -5,12 +5,13 @@ namespace App\Actions\Operational;
 use App\Enums\SurveyStatus;
 use App\Models\Survey;
 use App\Models\User;
+use App\Services\Notifications\Notify;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class BriefSurvey
 {
-    public function __construct(private SyncSurveyTeam $syncTeam) {}
+    public function __construct(private SyncSurveyTeam $syncTeam, private Notify $notify) {}
 
     /**
      * @param  list<int>  $surveyorIds
@@ -38,6 +39,8 @@ class BriefSurvey
                 'briefed_at' => now(),
                 'status' => SurveyStatus::InProgress->value,
             ]);
+
+            $this->notify->resolve('survey.awaiting_briefing', $locked);
 
             $locked->report()->firstOrCreate(
                 ['survey_id' => $locked->id],

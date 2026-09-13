@@ -5,7 +5,7 @@ import AppLayout from '../../../Layouts/AppLayout';
 import CategoryBadge from '../../../Components/CategoryBadge';
 import { PageHeader, Card, CardHeader, Button, Info, InfoGrid, StatusBadge } from '../../../Components/ui';
 
-export default function Show({ quotation, history, totals, permissions }) {
+export default function Show({ quotation, history, totals, permissions, customerHasWhatsapp = false }) {
     const number = quotation.number ?? `QT-${String(quotation.id).padStart(6, '0')} / R${quotation.revision_number}`;
     const validUntil = quotation.valid_until
         ? new Date(quotation.valid_until).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -16,18 +16,43 @@ export default function Show({ quotation, history, totals, permissions }) {
     function action(path, message) { if (confirm(message)) router.post(path); }
     function destroy() { if (confirm('Hapus quotation draft ini?')) router.delete(`/sales/quotations/${quotation.id}`); }
 
+    function sendWhatsapp() {
+        router.post(`/sales/quotations/${quotation.id}/send-whatsapp`, {}, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const url = page.props.flash?.whatsappUrl;
+                if (url) window.open(url, '_blank', 'noopener');
+            },
+        });
+    }
+
     return (
         <AppLayout>
             <Head title={number} />
             <div className="mx-auto max-w-6xl space-y-5">
                 <PageHeader
-                    title={<span className="flex items-center gap-3">{number} <StatusBadge status={quotation.status} /></span>}
+                    title={(
+                        <span className="flex flex-wrap items-center gap-3">
+                            {number} <StatusBadge status={quotation.status} />
+                            {quotation.is_addendum && <span className="rounded-full bg-info-soft px-2.5 py-1 text-xs font-semibold text-info">Tambahan (Addendum)</span>}
+                        </span>
+                    )}
                     subtitle={`${quotation.contact.name} · ${quotation.contact.company_name || 'Tanpa perusahaan'}`}
                     back={{ href: '/sales/quotations', label: 'Kembali ke Quotations' }}
                     actions={
                         <>
                             <Button href={`/sales/quotations/${quotation.id}/print`} external variant="outline" icon={FiPrinter}>Cetak / PDF</Button>
                             {permissions.update && <Button href={`/sales/quotations/${quotation.id}/edit`} variant="outline" icon={FiEdit2}>Edit</Button>}
+                            {permissions.sendWhatsapp && (
+                                <Button
+                                    onClick={sendWhatsapp}
+                                    disabled={!customerHasWhatsapp}
+                                    title={customerHasWhatsapp ? '' : 'Nomor WhatsApp customer belum ada di data Contact'}
+                                    className="bg-success text-white hover:bg-success"
+                                >
+                                    {quotation.whatsapp_sent_at ? 'Kirim Ulang via WhatsApp' : 'Kirim via WhatsApp'}
+                                </Button>
+                            )}
                             {permissions.send && <Button onClick={() => action(`/sales/quotations/${quotation.id}/send`, 'Tandai quotation sudah dikirim ke customer?')} icon={FiSend}>Tandai Terkirim</Button>}
                             {permissions.confirm && <Button href={`/sales/quotations/${quotation.id}/confirm`} icon={FiCheck}>Confirm Deal</Button>}
                             {permissions.reject && <Button onClick={() => action(`/sales/quotations/${quotation.id}/reject`, 'Tandai quotation ditolak customer?')} variant="ghost" icon={FiX} className="text-danger hover:bg-danger-soft hover:text-danger">Tandai Ditolak</Button>}
@@ -47,6 +72,12 @@ export default function Show({ quotation, history, totals, permissions }) {
                         <Info label="Lead" value={`#${quotation.lead_id}`} />
                         <Info label="Catatan" value={quotation.notes} />
                     </InfoGrid>
+                    {quotation.terms && (
+                        <div className="mt-3 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm">
+                            <span className="font-semibold text-text">Syarat &amp; Ketentuan (di cetakan):</span>
+                            <p className="mt-1 whitespace-pre-line text-text-muted">{quotation.terms}</p>
+                        </div>
+                    )}
                 </Card>
 
                 {quotation.status === 'draft' && <ReviewGate quotation={quotation} />}
@@ -126,13 +157,18 @@ function ReviewGate({ quotation }) {
     const pmStatus = quotation.pm_review_status;
     const mgrStatus = quotation.manager_review_status;
 
+    // Status review (pm_review_status/manager_review_status) adalah catatan permanen —
+    // begitu disetujui, statusnya tetap tersimpan meski delegasi opportunity ke PM
+    // ditarik kembali belakangan oleh Manager. Jadi cek hasil review DULU sebelum
+    // menyimpulkan "belum didelegasikan", supaya quotation yang sudah benar-benar
+    // disetujui tidak salah ditampilkan seolah belum diproses sama sekali.
     let message;
-    if (!pm) message = 'Opportunity ini belum didelegasikan ke Project Manager oleh Manager — quotation belum bisa diverifikasi.';
-    else if (pmStatus === 'rejected') message = `Ditolak oleh Project Manager (${quotation.pmReviewedBy?.name || '-'})${quotation.pm_review_notes ? `: ${quotation.pm_review_notes}` : ''}. Silakan revisi quotation ini.`;
-    else if (pmStatus !== 'approved') message = `Menunggu verifikasi Project Manager (${pm.name}).`;
+    if (mgrStatus === 'approved') message = 'Sudah disetujui Project Manager & Manager — siap dikirim ke customer.';
     else if (mgrStatus === 'rejected') message = `Ditolak oleh Manager (${quotation.managerReviewedBy?.name || '-'})${quotation.manager_review_notes ? `: ${quotation.manager_review_notes}` : ''}. Silakan revisi quotation ini.`;
-    else if (mgrStatus !== 'approved') message = 'Sudah disetujui Project Manager, menunggu verifikasi Manager.';
-    else message = 'Sudah disetujui Project Manager & Manager — siap dikirim ke customer.';
+    else if (pmStatus === 'approved') message = 'Sudah disetujui Project Manager, menunggu verifikasi Manager.';
+    else if (pmStatus === 'rejected') message = `Ditolak oleh Project Manager (${quotation.pmReviewedBy?.name || '-'})${quotation.pm_review_notes ? `: ${quotation.pm_review_notes}` : ''}. Silakan revisi quotation ini.`;
+    else if (!pm) message = 'Opportunity ini belum didelegasikan ke Project Manager oleh Manager — quotation belum bisa diverifikasi.';
+    else message = `Menunggu verifikasi Project Manager (${pm.name}).`;
 
     const tone = mgrStatus === 'approved'
         ? 'border-success/25 bg-success-soft text-success'

@@ -26,8 +26,12 @@ class Quotation extends Model
         'status',
         'revision_number',
         'parent_quotation_id',
+        'is_addendum',
         'valid_until',
         'notes',
+        'terms',
+        'whatsapp_sent_at',
+        'whatsapp_sent_by',
         'agreed_dpp',
         'pm_review_status',
         'pm_reviewed_by',
@@ -47,6 +51,8 @@ class Quotation extends Model
             'valid_until' => 'date',
             'pm_reviewed_at' => 'datetime',
             'manager_reviewed_at' => 'datetime',
+            'is_addendum' => 'boolean',
+            'whatsapp_sent_at' => 'datetime',
         ];
     }
 

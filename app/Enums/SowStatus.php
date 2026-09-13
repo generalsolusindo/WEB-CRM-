@@ -25,8 +25,8 @@ enum SowStatus: string
             self::PendingVendorSignature => 'Menunggu TTD PIC Vendor',
             self::PendingHrVerification => 'Menunggu Verifikasi TTD (HR)',
             self::RejectedSignature => 'TTD Ditolak HR',
-            self::PendingAdminSignature => 'Menunggu TTD Admin Project',
-            self::PendingDirectorSignature => 'Menunggu TTD Direktur',
+            self::PendingAdminSignature => 'Menunggu TTD Operasional',
+            self::PendingDirectorSignature => 'Menunggu TTD Project Manager',
             self::Completed => 'Selesai',
         };
     }

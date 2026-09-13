@@ -10,10 +10,13 @@ use App\Http\Requests\Sales\SaveQuotationRequest;
 use App\Models\ProcurementRequest;
 use App\Models\Quotation;
 use App\Models\Tax;
+use App\Services\Whatsapp\WhatsappGateway;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -72,6 +75,7 @@ class QuotationController extends Controller
         return Inertia::render('Sales/Quotations/Form', [
             'procurementRequest' => $procurementRequest,
             'taxes' => $this->activeTaxes(),
+            'defaultTerms' => \App\Support\QuotationDefaults::terms(),
         ]);
     }
 
@@ -113,10 +117,12 @@ class QuotationController extends Controller
             'quotation' => $quotation,
             'history' => $history,
             'totals' => \App\Services\Sales\DocumentTotals::of($quotation->lines),
+            'customerHasWhatsapp' => $quotation->contact?->whatsappNumber() !== null,
             'permissions' => [
                 'update' => request()->user()->can('update', $quotation),
                 'delete' => request()->user()->can('delete', $quotation),
                 'send' => request()->user()->can('send', $quotation),
+                'sendWhatsapp' => request()->user()->can('sendWhatsapp', $quotation),
                 'revise' => request()->user()->can('revise', $quotation),
                 'reject' => request()->user()->can('reject', $quotation),
                 'confirm' => request()->user()->can('confirm', $quotation),
@@ -148,16 +154,78 @@ class QuotationController extends Controller
     {
         Gate::authorize('view', $quotation);
 
+        return view('sales.quotations.print', $this->printData($quotation));
+    }
+
+    public function pdf(Quotation $quotation): \Illuminate\Http\Response
+    {
+        Gate::authorize('view', $quotation);
+
+        return Pdf::loadView('sales.quotations.print', $this->printData($quotation, forPdf: true))
+            ->stream($this->pdfFilename($quotation));
+    }
+
+    /** Unduhan publik lewat tautan bertanda tangan (dipakai di pesan WhatsApp ke customer). */
+    public function downloadPdf(Quotation $quotation): \Illuminate\Http\Response
+    {
+        return Pdf::loadView('sales.quotations.print', $this->printData($quotation, forPdf: true))
+            ->stream($this->pdfFilename($quotation));
+    }
+
+    public function sendWhatsapp(Quotation $quotation, WhatsappGateway $whatsapp): RedirectResponse
+    {
+        Gate::authorize('sendWhatsapp', $quotation);
+
+        $quotation->load('contact');
+        $number = $quotation->contact?->whatsappNumber();
+
+        if (! $number) {
+            return back()->with('error', 'Nomor WhatsApp customer belum ada / tidak valid. Lengkapi di data Contact dulu.');
+        }
+
+        DB::transaction(function () use ($quotation) {
+            if ($quotation->status === QuotationStatus::Draft->value) {
+                $quotation->status = QuotationStatus::Sent->value;
+            }
+            $quotation->whatsapp_sent_at = now();
+            $quotation->whatsapp_sent_by = request()->user()->id;
+            $quotation->save();
+        });
+
+        $pdfUrl = URL::temporarySignedRoute(
+            'quotations.pdf.public',
+            now()->addDays(7),
+            ['quotation' => $quotation->id],
+        );
+
+        $quotationNumber = $quotation->number ?? "QT-{$quotation->id}";
+        $message = "Yth. {$quotation->contact->name},\n\n"
+            ."Terlampir penawaran (quotation) *{$quotationNumber}* dari CV. General Solusindo.\n\n"
+            ."Unduh quotation (PDF):\n{$pdfUrl}\n\n"
+            .'Terima kasih.';
+
+        return back()->with('whatsappUrl', $whatsapp->link($number, $message));
+    }
+
+    private function pdfFilename(Quotation $quotation): string
+    {
+        return str_replace('/', '-', $quotation->number ?? "QT-{$quotation->id}").'.pdf';
+    }
+
+    /** @return array<string, mixed> */
+    private function printData(Quotation $quotation, bool $forPdf = false): array
+    {
         $quotation->load([
             'contact:id,name,company_name,email,phone,address,npwp',
             'lines.tax:id,name,rate',
             'sales:id,name',
         ]);
 
-        return view('sales.quotations.print', [
+        return [
             'quotation' => $quotation,
             'totals' => \App\Services\Sales\DocumentTotals::of($quotation->lines),
-        ]);
+            'forPdf' => $forPdf,
+        ];
     }
 
     public function update(

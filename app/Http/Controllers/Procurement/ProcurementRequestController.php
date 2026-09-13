@@ -61,18 +61,25 @@ class ProcurementRequestController extends Controller
         Gate::authorize('view', $procurementRequest);
 
         $procurementRequest->load([
-            'lead.contact:id,name,company_name,email,phone',
+            'lead.contact:id,name,company_name,email,phone,npwp',
             'requestedBy:id,name',
             'lines' => fn ($query) => $query->orderBy('id'),
             'lines.requirement:id,notes',
             'lines.vendorProduct:id,item_name,price,unit',
         ]);
 
+        $contact = $procurementRequest->lead->contact;
+        $npwpDocument = $contact->npwpDocument();
+
         return Inertia::render('Procurement/Requests/Show', [
             'procurementRequest' => $procurementRequest,
             'editable' => request()->user()->can('update', $procurementRequest),
             'canStart' => request()->user()->can('start', $procurementRequest),
             'canFinalize' => request()->user()->can('finalize', $procurementRequest),
+            'hasNpwp' => filled($contact->npwp),
+            'npwpDocumentUrl' => $npwpDocument
+                ? \Illuminate\Support\Facades\Storage::disk('local')->temporaryUrl($npwpDocument->file_path, now()->addDay())
+                : null,
             'availabilityOptions' => AvailabilityStatus::options(),
             'taxes' => Tax::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'rate']),
             'catalog' => VendorProduct::query()

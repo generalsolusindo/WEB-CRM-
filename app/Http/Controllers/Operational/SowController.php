@@ -2,19 +2,27 @@
 
 namespace App\Http\Controllers\Operational;
 
+use App\Actions\Operational\AddSowScopeSection;
+use App\Actions\Operational\DeleteSowScopeSection;
+use App\Actions\Operational\MoveSowScopeSection;
 use App\Actions\Operational\RestartSowSignatures;
 use App\Actions\Operational\SaveSowDraft;
 use App\Actions\Operational\SubmitSowForReview;
+use App\Actions\Operational\UpdateSowScopeSection;
 use App\Actions\Sow\SignSow;
 use App\Enums\SowStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Operational\SaveSowRequest;
-use App\Http\Requests\Operational\SignSowAsAdminRequest;
+use App\Http\Requests\Operational\SaveSowScopeSectionRequest;
 use App\Http\Requests\Operational\UploadSowImageRequest;
+use App\Http\Requests\Operational\UploadSowScopeImageRequest;
 use App\Models\Attachment;
 use App\Models\Project;
 use App\Models\Sow;
+use App\Models\SowScopeSection;
 use App\Models\User;
+use App\Services\AdministratorSignature;
+use App\Support\SowDefaults;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -36,6 +44,7 @@ class SowController extends Controller
             'vendor:id,name,contact_person,phone',
             'actualProcurements' => fn ($q) => $q->orderBy('id'),
             'sow.attachments' => fn ($q) => $q->where('category', 'sow_background')->latest(),
+            'sow.scopeSections.attachments',
             'sow.technician:id,name',
             'sow.hrContentReviewedBy:id,name',
         ]);
@@ -76,10 +85,19 @@ class SowController extends Controller
                 'client_name' => $sow->client_name,
                 'execution_date' => $sow->execution_date,
                 'background' => $sow->background,
-                'scope_pre_work' => $sow->scope_pre_work,
-                'scope_other' => $sow->scope_other,
+                'scope_sections' => $sow->scopeSections->map(fn (SowScopeSection $s) => [
+                    'id' => $s->id,
+                    'title' => $s->title,
+                    'content' => $s->content,
+                    'images' => $s->attachments->map(fn (Attachment $a) => [
+                        'id' => $a->id,
+                        'url' => Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay()),
+                    ]),
+                ]),
                 'responsibilities' => $sow->responsibilities,
-                'schedule' => $sow->schedule,
+                'schedule_duration' => $sow->schedule_duration,
+                'schedule_start_date' => $sow->schedule_start_date?->format('Y-m-d'),
+                'schedule_end_date' => $sow->schedule_end_date?->format('Y-m-d'),
                 'safety' => $sow->safety,
                 'payment_terms' => $sow->payment_terms,
                 'output' => $sow->output,
@@ -106,16 +124,17 @@ class SowController extends Controller
                 'client_name' => $project->salesOrder?->contact?->company_name ?: $project->salesOrder?->contact?->name,
                 'execution_date' => null,
                 'background' => null,
-                'scope_pre_work' => null,
-                'scope_other' => null,
-                'responsibilities' => null,
-                'schedule' => null,
-                'safety' => null,
-                'payment_terms' => null,
-                'output' => null,
-                'warranty' => null,
-                'notes' => null,
-                'closing' => null,
+                'scope_sections' => [],
+                'responsibilities' => SowDefaults::responsibilities(),
+                'schedule_duration' => null,
+                'schedule_start_date' => null,
+                'schedule_end_date' => null,
+                'safety' => SowDefaults::safety(),
+                'payment_terms' => SowDefaults::paymentTerms(),
+                'output' => SowDefaults::output(),
+                'warranty' => SowDefaults::warranty(),
+                'notes' => SowDefaults::notes(),
+                'closing' => SowDefaults::closing($project, null),
                 'technician_id' => null,
                 'technician_team_note' => null,
                 'client_pic_name' => $lead?->pic_name,
@@ -129,7 +148,7 @@ class SowController extends Controller
                 'director' => $sow->director_signature,
             ] : null,
             'canEdit' => request()->user()->can('manageSow', $project),
-            'canSignAdmin' => $sow ? request()->user()->can('signAsAdmin', $sow) : false,
+            'canSignOperational' => $sow ? request()->user()->can('signAsAdmin', $sow) : false,
             'canRestartSignatures' => $sow ? request()->user()->can('restartSignatures', $sow) : false,
         ]);
     }
@@ -168,6 +187,73 @@ class SowController extends Controller
         return back()->with('success', 'Gambar dihapus.');
     }
 
+    public function storeScopeSection(SaveSowScopeSectionRequest $request, Project $project, AddSowScopeSection $action): RedirectResponse
+    {
+        $sow = $project->sow;
+        abort_unless($sow, 404, 'Simpan draft SOW terlebih dahulu.');
+
+        $action->handle($sow, $request->validated('title'), $request->validated('content'));
+
+        return back()->with('success', 'Sub-bab ruang lingkup ditambahkan.');
+    }
+
+    public function updateScopeSection(SaveSowScopeSectionRequest $request, Project $project, SowScopeSection $scopeSection, UpdateSowScopeSection $action): RedirectResponse
+    {
+        abort_unless($scopeSection->sow_id === $project->sow?->id, 404);
+
+        $action->handle($scopeSection, $request->validated('title'), $request->validated('content'));
+
+        return back()->with('success', 'Sub-bab ruang lingkup tersimpan.');
+    }
+
+    public function destroyScopeSection(Project $project, SowScopeSection $scopeSection, DeleteSowScopeSection $action): RedirectResponse
+    {
+        Gate::authorize('manageSow', $project);
+        abort_unless($scopeSection->sow_id === $project->sow?->id, 404);
+
+        $action->handle($scopeSection);
+
+        return back()->with('success', 'Sub-bab ruang lingkup dihapus.');
+    }
+
+    public function moveScopeSection(Project $project, SowScopeSection $scopeSection, MoveSowScopeSection $action): RedirectResponse
+    {
+        Gate::authorize('manageSow', $project);
+        abort_unless($scopeSection->sow_id === $project->sow?->id, 404);
+        $direction = request()->input('direction') === 'up' ? 'up' : 'down';
+
+        $action->handle($scopeSection, $direction);
+
+        return back()->with('success', 'Urutan sub-bab diperbarui.');
+    }
+
+    public function storeScopeImage(UploadSowScopeImageRequest $request, Project $project, SowScopeSection $scopeSection): RedirectResponse
+    {
+        abort_unless($scopeSection->sow_id === $project->sow?->id, 404);
+
+        foreach ($request->file('images', []) as $image) {
+            $scopeSection->attachments()->create([
+                'category' => 'sow_scope_image',
+                'file_path' => $image->store('sow-scope-images'),
+                'uploaded_by' => $request->user()->id,
+            ]);
+        }
+
+        return back()->with('success', 'Gambar tersimpan.');
+    }
+
+    public function destroyScopeImage(Project $project, SowScopeSection $scopeSection, Attachment $image): RedirectResponse
+    {
+        Gate::authorize('manageSow', $project);
+        abort_unless($scopeSection->sow_id === $project->sow?->id, 404);
+        abort_unless($image->attachable_type === SowScopeSection::class && $image->attachable_id === $scopeSection->id, 404);
+
+        Storage::disk('local')->delete($image->file_path);
+        $image->delete();
+
+        return back()->with('success', 'Gambar dihapus.');
+    }
+
     public function submit(Project $project, SubmitSowForReview $action): RedirectResponse
     {
         $sow = $project->sow;
@@ -192,6 +278,7 @@ class SowController extends Controller
             'sow.adminSignedBy:id,name',
             'sow.directorSignedBy:id,name',
             'sow.attachments' => fn ($q) => $q->where('category', 'sow_background'),
+            'sow.scopeSections.attachments',
         ]);
         abort_unless($project->sow, 404);
 
@@ -199,19 +286,28 @@ class SowController extends Controller
             fn ($a) => Storage::disk('local')->temporaryUrl($a->file_path, now()->addHour()),
         );
 
+        $scopeSectionImageUrls = $project->sow->scopeSections->mapWithKeys(fn ($section) => [
+            $section->id => $section->attachments->map(
+                fn ($a) => Storage::disk('local')->temporaryUrl($a->file_path, now()->addHour()),
+            ),
+        ]);
+
         return view('operational.sows.print', [
             'project' => $project,
             'sow' => $project->sow,
             'imageUrls' => $imageUrls,
+            'scopeSectionImageUrls' => $scopeSectionImageUrls,
         ]);
     }
 
-    public function signAdmin(SignSowAsAdminRequest $request, Sow $sow, SignSow $action): RedirectResponse
+    public function signOperational(Sow $sow, SignSow $action, AdministratorSignature $administratorSignature): RedirectResponse
     {
-        $action->handle($sow, $request->user(), 'admin', $request->validated('signature'));
+        Gate::authorize('signAsAdmin', $sow);
+
+        $action->handle($sow, request()->user(), 'admin', $administratorSignature->dataUrl());
 
         return redirect()->route('operational.projects.show', $sow->project_id)
-            ->with('success', 'SOW berhasil ditanda tangani — diteruskan ke Direktur.');
+            ->with('success', 'SOW berhasil ditanda tangani — diteruskan ke Project Manager.');
     }
 
     public function restartSignatures(Sow $sow, RestartSowSignatures $action): RedirectResponse

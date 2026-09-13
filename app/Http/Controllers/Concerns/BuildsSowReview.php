@@ -38,6 +38,7 @@ trait BuildsSowReview
             'hrSignatureReviewedBy:id,name',
             'adminSignedBy:id,name',
             'directorSignedBy:id,name',
+            'scopeSections.attachments',
         ]);
 
         return [
@@ -50,10 +51,19 @@ trait BuildsSowReview
             'client_name' => $sow->client_name,
             'execution_date' => $sow->execution_date,
             'background' => $sow->background,
-            'scope_pre_work' => $sow->scope_pre_work,
-            'scope_other' => $sow->scope_other,
+            'scope_sections' => $sow->scopeSections->map(fn ($s) => [
+                'id' => $s->id,
+                'title' => $s->title,
+                'content' => $s->content,
+                'images' => $s->attachments->map(fn ($a) => [
+                    'id' => $a->id,
+                    'url' => \Illuminate\Support\Facades\Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay()),
+                ]),
+            ]),
             'responsibilities' => $sow->responsibilities,
-            'schedule' => $sow->schedule,
+            'schedule_duration' => $sow->schedule_duration,
+            'schedule_start_date' => $sow->schedule_start_date?->format('Y-m-d'),
+            'schedule_end_date' => $sow->schedule_end_date?->format('Y-m-d'),
             'safety' => $sow->safety,
             'payment_terms' => $sow->payment_terms,
             'output' => $sow->output,
