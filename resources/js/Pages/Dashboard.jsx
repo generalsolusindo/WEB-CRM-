@@ -8,12 +8,13 @@ import {
 } from 'react-icons/fi';
 import AppLayout from '../Layouts/AppLayout';
 import { getMenuForUser } from '../config/menuConfig';
+import { StatusBadge } from '../Components/ui';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(v || 0));
 }
 
-export default function Dashboard({ salesActions = null, procurementActions = null, financeActions = null, operationalActions = null, managementOverview = null }) {
+export default function Dashboard({ salesActions = null, procurementActions = null, financeActions = null, operationalActions = null, managementOverview = null, projectManagerOverview = null }) {
     const { auth } = usePage().props;
 
     return (
@@ -28,7 +29,8 @@ export default function Dashboard({ salesActions = null, procurementActions = nu
             {procurementActions && <ProcurementDashboard data={procurementActions} />}
             {operationalActions && <OperationalDashboard data={operationalActions} />}
             {financeActions && <FinanceDashboard data={financeActions} />}
-            {!salesActions && !managementOverview && !procurementActions && !operationalActions && !financeActions && (
+            {projectManagerOverview && <ProjectManagerDashboard data={projectManagerOverview} menuBadges={auth?.menuBadges ?? {}} />}
+            {!salesActions && !managementOverview && !procurementActions && !operationalActions && !financeActions && !projectManagerOverview && (
                 <GenericDashboard auth={auth} menuBadges={auth?.menuBadges ?? {}} />
             )}
         </AppLayout>
@@ -476,6 +478,100 @@ function OperationalDashboard({ data }) {
                                         <span className="font-semibold text-text">{g.items.length}</span>
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ─────────────────────────── Project Manager ─────────────────────────── */
+
+function ProjectManagerDashboard({ data, menuBadges = {} }) {
+    const verifQuotation = menuBadges['/project-manager/quotations'] || 0;
+    const persetujuan = menuBadges['/project-manager/procurement-payments'] || 0;
+    const active = data.active_projects ?? [];
+    const total = verifQuotation + persetujuan;
+
+    return (
+        <div className="mx-auto max-w-6xl space-y-6">
+            <section className="flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-navy via-navy to-primary p-7 text-white shadow-md">
+                <div>
+                    <p className="text-sm font-medium text-white/65">Ringkasan hari ini</p>
+                    <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                        {total > 0 ? `${total} hal butuh tindak lanjut` : 'Semua sudah tertangani 🎉'}
+                    </h1>
+                    <p className="mt-1 text-sm text-white/70">Tracking project, quotation, dan pengadaan yang kamu delegasikan.</p>
+                </div>
+                <Link href="/project-manager/projects" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-navy transition hover:bg-white/90">
+                    <FiCalendar className="h-4 w-4" /> Semua Project Saya
+                </Link>
+            </section>
+
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <Kpi icon={FiFileText} tone="amber" label="Verifikasi Quotation" value={verifQuotation} href="/project-manager/quotations" />
+                <Kpi icon={FiCheckSquare} tone="rose" label="Persetujuan Pengadaan" value={persetujuan} href="/project-manager/procurement-payments" />
+                <Kpi icon={FiCalendar} tone="blue" label="Project Aktif" value={active.length} href="/project-manager/projects" />
+                <Kpi icon={FiCheckCircle} tone="green" label="Project Selesai" value={data.completed ?? 0} href="/project-manager/projects?status=completed" />
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
+                <div className="card flex flex-col overflow-hidden p-0 lg:col-span-2 lg:min-h-[26rem]">
+                    <div className="border-b border-border px-5 py-4">
+                        <h2 className="text-base font-bold tracking-tight text-text">Tracking Project Aktif</h2>
+                        <p className="mt-0.5 text-xs text-text-muted">Project yang sudah didelegasikan ke kamu dan belum Selesai.</p>
+                    </div>
+
+                    {active.length === 0 ? (
+                        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-14 text-center">
+                            <FiCheckCircle className="h-8 w-8 text-success" />
+                            <p className="text-sm font-medium text-text">Tidak ada project aktif saat ini.</p>
+                            <p className="text-xs text-text-muted">Project baru akan muncul di sini begitu didelegasikan ke kamu.</p>
+                        </div>
+                    ) : (
+                        <ul className="flex-1">
+                            {active.map((p) => (
+                                <li key={p.id}>
+                                    <Link href={p.href} className="flex items-center gap-3 border-b border-border px-5 py-3.5 transition last:border-0 hover:bg-bg">
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block truncate text-sm font-medium text-text">{p.number} {p.is_won && <StatusBadge status="won" label="Won" />}</span>
+                                            <span className="block truncate text-xs text-text-muted">{p.customer || 'Tanpa customer'}</span>
+                                        </span>
+                                        <StatusBadge status={p.status} label={p.status_label} />
+                                        <FiArrowRight className="h-4 w-4 shrink-0 text-text-faint" />
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+
+                <div className="space-y-6">
+                    <div className="card p-5">
+                        <h3 className="text-sm font-bold tracking-tight text-text">Pintasan</h3>
+                        <div className="mt-3 space-y-1">
+                            <Shortcut icon={FiUserCheck} href="/project-manager/opportunities">Opportunity Saya</Shortcut>
+                            <Shortcut icon={FiCalendar} href="/project-manager/projects">Project Saya</Shortcut>
+                            <Shortcut icon={FiFileText} href="/project-manager/sows">SOW Menunggu TTD</Shortcut>
+                        </div>
+                    </div>
+
+                    {data.by_status?.length > 0 && (
+                        <div className="card p-5">
+                            <h3 className="text-sm font-bold tracking-tight text-text">Distribusi Status Project</h3>
+                            <div className="mt-3 space-y-1.5">
+                                {data.by_status.filter((s) => s.count > 0).map((s) => (
+                                    <div key={s.value} className="flex items-center gap-2 text-xs">
+                                        <StatusBadge status={s.value} label={s.label} />
+                                        <span className="flex-1" />
+                                        <span className="font-semibold text-text">{s.count}</span>
+                                    </div>
+                                ))}
+                                {data.by_status.every((s) => s.count === 0) && (
+                                    <p className="text-xs text-text-muted">Belum ada project yang didelegasikan.</p>
+                                )}
                             </div>
                         </div>
                     )}

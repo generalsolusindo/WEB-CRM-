@@ -72,6 +72,7 @@ const menuConfig = {
         { label: 'SOW Menunggu TTD', href: '/management/sows', icon: FiFileText },
     ],
     project_manager: [
+        { label: 'Dashboard', href: '/dashboard', icon: FiHome },
         { label: 'Opportunity Saya', href: '/project-manager/opportunities', icon: FiUsers },
         { label: 'Verifikasi Quotation', href: '/project-manager/quotations', icon: FiFileText },
         { label: 'Persetujuan Pengadaan', href: '/project-manager/procurement-payments', icon: FiCheckSquare },

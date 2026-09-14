@@ -10,6 +10,7 @@ use App\Enums\ProcurementRequestStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\QuotationStatus;
 use App\Enums\SurveyStatus;
+use App\Http\Controllers\Concerns\BuildsProjectOverview;
 use App\Models\Bast;
 use App\Models\Invoice;
 use App\Models\Lead;
@@ -27,6 +28,8 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    use BuildsProjectOverview;
+
     public function __invoke(Request $request, SalesOrderSettlement $settlement): Response
     {
         $user = $request->user();
@@ -47,7 +50,48 @@ class DashboardController extends Controller
             'managementOverview' => $user->role === 'management'
                 ? $this->managementOverview()
                 : null,
+            'projectManagerOverview' => $user->role === 'project_manager'
+                ? $this->projectManagerOverview($user)
+                : null,
         ]);
+    }
+
+    /**
+     * Ringkasan tracking project yang didelegasikan ke Project Manager ini —
+     * dipakai di Dashboard supaya PM langsung lihat progres tanpa harus
+     * masuk ke "Project Saya" dulu.
+     *
+     * @return array<string, mixed>
+     */
+    private function projectManagerOverview(\App\Models\User $user): array
+    {
+        $projects = Project::query()
+            ->where('delegated_to', $user->id)
+            ->with(['salesOrder:id,number,contact_id,status', 'salesOrder.contact:id,name', 'delegatedTo:id,name'])
+            ->latest()
+            ->get();
+
+        $rows = $projects->map(fn (Project $p) => $this->projectOverviewRow($p));
+
+        $byStatus = collect(ProjectStatus::options())->map(fn ($opt) => [
+            'value' => $opt['value'],
+            'label' => $opt['label'],
+            'count' => $rows->where('status', $opt['value'])->count(),
+        ])->values();
+
+        $active = $rows->where('status', '!=', ProjectStatus::Completed->value)
+            ->map(fn ($row) => [
+                ...$row,
+                'href' => "/project-manager/projects/{$row['id']}",
+            ])
+            ->values();
+
+        return [
+            'total' => $rows->count(),
+            'completed' => $rows->where('status', ProjectStatus::Completed->value)->count(),
+            'by_status' => $byStatus,
+            'active_projects' => $active,
+        ];
     }
 
     /**
