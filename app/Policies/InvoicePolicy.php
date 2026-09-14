@@ -29,6 +29,19 @@ class InvoicePolicy
         return $this->isFinance($user);
     }
 
+    /**
+     * Edit baris invoice (nama, kategori, qty, harga, diskon, pajak), jatuh tempo & catatan.
+     * Phase (DP/Full/Final) tidak ikut berubah karena dipakai perhitungan invoice pelunasan lain.
+     * Dikunci begitu ada pembayaran tercatat, supaya tidak mismatch dengan uang yang sudah masuk.
+     */
+    public function update(User $user, Invoice $invoice): bool
+    {
+        return $this->isFinance($user)
+            && ! $invoice->isSurvey()
+            && $invoice->status !== InvoiceStatus::Cancelled->value
+            && ! $invoice->payments()->exists();
+    }
+
     public function send(User $user, Invoice $invoice): bool
     {
         return $this->isFinance($user)

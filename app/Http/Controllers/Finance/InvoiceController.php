@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Finance;
 
 use App\Actions\Finance\CreateFinalInvoice;
 use App\Actions\Finance\CreateInvoice;
+use App\Actions\Finance\UpdateInvoice;
 use App\Enums\InvoicePhase;
 use App\Enums\InvoiceStatus;
 use App\Enums\OrderType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Finance\StoreInvoiceRequest;
 use App\Http\Requests\Finance\UpdateInvoiceNumberRequest;
+use App\Http\Requests\Finance\UpdateInvoiceRequest;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\SalesOrder;
@@ -145,6 +147,30 @@ class InvoiceController extends Controller
             ->with('success', 'Invoice draft berhasil dibuat.');
     }
 
+    public function edit(Invoice $invoice): Response
+    {
+        Gate::authorize('update', $invoice);
+
+        $invoice->load(['lines.tax:id,name,rate', 'salesOrder:id,number,contact_id', 'salesOrder.contact:id,name,company_name']);
+
+        return Inertia::render('Finance/Invoices/Edit', [
+            'invoice' => $invoice,
+        ]);
+    }
+
+    public function update(UpdateInvoiceRequest $request, Invoice $invoice, UpdateInvoice $action): RedirectResponse
+    {
+        $action->handle(
+            $invoice,
+            $request->validated('due_date'),
+            $request->validated('notes'),
+            $request->validated('lines'),
+        );
+
+        return redirect()->route('finance.invoices.show', $invoice)
+            ->with('success', 'Invoice berhasil diperbarui.');
+    }
+
     public function storeFinal(SalesOrder $salesOrder, CreateFinalInvoice $action): RedirectResponse
     {
         Gate::authorize('create', Invoice::class);
@@ -222,6 +248,7 @@ class InvoiceController extends Controller
                     && $invoice->lines->contains('category', 'service'),
             ],
             'permissions' => [
+                'update' => request()->user()->can('update', $invoice),
                 'send' => request()->user()->can('send', $invoice),
                 'sendWhatsapp' => request()->user()->can('sendWhatsapp', $invoice),
                 'updateNumber' => request()->user()->can('updateNumber', $invoice),
