@@ -291,6 +291,14 @@ class InvoiceController extends Controller
             : 'Sales Order: '.$invoice->salesOrder?->number
                 .($invoice->salesOrder?->po_number ? ' · PO Customer: '.$invoice->salesOrder->po_number : '');
 
+        $dpPercent = (float) ($invoice->salesOrder?->dp_percent ?? 50);
+        $paymentPercentLabel = $invoice->isSurvey() ? null : match ($invoice->invoice_phase) {
+            'dp' => $this->formatPercent($dpPercent),
+            'final' => $this->formatPercent(100 - $dpPercent),
+            'full' => $this->formatPercent(100),
+            default => null,
+        };
+
         return [
             'invoice' => $invoice,
             'customer' => $customer,
@@ -306,6 +314,7 @@ class InvoiceController extends Controller
                 'pph23_amount' => (float) $invoice->pph23_amount,
                 'payable' => $invoice->payableAmount(),
             ],
+            'paymentPercentLabel' => $paymentPercentLabel,
             'pph23BuktiPotong' => $invoice->pph23_bukti_potong_no,
             'totalPaid' => (float) $invoice->payments->sum('amount_paid'),
             'settlement' => $this->settlementInfo($invoice),
@@ -337,8 +346,14 @@ class InvoiceController extends Controller
                     'Pelunasan 50% setelah BAST',
                     'Garansi 1 bulan',
                     'Tidak dapat dibatalkan',
+                    'Final Report akan diserahkan setelah pembayaran penuh (100%) diterima',
                 ],
         ];
+    }
+
+    private function formatPercent(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 2), '0'), '.').'%';
     }
 
     /**

@@ -141,7 +141,7 @@
                     @if ($customer?->address)<div class="muted">{{ $customer->address }}</div>@endif
                     @if ($customer?->npwp)<div class="muted">NPWP: {{ $customer->npwp }}</div>@endif
                 </td>
-                <td>
+                <td style="text-align:right">
                     <div class="label">Referensi</div>
                     <div>{{ $reference }}</div>
                     @if ($customer?->email)<div class="muted">{{ $customer->email }}</div>@endif
@@ -231,6 +231,9 @@
                             <tr class="grand"><td>Total Pembayaran</td><td class="num">{{ $rupiah($totals['payable']) }}</td></tr>
                         @else
                             <tr class="grand"><td>Total Pembayaran</td><td class="num">{{ $rupiah($totals['grand_total']) }}</td></tr>
+                        @endif
+                        @if ($paymentPercentLabel ?? null)
+                            <tr><td class="muted">DP/Pelunasan</td><td class="num">{{ $paymentPercentLabel }}</td></tr>
                         @endif
                         @if ($totalPaid > 0)
                             @php $sisa = ($totals['payable'] ?? $totals['grand_total']) - $totalPaid; @endphp
