@@ -60,9 +60,10 @@ class UpdateQuotation
 
                 $taxId = array_key_exists('tax_id', $input) ? $input['tax_id'] : $line->tax_id;
                 $taxRate = $input['tax_rate'] ?? ($taxId ? (float) ($taxRates[$taxId] ?? 0) : 0.0);
+                $qty = isset($input['qty']) && $input['qty'] !== '' ? (float) $input['qty'] : (float) $line->qty;
 
                 $priced = LinePricing::resolve(
-                    (float) $line->qty,
+                    $qty,
                     (float) $input['selling_price'],
                     (float) $line->cost_price,
                     isset($input['discount_percent']) ? (float) $input['discount_percent'] : null,
@@ -70,6 +71,12 @@ class UpdateQuotation
                 );
 
                 $line->update([
+                    'item_name' => ($input['item_name'] ?? '') !== '' ? $input['item_name'] : $line->item_name,
+                    'description' => array_key_exists('description', $input)
+                        ? ($input['description'] ?: null)
+                        : $line->description,
+                    'qty' => $qty,
+                    'unit' => ($input['unit'] ?? '') !== '' ? $input['unit'] : $line->unit,
                     'category' => in_array($input['category'] ?? null, ['material', 'service', 'reimburse'], true)
                         ? $input['category']
                         : $line->category,

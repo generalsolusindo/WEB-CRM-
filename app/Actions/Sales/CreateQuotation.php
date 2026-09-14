@@ -99,9 +99,10 @@ class CreateQuotation
     {
         $taxId = $input['tax_id'] ?? $source->tax_id;
         $taxRate = $input['tax_rate'] ?? ($taxId ? (float) ($taxRates[$taxId] ?? 0) : 0.0);
+        $qty = isset($input['qty']) && $input['qty'] !== '' ? (float) $input['qty'] : (float) $source->qty;
 
         $priced = LinePricing::resolve(
-            (float) $source->qty,
+            $qty,
             (float) $input['selling_price'],
             (float) $source->cost_price,
             isset($input['discount_percent']) ? (float) $input['discount_percent'] : null,
@@ -114,14 +115,16 @@ class CreateQuotation
 
         return [
             'procurement_request_line_id' => $source->id,
-            'item_name' => $source->item_name,
+            'item_name' => ($input['item_name'] ?? '') !== '' ? $input['item_name'] : $source->item_name,
             'category' => $category,
-            'description' => $source->description,
+            'description' => array_key_exists('description', $input)
+                ? ($input['description'] ?: null)
+                : $source->description,
             'sourcing_note' => array_key_exists('sourcing_note', $input)
                 ? ($input['sourcing_note'] ?: null)
                 : $source->sourcing_note,
-            'qty' => $source->qty,
-            'unit' => $source->unit,
+            'qty' => $qty,
+            'unit' => ($input['unit'] ?? '') !== '' ? $input['unit'] : $source->unit,
             'cost_price' => $source->cost_price,
             'selling_price' => $input['selling_price'],
             'discount_percent' => $priced['discount_percent'],

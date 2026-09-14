@@ -147,6 +147,55 @@ class QuotationLifecycleTest extends TestCase
         $this->assertSame('50.00', $quotation->lines()->first()->markup_percent);
     }
 
+    public function test_editing_can_change_item_name_qty_and_unit(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $line = $quotation->lines()->firstOrFail();
+
+        $this->actingAs($sales)
+            ->put("/sales/quotations/{$quotation->id}", [
+                'lines' => [
+                    [
+                        'procurement_request_line_id' => $line->procurement_request_line_id,
+                        'item_name' => 'Router Enterprise (revisi nama)',
+                        'qty' => 4,
+                        'unit' => 'unit',
+                        'selling_price' => 1300000,
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $fresh = $quotation->lines()->first()->fresh();
+        $this->assertSame('Router Enterprise (revisi nama)', $fresh->item_name);
+        $this->assertSame('4.00', $fresh->qty);
+        $this->assertSame('unit', $fresh->unit);
+        // subtotal harus ikut dihitung ulang pakai qty baru (4 x 1300000)
+        $this->assertSame('5200000.00', $fresh->subtotal);
+    }
+
+    public function test_editing_without_item_name_qty_unit_keeps_existing_values(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $line = $quotation->lines()->firstOrFail();
+        $originalName = $line->item_name;
+        $originalQty = $line->qty;
+        $originalUnit = $line->unit;
+
+        $this->actingAs($sales)
+            ->put("/sales/quotations/{$quotation->id}", [
+                'lines' => [
+                    ['procurement_request_line_id' => $line->procurement_request_line_id, 'selling_price' => 1400000],
+                ],
+            ])
+            ->assertRedirect();
+
+        $fresh = $line->fresh();
+        $this->assertSame($originalName, $fresh->item_name);
+        $this->assertSame($originalQty, $fresh->qty);
+        $this->assertSame($originalUnit, $fresh->unit);
+    }
+
     public function test_sent_quotation_can_still_be_updated_but_resets_to_draft_and_clears_review(): void
     {
         [$sales, $quotation] = $this->draftQuotation();

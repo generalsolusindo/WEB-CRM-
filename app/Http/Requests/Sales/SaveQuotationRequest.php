@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Sales;
 
 use App\Models\Quotation;
+use App\Models\Requirement;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -36,6 +37,10 @@ class SaveQuotationRequest extends FormRequest
             'agreed_dpp' => ['nullable', 'numeric', 'min:0', 'decimal:0,2'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.procurement_request_line_id' => ['required', 'integer', 'distinct'],
+            'lines.*.item_name' => ['nullable', 'string', 'max:255'],
+            'lines.*.description' => ['nullable', 'string'],
+            'lines.*.qty' => ['nullable', 'numeric', 'min:0.01'],
+            'lines.*.unit' => ['nullable', 'string', Rule::in(Requirement::UNITS)],
             'lines.*.category' => ['nullable', Rule::in(['material', 'service', 'reimburse'])],
             'lines.*.sourcing_note' => ['nullable', 'string', 'max:2000'],
             'lines.*.selling_price' => ['required', 'numeric', 'min:0', 'decimal:0,2'],

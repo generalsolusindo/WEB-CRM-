@@ -19,6 +19,10 @@ function initialLine(line, taxes) {
     else if (rate != null && rate > 0) taxMode = 'custom';
     return {
         procurement_request_line_id: line.procurement_request_line_id ?? line.id,
+        item_name: line.item_name ?? '',
+        description: line.description ?? '',
+        qty: String(line.qty ?? ''),
+        unit: line.unit ?? '',
         category: line.category ?? line.vendor_product?.category ?? 'material',
         sourcing_note: line.sourcing_note ?? '',
         selling_price: line.selling_price ?? suggestedPrice(line.cost_price),
@@ -31,7 +35,7 @@ function initialLine(line, taxes) {
     };
 }
 
-export default function Form({ procurementRequest = null, quotation = null, taxes = [], defaultTerms = '' }) {
+export default function Form({ procurementRequest = null, quotation = null, taxes = [], defaultTerms = '', unitOptions = [] }) {
     const editing = Boolean(quotation);
     const sourceLines = editing ? quotation.lines : procurementRequest.lines;
     const customer = editing ? quotation.contact : procurementRequest.lead.contact;
@@ -53,6 +57,10 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
         agreed_dpp: payload.agreed_dpp === '' ? null : Number(payload.agreed_dpp),
         lines: payload.lines.map((l) => ({
             procurement_request_line_id: l.procurement_request_line_id,
+            item_name: l.item_name,
+            description: l.description,
+            qty: l.qty,
+            unit: l.unit,
             category: l.category,
             sourcing_note: l.sourcing_note,
             selling_price: l.selling_price,
@@ -67,7 +75,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
         setData('lines', data.lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
     }
 
-    const grossAll = r2(sourceLines.reduce((s, line, i) => s + Number(line.qty) * Number(data.lines[i].selling_price || 0), 0));
+    const grossAll = r2(sourceLines.reduce((s, line, i) => s + Number(data.lines[i].qty || 0) * Number(data.lines[i].selling_price || 0), 0));
     const agreedDpp = data.agreed_dpp !== '' ? Number(data.agreed_dpp) : null;
     const agreedFactor = agreedDpp != null && agreedDpp > 0 && grossAll > 0
         ? Math.min(agreedDpp, grossAll) / grossAll
@@ -75,7 +83,8 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
 
     function calc(line, i) {
         const d = data.lines[i];
-        const gross = r2(Number(line.qty) * Number(d.selling_price || 0));
+        const qty = Number(d.qty || 0);
+        const gross = r2(qty * Number(d.selling_price || 0));
         let discount = 0;
         if (agreedFactor != null) {
             discount = r2(gross - r2(gross * agreedFactor));
@@ -84,7 +93,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
         const dpp = r2(gross - discount);
         const tax = r2(dpp * Number(d.tax_rate || 0) / 100);
         const cost = Number(line.cost_price);
-        const totalCost = r2(Number(line.qty) * cost);
+        const totalCost = r2(qty * cost);
         return {
             gross, discount, dpp, tax,
             markup: cost > 0 ? ((Number(d.selling_price || 0) - cost) / cost) * 100 : null,
@@ -93,7 +102,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
     }
 
     function onDiscountPercent(i, line, value) {
-        const gross = r2(Number(line.qty) * Number(data.lines[i].selling_price || 0));
+        const gross = r2(Number(data.lines[i].qty || 0) * Number(data.lines[i].selling_price || 0));
         setLine(i, {
             discount_mode: 'percent',
             discount_percent: value,
@@ -101,7 +110,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
         });
     }
     function onDiscountAmount(i, line, value) {
-        const gross = r2(Number(line.qty) * Number(data.lines[i].selling_price || 0));
+        const gross = r2(Number(data.lines[i].qty || 0) * Number(data.lines[i].selling_price || 0));
         setLine(i, {
             discount_mode: 'amount',
             discount_amount: value,
@@ -118,7 +127,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
     const totals = sourceLines.reduce((acc, line, i) => {
         const c = calc(line, i);
         acc.gross += c.gross; acc.discount += c.discount; acc.dpp += c.dpp; acc.tax += c.tax;
-        acc.cost += r2(Number(line.qty) * Number(line.cost_price));
+        acc.cost += r2(Number(data.lines[i].qty || 0) * Number(line.cost_price));
         if (data.lines[i].category === 'service') acc.serviceDpp += c.dpp;
         return acc;
     }, { gross: 0, discount: 0, dpp: 0, tax: 0, cost: 0, serviceDpp: 0 });
@@ -183,7 +192,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                     <section className="card overflow-hidden p-0">
                         <div className="border-b border-border p-5">
                             <h2 className="font-semibold text-text">Line Items</h2>
-                            <p className="text-sm text-text-muted">Item, qty & cost dari Procurement. Isi selling price, diskon (% atau Rp), dan pajak per baris.</p>
+                            <p className="text-sm text-text-muted">Nama item, deskripsi, qty & unit bisa diubah bebas. Cost tetap mengikuti data Procurement.</p>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
@@ -215,8 +224,18 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                             )}
                                             <tr>
                                                 <td className="px-3 py-3">
-                                                    <div className="font-medium text-text">{line.item_name}</div>
-                                                    <div className="whitespace-pre-line text-xs text-text-muted">{line.description || '—'}</div>
+                                                    <input
+                                                        type="text" value={data.lines[i].item_name}
+                                                        onChange={(e) => setLine(i, { item_name: e.target.value })}
+                                                        className="w-full rounded border border-border px-1.5 py-1 text-sm font-medium text-text"
+                                                    />
+                                                    {errors[`lines.${i}.item_name`] && <span className="text-xs text-danger">{errors[`lines.${i}.item_name`]}</span>}
+                                                    <textarea
+                                                        rows="2" value={data.lines[i].description}
+                                                        onChange={(e) => setLine(i, { description: e.target.value })}
+                                                        placeholder="Deskripsi (opsional, bisa multi-baris)"
+                                                        className="mt-1 w-full rounded border border-border px-1.5 py-1 text-xs text-text-muted"
+                                                    />
                                                     <select value={data.lines[i].category} onChange={(e) => setLine(i, { category: e.target.value })} className="mt-1 rounded border border-border px-1 py-0.5 text-[11px]">
                                                         <option value="material">Material</option>
                                                         <option value="service">Jasa</option>
@@ -229,7 +248,25 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                                         <span className={c.margin != null && c.margin < 0 ? 'text-danger' : 'text-success'}>Margin efektif {c.margin == null ? '—' : `${c.margin.toFixed(1)}%`}</span>
                                                     </div>
                                                 </td>
-                                                <td className="whitespace-nowrap px-3 py-3 text-text-muted">{line.qty} {line.unit}</td>
+                                                <td className="min-w-24 px-3 py-3">
+                                                    <input
+                                                        type="number" min="0.01" step="0.01" value={data.lines[i].qty}
+                                                        onChange={(e) => setLine(i, { qty: e.target.value })}
+                                                        className="w-full rounded border border-border px-1.5 py-1 text-right text-xs"
+                                                    />
+                                                    <select
+                                                        value={data.lines[i].unit}
+                                                        onChange={(e) => setLine(i, { unit: e.target.value })}
+                                                        className="mt-1 w-full rounded border border-border px-1 py-1 text-[11px]"
+                                                    >
+                                                        <option value="">— unit —</option>
+                                                        {unitOptions.map((u) => <option key={u} value={u}>{u}</option>)}
+                                                        {data.lines[i].unit && !unitOptions.includes(data.lines[i].unit) && (
+                                                            <option value={data.lines[i].unit}>{data.lines[i].unit} (lama)</option>
+                                                        )}
+                                                    </select>
+                                                    {errors[`lines.${i}.qty`] && <span className="text-xs text-danger">{errors[`lines.${i}.qty`]}</span>}
+                                                </td>
                                                 <td className="px-3 py-3 text-right text-text-muted">{money(line.cost_price)}</td>
                                                 <td className="min-w-36 px-3 py-3">
                                                     <CurrencyInput value={data.lines[i].selling_price} onChange={(e) => setLine(i, { selling_price: e.target.value })} className="w-full rounded-lg border border-border px-2 py-1.5 text-right outline-none focus:border-navy" />

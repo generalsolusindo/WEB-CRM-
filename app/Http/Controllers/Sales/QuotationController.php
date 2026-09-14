@@ -77,6 +77,7 @@ class QuotationController extends Controller
             'procurementRequest' => $procurementRequest,
             'taxes' => $this->activeTaxes(),
             'defaultTerms' => \App\Support\QuotationDefaults::terms(),
+            'unitOptions' => \App\Models\Requirement::UNITS,
         ]);
     }
 
@@ -143,6 +144,7 @@ class QuotationController extends Controller
         return Inertia::render('Sales/Quotations/Form', [
             'quotation' => $quotation,
             'taxes' => $this->activeTaxes(),
+            'unitOptions' => \App\Models\Requirement::UNITS,
         ]);
     }
 
