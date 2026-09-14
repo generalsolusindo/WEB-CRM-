@@ -2,6 +2,7 @@
 
 namespace App\Actions\Sales;
 
+use App\Enums\QuotationStatus;
 use App\Models\Notification;
 use App\Models\Quotation;
 use App\Models\Tax;
@@ -18,8 +19,12 @@ class UpdateQuotation
         return DB::transaction(function () use ($quotation, $data) {
             $locked = Quotation::query()->with(['lines', 'lead.delegatedTo'])->whereKey($quotation->id)->lockForUpdate()->firstOrFail();
 
-            if ($locked->status !== 'draft') {
-                throw ValidationException::withMessages(['quotation' => 'Hanya quotation Draft yang dapat diubah.']);
+            if ($locked->salesOrder()->exists()) {
+                throw ValidationException::withMessages(['quotation' => 'Quotation yang sudah menjadi Sales Order tidak dapat diubah.']);
+            }
+
+            if ($locked->revisions()->exists()) {
+                throw ValidationException::withMessages(['quotation' => 'Quotation ini sudah punya revisi yang lebih baru, tidak dapat diubah lagi.']);
             }
 
             $byId = collect($data['lines'])->keyBy(fn (array $line) => (int) $line['procurement_request_line_id']);
@@ -30,6 +35,9 @@ class UpdateQuotation
             }
 
             $locked->update([
+                // Angka berubah -> kembali ke Draft supaya wajib direview & dikirim ulang
+                // ke customer, apa pun status sebelumnya (Sent/Rejected).
+                'status' => QuotationStatus::Draft->value,
                 'notes' => $data['notes'] ?? null,
                 'terms' => $data['terms'] ?? null,
                 'agreed_dpp' => isset($data['agreed_dpp']) && $data['agreed_dpp'] !== null && $data['agreed_dpp'] !== ''

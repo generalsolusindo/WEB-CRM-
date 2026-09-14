@@ -144,6 +144,11 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                 />
 
                 <form onSubmit={submit} className="space-y-5">
+                    {editing && quotation.status !== 'draft' && (
+                        <div className="rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm font-medium text-warning">
+                            Quotation ini berstatus {quotation.status === 'sent' ? 'Terkirim' : 'Ditolak'}. Menyimpan perubahan akan mengembalikan status ke Draft dan approval PM/Manager perlu diulang dari awal.
+                        </div>
+                    )}
                     {errors.procurement_request && <Alert text={errors.procurement_request} />}
                     {errors.quotation && <Alert text={errors.quotation} />}
                     {errors.lines && <Alert text={errors.lines} />}

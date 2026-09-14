@@ -130,7 +130,7 @@ class QuotationLifecycleTest extends TestCase
         $this->assertDatabaseCount('quotations', 0);
     }
 
-    public function test_only_draft_quotation_can_be_updated(): void
+    public function test_draft_quotation_can_be_updated(): void
     {
         [$sales, $quotation] = $this->draftQuotation();
         $line = $quotation->lines()->firstOrFail();
@@ -145,13 +145,59 @@ class QuotationLifecycleTest extends TestCase
 
         $this->assertSame('1500000.00', $quotation->lines()->first()->selling_price);
         $this->assertSame('50.00', $quotation->lines()->first()->markup_percent);
+    }
 
-        $quotation->update(['status' => 'sent']);
+    public function test_sent_quotation_can_still_be_updated_but_resets_to_draft_and_clears_review(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $line = $quotation->lines()->firstOrFail();
+        $quotation->update([
+            'status' => 'sent',
+            'pm_review_status' => 'approved',
+            'manager_review_status' => 'approved',
+        ]);
 
         $this->actingAs($sales)
             ->put("/sales/quotations/{$quotation->id}", [
                 'lines' => [
                     ['procurement_request_line_id' => $line->procurement_request_line_id, 'selling_price' => 1600000],
+                ],
+            ])
+            ->assertRedirect();
+
+        $quotation->refresh();
+        $this->assertSame('draft', $quotation->status);
+        $this->assertNull($quotation->pm_review_status);
+        $this->assertNull($quotation->manager_review_status);
+        $this->assertSame('1600000.00', $quotation->lines()->first()->selling_price);
+    }
+
+    public function test_quotation_that_already_became_a_sales_order_cannot_be_updated(): void
+    {
+        [$sales, $salesOrder] = $this->confirmedSalesOrder('material_only');
+        $quotation = $salesOrder->quotation;
+        $line = $quotation->lines()->firstOrFail();
+
+        $this->actingAs($sales)
+            ->put("/sales/quotations/{$quotation->id}", [
+                'lines' => [
+                    ['procurement_request_line_id' => $line->procurement_request_line_id, 'selling_price' => 1700000],
+                ],
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_quotation_with_a_newer_revision_cannot_be_updated(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $line = $quotation->lines()->firstOrFail();
+        $quotation->update(['status' => 'sent']);
+        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/revisions");
+
+        $this->actingAs($sales)
+            ->put("/sales/quotations/{$quotation->id}", [
+                'lines' => [
+                    ['procurement_request_line_id' => $line->procurement_request_line_id, 'selling_price' => 1700000],
                 ],
             ])
             ->assertForbidden();

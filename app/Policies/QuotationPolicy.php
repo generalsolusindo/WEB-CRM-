@@ -30,10 +30,16 @@ class QuotationPolicy
             && $procurementRequest->lead()->where('sales_id', $user->id)->exists();
     }
 
+    /**
+     * Bisa diedit di status apa saja (Draft/Sent/Rejected), selama belum jadi Sales Order
+     * dan belum punya revisi yang lebih baru. Edit mereset approval PM/Manager dan status
+     * kembali ke Draft karena angkanya berubah dan perlu direview & dikirim ulang.
+     */
     public function update(User $user, Quotation $quotation): bool
     {
         return $this->owns($user, $quotation)
-            && $quotation->status === QuotationStatus::Draft->value;
+            && ! $quotation->salesOrder()->exists()
+            && ! $quotation->revisions()->exists();
     }
 
     /** Ubah nomor quotation secara manual (mis. menyambung dari sistem lama) — bisa di status apa saja. */
@@ -42,9 +48,11 @@ class QuotationPolicy
         return $this->owns($user, $quotation);
     }
 
+    /** Hapus tetap hanya untuk Draft (beda dari update() yang sekarang lebih longgar). */
     public function delete(User $user, Quotation $quotation): bool
     {
-        return $this->update($user, $quotation)
+        return $this->owns($user, $quotation)
+            && $quotation->status === QuotationStatus::Draft->value
             && ! $quotation->revisions()->exists()
             && ! $quotation->salesOrder()->exists();
     }
