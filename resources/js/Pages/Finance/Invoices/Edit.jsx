@@ -75,6 +75,11 @@ export default function Edit({ invoice }) {
                 <div className="rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm font-medium text-warning">
                     Menyimpan perubahan akan mengembalikan status invoice ke Draft — perlu dikirim ulang ke customer. Phase invoice ({invoice.invoice_phase}) tidak bisa diubah di sini.
                 </div>
+                {invoice.whatsapp_sent_at && (
+                    <div className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">
+                        Invoice ini sudah pernah dikirim via WhatsApp ({new Date(invoice.whatsapp_sent_at).toLocaleString('id-ID')}) dengan total tagihan yang lama tertulis di teks pesan. Setelah menyimpan perubahan ini, <strong>kirim ulang via WhatsApp</strong> supaya customer tidak pegang total yang sudah tidak sesuai.
+                    </div>
+                )}
                 {errors.invoice && <Alert text={errors.invoice} />}
 
                 <form onSubmit={submit} className="space-y-5">

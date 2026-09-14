@@ -279,7 +279,7 @@ class InvoiceController extends Controller
     public function downloadPdf(Invoice $invoice): \Illuminate\Http\Response
     {
         return \Barryvdh\DomPDF\Facade\Pdf::loadView('finance.invoices.print', $this->printData($invoice, forPdf: true))
-            ->download($this->pdfFilename($invoice));
+            ->stream($this->pdfFilename($invoice));
     }
 
     private function pdfFilename(Invoice $invoice): string

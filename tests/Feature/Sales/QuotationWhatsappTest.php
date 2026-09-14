@@ -102,6 +102,8 @@ class QuotationWhatsappTest extends TestCase
         $ok = $this->get($signed);
         $ok->assertOk();
         $this->assertSame('application/pdf', $ok->headers->get('content-type'));
+        // Harus tampil inline di browser customer, bukan dipaksa download.
+        $this->assertStringStartsWith('inline', $ok->headers->get('content-disposition'));
     }
 
     public function test_quotation_pdf_endpoint_is_owner_only(): void

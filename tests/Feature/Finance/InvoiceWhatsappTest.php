@@ -87,6 +87,8 @@ class InvoiceWhatsappTest extends TestCase
         $ok = $this->get($signed);
         $ok->assertOk();
         $this->assertSame('application/pdf', $ok->headers->get('content-type'));
+        // Harus tampil inline di browser customer, bukan dipaksa download (lihat fix serupa di Quotation).
+        $this->assertStringStartsWith('inline', $ok->headers->get('content-disposition'));
     }
 
     public function test_finance_pdf_endpoint_is_finance_only(): void
