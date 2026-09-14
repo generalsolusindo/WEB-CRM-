@@ -23,10 +23,15 @@
     // Kolom: No | Deskripsi | Qty | Satuan | Harga Satuan | [Diskon] | [Pajak] | Amount
     $cols = 6 + ($showLineDiscount ? 1 : 0) + ($hasTax ? 1 : 0);
 
-    // Base64 supaya logo tetap tampil saat dirender DomPDF (tidak bisa fetch URL remote).
+    // Base64 supaya logo & stempel tetap tampil saat dirender DomPDF (tidak bisa fetch URL remote).
     $logoPath = public_path('images/logo-gs.png');
     $logoSrc = is_file($logoPath)
         ? 'data:image/png;base64,'.base64_encode(file_get_contents($logoPath))
+        : null;
+
+    $stampPath = public_path('images/stempel-invoice.png');
+    $stampSrc = is_file($stampPath)
+        ? 'data:image/png;base64,'.base64_encode(file_get_contents($stampPath))
         : null;
 @endphp
 <!DOCTYPE html>
@@ -82,9 +87,12 @@
 
         .tc { margin-top: 14px; font-size: 10px; }
         .tc li { margin-left: 16px; }
-        .sign { margin-top: 26px; width: 240px; }
-        .sign .space { height: 54px; }
+        .sign { margin-top: 26px; width: 100%; }
+        .sign td { text-align: right; }
+        .sign .box { display: inline-block; width: 240px; text-align: center; }
+        .sign .stamp { height: 90px; margin: 4px 0; }
         .sign .name { border-top: 1px solid #111827; padding-top: 3px; font-weight: 700; }
+        .thanks { margin-top: 22px; text-align: center; font-size: 12px; font-weight: 700; color: #111827; }
         .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
         .badge.paid { background: #dcfce7; color: #166534; }
         .badge.unpaid { background: #fef9c3; color: #854d0e; }
@@ -209,13 +217,6 @@
                     <ul style="margin:0; padding-left:16px">
                         @foreach ($terms as $t)<li>{{ $t }}</li>@endforeach
                     </ul>
-
-                    @if ($invoice->payments->isNotEmpty())
-                        <div class="label" style="margin-top:12px">Riwayat Pembayaran</div>
-                        @foreach ($invoice->payments as $payment)
-                            <div>{{ \Illuminate\Support\Carbon::parse($payment->paid_at)->format('d M Y H:i') }} — {{ $rupiah($payment->amount_paid) }}{{ $payment->notes ? ' ('.$payment->notes.')' : '' }}</div>
-                        @endforeach
-                    @endif
                 </td>
                 <td class="sum">
                     <table>
@@ -256,11 +257,19 @@
         </table>
 
         <table class="sign"><tr><td>
-            <div class="muted">Hormat kami,</div>
-            <div>{{ $company['name'] }}</div>
-            <div class="space"></div>
-            <div class="name">{{ $preparedBy ?? '' }}</div>
+            <div class="box">
+                <div class="muted">Hormat kami,</div>
+                <div>{{ $company['name'] }}</div>
+                @if ($stampSrc)
+                    <img src="{{ $stampSrc }}" alt="Stempel {{ $company['name'] }}" class="stamp">
+                @else
+                    <div class="space"></div>
+                @endif
+                <div class="name">{{ $preparedBy ?? '' }}</div>
+            </div>
         </td></tr></table>
+
+        <div class="thanks">THANK YOU FOR YOUR BUSINESS!</div>
     </div>
 </body>
 </html>
