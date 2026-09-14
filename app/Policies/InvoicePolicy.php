@@ -10,7 +10,7 @@ class InvoicePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $this->isFinance($user);
+        return $this->isFinance($user) || $this->isManagement($user);
     }
 
     public function view(User $user, Invoice $invoice): bool
@@ -89,5 +89,11 @@ class InvoicePolicy
     private function isFinance(User $user): bool
     {
         return $user->role === 'finance' && $user->is_active;
+    }
+
+    /** Management cuma boleh lihat daftar (monitoring read-only), tidak bisa buka detail/aksi. */
+    private function isManagement(User $user): bool
+    {
+        return $user->role === 'management' && $user->is_active;
     }
 }

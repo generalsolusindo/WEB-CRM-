@@ -104,6 +104,12 @@ Route::middleware('auth')->group(function () {
         Route::get('sows', [ManagementSowController::class, 'index'])->name('sows.index');
         Route::get('sows/{sow}', [ManagementSowController::class, 'show'])->name('sows.show');
         Route::post('sows/{sow}/sign', [ManagementSowController::class, 'sign'])->name('sows.sign');
+        Route::get('procurement-requests', [\App\Http\Controllers\Management\ProcurementRequestController::class, 'index'])
+            ->name('procurement-requests.index');
+        Route::get('invoices', [\App\Http\Controllers\Management\InvoiceController::class, 'index'])
+            ->name('invoices.index');
+        Route::get('surveys', [\App\Http\Controllers\Management\SurveyController::class, 'index'])
+            ->name('surveys.index');
     });
 
     Route::prefix('project-manager')->name('project-manager.')->middleware('role:project_manager')->group(function () {

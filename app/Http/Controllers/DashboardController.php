@@ -110,6 +110,7 @@ class DashboardController extends Controller
 
         $leadCounts = $countByStatus(Lead::class, 'stage');
         $leadsByStage = collect(LeadStage::options())->map(fn ($o) => [
+            'value' => $o['value'],
             'label' => $o['label'],
             'count' => (int) ($leadCounts[$o['value']] ?? 0),
         ])->values();
@@ -122,6 +123,7 @@ class DashboardController extends Controller
 
         $prCounts = $countByStatus(ProcurementRequest::class);
         $prByStatus = collect(ProcurementRequestStatus::options())->map(fn ($o) => [
+            'value' => $o['value'],
             'label' => $o['label'],
             'count' => (int) ($prCounts[$o['value']] ?? 0),
         ])->values();
@@ -140,6 +142,7 @@ class DashboardController extends Controller
 
         $projectCounts = $countByStatus(Project::class);
         $projectsByStatus = collect(ProjectStatus::options())->map(fn ($o) => [
+            'value' => $o['value'],
             'label' => $o['label'],
             'count' => (int) ($projectCounts[$o['value']] ?? 0),
         ])->values();
@@ -156,6 +159,7 @@ class DashboardController extends Controller
         $surveysByStatus = collect(SurveyStatus::options())
             ->filter(fn ($o) => ! in_array($o['value'], ['closed', 'cancelled'], true))
             ->map(fn ($o) => [
+                'value' => $o['value'],
                 'label' => $o['label'],
                 'count' => (int) ($surveyCounts[$o['value']] ?? 0),
             ])->values();

@@ -723,7 +723,7 @@ function ManagementOverview({ data, menuBadges = {} }) {
                     <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
                         {total > 0 ? `${total} hal butuh tindak lanjut` : 'Semua sudah tertangani 🎉'}
                     </h1>
-                    <p className="mt-1 text-sm text-white/70">Ringkasan monitoring lintas-departemen, read-only.</p>
+                    <p className="mt-1 text-sm text-white/70">Ringkasan monitoring lintas-departemen — klik kartu mana pun untuk lihat detail lengkapnya.</p>
                 </div>
                 {total > 0 && (
                     <div className="flex gap-2">
@@ -740,59 +740,87 @@ function ManagementOverview({ data, menuBadges = {} }) {
                     </div>
                 )}
             </section>
-            <StatSection title="Sales">
-                <StatGrid items={data.sales.leads_by_stage} />
+
+            <StatSection title="Sales" href="/management/opportunities">
+                <StatGrid items={data.sales.leads_by_stage} hrefFor={(item) => `/management/opportunities?stage=${item.value}`} />
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <Stat label="Quotation Terbuka (Draft/Sent)" value={data.sales.open_quotations} />
-                    <Stat label="Nilai Pipeline (Quotation Terbuka)" value={money(data.sales.pipeline_value)} />
+                    <Stat label="Quotation Terbuka (Draft/Sent)" value={data.sales.open_quotations} href="/management/quotations" />
+                    <Stat label="Nilai Pipeline (Quotation Terbuka)" value={money(data.sales.pipeline_value)} href="/management/quotations" />
                 </div>
             </StatSection>
-            <StatSection title="Procurement"><StatGrid items={data.procurement.by_status} /></StatSection>
-            <StatSection title="Finance">
+
+            <StatSection title="Procurement" href="/management/procurement-requests">
+                <StatGrid items={data.procurement.by_status} hrefFor={(item) => `/management/procurement-requests?status=${item.value}`} />
+            </StatSection>
+
+            <StatSection title="Finance" href="/management/invoices">
                 <div className="grid gap-3 sm:grid-cols-2">
-                    <Stat label="Total Piutang Belum Lunas" value={money(data.finance.outstanding_total)} warn={data.finance.outstanding_total > 0} />
-                    <Stat label="Invoice Jatuh Tempo" value={data.finance.overdue_count} warn={data.finance.overdue_count > 0} />
+                    <Stat label="Total Piutang Belum Lunas" value={money(data.finance.outstanding_total)} warn={data.finance.outstanding_total > 0} href="/management/invoices" />
+                    <Stat label="Invoice Jatuh Tempo" value={data.finance.overdue_count} warn={data.finance.overdue_count > 0} href="/management/invoices?status=overdue" />
                 </div>
             </StatSection>
-            <StatSection title="Operational — Project">
-                <StatGrid items={data.operational.projects_by_status} />
+
+            <StatSection title="Operational — Project" href="/management/projects">
+                <StatGrid items={data.operational.projects_by_status} hrefFor={(item) => `/management/projects?status=${item.value}`} />
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <Stat label="Task Telat (belum selesai, lewat jadwal)" value={data.operational.tasks_overdue} warn={data.operational.tasks_overdue > 0} />
-                    <Stat label="BAST Menunggu Verifikasi" value={data.operational.bast_pending} warn={data.operational.bast_pending > 0} />
+                    <Stat label="Task Telat (belum selesai, lewat jadwal)" value={data.operational.tasks_overdue} warn={data.operational.tasks_overdue > 0} href="/management/projects" />
+                    <Stat label="BAST Menunggu Verifikasi" value={data.operational.bast_pending} warn={data.operational.bast_pending > 0} href="/management/projects" />
                 </div>
             </StatSection>
-            <StatSection title="Survey"><StatGrid items={data.survey.by_status} /></StatSection>
+
+            <StatSection title="Survey" href="/management/surveys">
+                <StatGrid items={data.survey.by_status} hrefFor={(item) => `/management/surveys?status=${item.value}`} />
+            </StatSection>
         </div>
     );
 }
 
-function StatSection({ title, children }) {
+function StatSection({ title, href, children }) {
     return (
         <div className="card p-5">
-            <h3 className="mb-3 text-sm font-bold tracking-tight text-text">{title}</h3>
+            <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-bold tracking-tight text-text">{title}</h3>
+                {href && (
+                    <Link href={href} className="flex items-center gap-1 text-xs font-semibold text-primary transition hover:underline">
+                        Lihat semua <FiArrowRight className="h-3 w-3" />
+                    </Link>
+                )}
+            </div>
             {children}
         </div>
     );
 }
 
-function StatGrid({ items }) {
+function StatGrid({ items, hrefFor }) {
     return (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {items.map((item, i) => (
-                <div key={i} className="rounded-xl bg-bg px-3 py-2.5">
-                    <div className="text-lg font-bold text-text">{item.count}</div>
-                    <div className="text-xs text-text-muted">{item.label}</div>
-                </div>
-            ))}
+            {items.map((item, i) => {
+                const href = hrefFor ? hrefFor(item) : null;
+                const Tag = href ? Link : 'div';
+                return (
+                    <Tag
+                        key={i}
+                        {...(href ? { href } : {})}
+                        className={`rounded-xl bg-bg px-3 py-2.5 ${href ? 'block transition hover:bg-primary-soft hover:shadow-sm' : ''}`}
+                    >
+                        <div className="text-lg font-bold text-text">{item.count}</div>
+                        <div className="text-xs text-text-muted">{item.label}</div>
+                    </Tag>
+                );
+            })}
         </div>
     );
 }
 
-function Stat({ label, value, warn = false }) {
+function Stat({ label, value, warn = false, href }) {
+    const Tag = href ? Link : 'div';
     return (
-        <div className="rounded-xl bg-bg px-3 py-2.5">
+        <Tag
+            {...(href ? { href } : {})}
+            className={`rounded-xl bg-bg px-3 py-2.5 ${href ? 'block transition hover:bg-primary-soft hover:shadow-sm' : ''}`}
+        >
             <div className={`text-lg font-bold ${warn ? 'text-danger' : 'text-text'}`}>{value}</div>
             <div className="text-xs text-text-muted">{label}</div>
-        </div>
+        </Tag>
     );
 }

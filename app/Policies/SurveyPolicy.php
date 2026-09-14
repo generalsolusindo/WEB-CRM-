@@ -27,6 +27,12 @@ class SurveyPolicy
         return $user->role === 'finance' && $user->is_active;
     }
 
+    /** Monitoring read-only Management — cuma daftar, tidak ada aksi/detail. */
+    public function viewAnyManagement(User $user): bool
+    {
+        return $user->role === 'management' && $user->is_active;
+    }
+
     public function viewFinance(User $user, Survey $survey): bool
     {
         return $user->role === 'finance' && $user->is_active;

@@ -10,7 +10,7 @@ class ProcurementRequestPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $this->isProcurement($user);
+        return $this->isProcurement($user) || $this->isManagement($user);
     }
 
     public function view(User $user, ProcurementRequest $procurementRequest): bool
@@ -45,5 +45,11 @@ class ProcurementRequestPolicy
     private function isProcurement(User $user): bool
     {
         return $user->role === 'procurement' && $user->is_active;
+    }
+
+    /** Management cuma boleh lihat daftar (monitoring read-only), tidak bisa buka detail/aksi. */
+    private function isManagement(User $user): bool
+    {
+        return $user->role === 'management' && $user->is_active;
     }
 }
