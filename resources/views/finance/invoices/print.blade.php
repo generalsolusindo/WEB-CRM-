@@ -38,13 +38,29 @@
 <html lang="id">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $invoice->number }}</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'DejaVu Sans', Arial, sans-serif; color: #111827; font-size: 11px; background: {{ $forPdf ? '#fff' : '#f1f5f9' }}; }
         .sheet { background: #fff; {{ $forPdf ? 'padding: 16mm 18mm;' : 'width: 210mm; min-height: 297mm; margin: 12px auto; padding: 20mm;' }} }
+        .grid-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .toolbar { width: 210mm; margin: 12px auto 0; text-align: right; }
         .toolbar button { padding: 8px 16px; border: 0; border-radius: 6px; background: #001B3A; color: #fff; font-size: 12px; cursor: pointer; }
+        @if (! $forPdf)
+            @media (max-width: 210mm) {
+                .toolbar { width: auto; margin: 12px 12px 0; }
+                .sheet { width: auto; min-height: 0; margin: 12px; padding: 5mm; }
+                .grid-scroll .items { min-width: 680px; }
+                .top td { display: block !important; width: 100% !important; }
+                .doc-title, .doc-sub, .meta { text-align: left; }
+                .meta div { white-space: normal; }
+                .meta .k { width: auto; margin-right: 6px; }
+                .meta .v { min-width: 0; }
+                .bill td { display: block !important; width: 100% !important; }
+                .bill td:last-child { margin-top: 10px; }
+            }
+        @endif
         table { border-collapse: collapse; width: 100%; }
         td, th { vertical-align: top; }
 
@@ -175,6 +191,7 @@
             </tr>
         </table>
 
+        <div class="grid-scroll">
         <table class="items">
             <thead>
                 <tr>
@@ -205,6 +222,7 @@
                 @endif
             </tbody>
         </table>
+        </div>
 
         <table class="foot">
             <tr>

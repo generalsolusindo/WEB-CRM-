@@ -33,13 +33,22 @@
 <html lang="id">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Quotation {{ $number }}</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Inter', Arial, sans-serif; color: #1E293B; font-size: 11px; background: {{ $forPdf ? '#fff' : '#f1f5f9' }}; }
         .sheet { background: #fff; {{ $forPdf ? 'padding: 15mm 16mm;' : 'width: 210mm; min-height: 297mm; margin: 12px auto; padding: 15mm 16mm;' }} }
+        .grid-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .toolbar { width: 210mm; margin: 12px auto 0; text-align: right; }
         .toolbar button { padding: 8px 16px; border: 0; border-radius: 6px; background: #001B3A; color: #fff; font-size: 12px; cursor: pointer; }
+        @if (! $forPdf)
+            @media (max-width: 210mm) {
+                .toolbar { width: auto; margin: 12px 12px 0; }
+                .sheet { width: auto; min-height: 0; margin: 12px; padding: 5mm; }
+                .grid-scroll table.grid { min-width: 680px; }
+            }
+        @endif
 
         table.layout { width: 100%; border-collapse: collapse; }
         table.layout td { vertical-align: top; border: none; padding: 0; }
@@ -154,6 +163,7 @@
             </tr>
         </table>
 
+        <div class="grid-scroll">
         <table class="grid strip">
             <thead>
                 <tr>
@@ -169,7 +179,9 @@
                 </tr>
             </tbody>
         </table>
+        </div>
 
+        <div class="grid-scroll">
         <table class="grid items">
             <thead>
                 <tr>
@@ -201,6 +213,7 @@
                 @endforeach
             </tbody>
         </table>
+        </div>
 
         <table class="layout summary-table">
             <tr>
