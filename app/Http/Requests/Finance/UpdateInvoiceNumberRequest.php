@@ -17,7 +17,7 @@ class UpdateInvoiceNumberRequest extends FormRequest
     {
         return [
             'number' => [
-                'required', 'string', 'max:60',
+                'required', 'string', 'max:30',
                 Rule::unique('invoices', 'number')->ignore($this->route('invoice')->id),
             ],
         ];

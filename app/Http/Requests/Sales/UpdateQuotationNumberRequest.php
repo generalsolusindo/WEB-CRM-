@@ -17,7 +17,7 @@ class UpdateQuotationNumberRequest extends FormRequest
     {
         return [
             'number' => [
-                'required', 'string', 'max:60',
+                'required', 'string', 'max:30',
                 Rule::unique('quotations', 'number')->ignore($this->route('quotation')->id),
             ],
         ];

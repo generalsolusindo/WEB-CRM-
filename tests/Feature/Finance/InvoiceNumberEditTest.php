@@ -81,4 +81,15 @@ class InvoiceNumberEditTest extends TestCase
             'number' => '9999/GS-INV/09/2026',
         ])->assertForbidden();
     }
+
+    /** Kolom invoices.number adalah VARCHAR(30) — validasi harus menolak sebelum kena error SQL. */
+    public function test_number_longer_than_column_limit_is_rejected_by_validation(): void
+    {
+        $invoice = $this->createInvoice();
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+
+        $this->actingAs($finance)->patch("/finance/invoices/{$invoice->id}/number", [
+            'number' => str_repeat('9', 31),
+        ])->assertSessionHasErrors('number');
+    }
 }

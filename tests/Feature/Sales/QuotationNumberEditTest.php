@@ -82,4 +82,15 @@ class QuotationNumberEditTest extends TestCase
 
         $this->assertSame('2000/GS-PN/09/2026', $quotation->fresh()->number);
     }
+
+    /** Kolom quotations.number adalah VARCHAR(30) — validasi harus menolak sebelum kena error SQL. */
+    public function test_number_longer_than_column_limit_is_rejected_by_validation(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $quotation = $this->createQuotation($sales);
+
+        $this->actingAs($sales)->patch("/sales/quotations/{$quotation->id}/number", [
+            'number' => str_repeat('9', 31),
+        ])->assertSessionHasErrors('number');
+    }
 }
