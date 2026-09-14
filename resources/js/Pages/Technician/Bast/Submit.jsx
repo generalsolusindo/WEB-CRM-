@@ -42,7 +42,7 @@ export default function Submit({ project }) {
                         <textarea rows="3" value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} className="input" />
                     </label>
                     <label className="block text-sm font-medium text-text">Dokumen BAST (pdf/jpg/png, minimal 1)
-                        <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFiles(form, 'documents', e.target.files, 5)} className="mt-1 block w-full text-sm" />
+                        <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFiles(form, 'documents', e.target.files, 5)} className="mt-1 block w-full text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" />
                         <span className="block text-[11px] text-text-muted">maks 5 MB per file</span>
                         {(form.errors.documents || form.errors['documents.0']) && <span className="text-xs text-danger">{form.errors.documents || form.errors['documents.0']}</span>}
                     </label>

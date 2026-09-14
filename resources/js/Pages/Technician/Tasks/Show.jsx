@@ -59,7 +59,7 @@ export default function Show({ task, project, photos, statusOptions, canWork, ch
                         <h2 className="font-semibold text-text">Absen Kehadiran</h2>
                         <p className="mt-1 text-sm text-text-muted">Wajib absen selfie sebelum bisa mengerjakan task ini.</p>
                         <form onSubmit={checkIn} className="mt-4 flex flex-wrap items-end gap-3">
-                            <input type="file" accept=".jpg,.jpeg,.png" capture="user" onChange={(e) => pickFile(checkInForm, 'photo', e.target.files[0], 5)} className="text-sm" />
+                            <input type="file" accept=".jpg,.jpeg,.png" capture="user" onChange={(e) => pickFile(checkInForm, 'photo', e.target.files[0], 5)} className="text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" />
                             <button disabled={checkInForm.processing || !checkInForm.data.photo} className="btn btn-primary">Kirim Absen</button>
                             <span className="w-full text-[11px] text-text-muted">maks 5 MB</span>
                             {checkInForm.errors.photo && <span className="w-full text-xs text-danger">{checkInForm.errors.photo}</span>}
@@ -82,7 +82,7 @@ export default function Show({ task, project, photos, statusOptions, canWork, ch
                             <h2 className="font-semibold text-text">Absen Pulang</h2>
                             <p className="mt-1 text-sm text-text-muted">Isi selfie sebelum meninggalkan lokasi project.</p>
                             <form onSubmit={checkOut} className="mt-4 flex flex-wrap items-end gap-3">
-                                <input type="file" accept=".jpg,.jpeg,.png" capture="user" onChange={(e) => pickFile(checkOutForm, 'photo', e.target.files[0], 5)} className="text-sm" />
+                                <input type="file" accept=".jpg,.jpeg,.png" capture="user" onChange={(e) => pickFile(checkOutForm, 'photo', e.target.files[0], 5)} className="text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" />
                                 <button disabled={checkOutForm.processing || !checkOutForm.data.photo} className="btn btn-primary">Kirim Absen Pulang</button>
                                 <span className="w-full text-[11px] text-text-muted">maks 5 MB</span>
                                 {checkOutForm.errors.photo && <span className="w-full text-xs text-danger">{checkOutForm.errors.photo}</span>}
@@ -120,7 +120,7 @@ export default function Show({ task, project, photos, statusOptions, canWork, ch
                                 <option value="task_before">Before</option>
                                 <option value="task_after">After</option>
                             </select>
-                            <input type="file" multiple accept=".jpg,.jpeg,.png" onChange={(e) => pickFiles(photoForm, 'photos', e.target.files, 5)} className="text-sm" />
+                            <input type="file" multiple accept=".jpg,.jpeg,.png" onChange={(e) => pickFiles(photoForm, 'photos', e.target.files, 5)} className="text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" />
                             <button disabled={photoForm.processing || photoForm.data.photos.length === 0} className="btn btn-primary">Upload</button>
                             <span className="w-full text-[11px] text-text-muted">bisa pilih beberapa foto sekaligus, maks 5 MB per foto</span>
                             {photoForm.errors.photos && <span className="w-full text-xs text-danger">{photoForm.errors.photos}</span>}

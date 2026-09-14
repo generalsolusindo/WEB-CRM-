@@ -56,11 +56,11 @@ export default function Confirm({ quotation, orderTypes, totals }) {
                         <CardHeader title="Bukti Persetujuan Customer" subtitle="Konfirmasi deal wajib disertai bukti asli dari customer, bukan sekadar klik tombol." className="-mx-5 -mt-5 mb-4 px-5" />
                         <div className="space-y-4">
                             <Field label="Dokumen Quotation (ditandatangani & distempel)" required error={errors.signed_quotation} hint="PDF/gambar, maks 1 MB. Stempel wajib bila customer berupa perusahaan/instansi.">
-                                <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile({ setData, setError, clearErrors }, 'signed_quotation', e.target.files[0], 1)} className="mt-1 block w-full text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-bg file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-text" />
+                                <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile({ setData, setError, clearErrors }, 'signed_quotation', e.target.files[0], 1)} className="mt-1 block w-full text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" />
                             </Field>
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <Field label="Purchase Order dari Customer (opsional)" error={errors.purchase_order} hint="maks 1 MB">
-                                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile({ setData, setError, clearErrors }, 'purchase_order', e.target.files[0], 1)} className="mt-1 block w-full text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-bg file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-text" />
+                                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile({ setData, setError, clearErrors }, 'purchase_order', e.target.files[0], 1)} className="mt-1 block w-full text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" />
                                 </Field>
                                 <Field label="Nomor PO (opsional)" error={errors.po_number}>
                                     <Input value={data.po_number} onChange={(e) => setData('po_number', e.target.value)} placeholder="mis. PO/2026/00123" />

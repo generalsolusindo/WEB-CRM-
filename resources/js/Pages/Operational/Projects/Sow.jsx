@@ -138,7 +138,7 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
                         <div className="mt-3">
                             {canEdit && (
                                 <label className="block text-sm font-medium text-text">Gambar/Diagram Pendukung
-                                    <input ref={fileInput} type="file" accept="image/*" multiple onChange={uploadImages} className="mt-1 block text-sm" disabled={!sow.id} />
+                                    <input ref={fileInput} type="file" accept="image/*" multiple onChange={uploadImages} className="mt-1 block text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" disabled={!sow.id} />
                                 </label>
                             )}
                             {canEdit && !sow.id && <p className="mt-1 text-xs text-warning">Simpan draft dulu sebelum upload gambar.</p>}
@@ -388,7 +388,7 @@ function ScopeSectionCard({ project, section, letter, isFirst, isLast, canEdit }
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <label className="text-sm font-medium text-text">
                     Gambar pendukung
-                    <input ref={fileRef} type="file" accept="image/*" multiple onChange={uploadImages} className="mt-1 block text-sm" />
+                    <input ref={fileRef} type="file" accept="image/*" multiple onChange={uploadImages} className="mt-1 block text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" />
                 </label>
                 <button type="button" onClick={save} disabled={saving} className="btn btn-primary">
                     {saving ? 'Menyimpan…' : 'Simpan Sub Bab'}

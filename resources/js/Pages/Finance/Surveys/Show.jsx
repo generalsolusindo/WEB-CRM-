@@ -140,7 +140,7 @@ export default function Show({ survey, invoice, payments, taxes = [], canHandle,
                                             <Input type="datetime-local" value={payForm.data.paid_at} onChange={(e) => payForm.setData('paid_at', e.target.value)} />
                                         </Field>
                                         <Field label="Bukti (pdf/jpg/png)" hint="maks 5 MB" error={payForm.errors.proof}>
-                                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile(payForm, 'proof', e.target.files[0], 5)} className="mt-1 block w-full text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-bg file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-text" />
+                                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile(payForm, 'proof', e.target.files[0], 5)} className="mt-1 block w-full text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" />
                                         </Field>
                                     </div>
                                     <Field label="Catatan">

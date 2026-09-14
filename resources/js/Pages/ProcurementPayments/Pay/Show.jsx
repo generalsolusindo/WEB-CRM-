@@ -93,7 +93,7 @@ function VendorPaySection({ payment, group }) {
                         type="file"
                         accept=".pdf,.jpg,.jpeg,.png"
                         onChange={(e) => pickFile(form, 'proof', e.target.files[0], 5)}
-                        className="mt-1 block w-full text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-bg file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-text"
+                        className="mt-1 block w-full text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong"
                     />
                     {form.errors.proof && <span className="text-xs font-medium text-danger">{form.errors.proof}</span>}
                 </div>

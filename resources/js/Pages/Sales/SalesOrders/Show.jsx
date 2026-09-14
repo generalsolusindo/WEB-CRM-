@@ -57,12 +57,12 @@ export default function Show({ salesOrder, totals, approvalDocs = [], canManageD
                     <p className="text-xs text-text-muted">Upload file baru untuk mengganti yang lama pada kategori yang sama. Kosongkan bila tidak diubah.</p>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <label className="block text-sm font-medium text-text">Dokumen Quotation (TTD &amp; stempel)
-                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile(docForm, 'signed_quotation', e.target.files[0], 1)} className="mt-1 block w-full text-sm" />
+                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile(docForm, 'signed_quotation', e.target.files[0], 1)} className="mt-1 block w-full text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" />
                             <span className="mt-1 block text-xs text-text-muted">maks 1 MB</span>
                             {docForm.errors.signed_quotation && <span className="mt-1 block text-xs text-danger">{docForm.errors.signed_quotation}</span>}
                         </label>
                         <label className="block text-sm font-medium text-text">Purchase Order Customer
-                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile(docForm, 'purchase_order', e.target.files[0], 1)} className="mt-1 block w-full text-sm" />
+                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => pickFile(docForm, 'purchase_order', e.target.files[0], 1)} className="mt-1 block w-full text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" />
                             <span className="mt-1 block text-xs text-text-muted">maks 1 MB</span>
                             {docForm.errors.purchase_order && <span className="mt-1 block text-xs text-danger">{docForm.errors.purchase_order}</span>}
                         </label>
