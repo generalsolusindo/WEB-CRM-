@@ -126,7 +126,7 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
                                         <tr key={line.id}>
                                             <td className="px-3 py-3">
                                                 <div className="font-medium text-text">{line.item_name}<CategoryBadge category={data.lines[i].category} /></div>
-                                                <div className="text-xs text-text-muted">{line.description || '—'}</div>
+                                                <div className="whitespace-pre-line text-xs text-text-muted">{line.description || '—'}</div>
                                                 {line.requirement?.notes && <div className="mt-1 text-xs text-warning">Catatan: {line.requirement.notes}</div>}
                                                 <label className="mt-2 block text-[11px] font-medium text-text-muted">Kategori
                                                     <select disabled={!editable} value={data.lines[i].category} onChange={(e) => setLine(i, { category: e.target.value })} className={`mt-1 ${control}`}>

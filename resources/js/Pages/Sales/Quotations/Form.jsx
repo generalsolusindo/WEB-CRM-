@@ -211,7 +211,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                             <tr>
                                                 <td className="px-3 py-3">
                                                     <div className="font-medium text-text">{line.item_name}</div>
-                                                    <div className="text-xs text-text-muted">{line.description || '—'}</div>
+                                                    <div className="whitespace-pre-line text-xs text-text-muted">{line.description || '—'}</div>
                                                     <select value={data.lines[i].category} onChange={(e) => setLine(i, { category: e.target.value })} className="mt-1 rounded border border-border px-1 py-0.5 text-[11px]">
                                                         <option value="material">Material</option>
                                                         <option value="service">Jasa</option>

@@ -105,7 +105,7 @@ export default function RequirementsPanel({ leadId, requirements, editable, unit
                                         {item.notes && <div className="text-xs text-text-muted">{item.notes}</div>}
                                     </td>
                                     <td className="whitespace-nowrap px-3 py-3 text-text-muted">{item.qty} {item.unit}</td>
-                                    <td className="px-3 py-3 text-text-muted">{item.description || '—'}</td>
+                                    <td className="whitespace-pre-line px-3 py-3 text-text-muted">{item.description || '—'}</td>
                                     {editable && (
                                         <td className="whitespace-nowrap px-3 py-3 text-right">
                                             {item.submitted_at ? (
@@ -148,7 +148,9 @@ export default function RequirementsPanel({ leadId, requirements, editable, unit
                             </select>
                         </Field>
                     </div>
-                    <Field label="Deskripsi" error={errors.description}><textarea rows="2" value={data.description} onChange={(e) => setData('description', e.target.value)} className="input" /></Field>
+                    <Field label="Deskripsi" error={errors.description}>
+                        <textarea rows="5" value={data.description} onChange={(e) => setData('description', e.target.value)} className="input" placeholder={'Bisa multi-baris, contoh:\n- on-site assessment oleh 2 personel\n- pengujian network & WiFi'} />
+                    </Field>
                     <Field label="Catatan" error={errors.notes}><textarea rows="2" value={data.notes} onChange={(e) => setData('notes', e.target.value)} className="input" /></Field>
                     <div className="flex justify-end gap-2">{editingId && <button type="button" onClick={cancel} className="btn btn-outline">Batal</button>}<button disabled={processing} className="btn btn-primary">{processing ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Tambah Item'}</button></div>
                 </form>

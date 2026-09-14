@@ -118,7 +118,7 @@ export default function Show({ quotation, history, totals, permissions, customer
                                     <tr>
                                         <td className="px-4 py-3.5">
                                             <div className="font-medium text-text">{line.item_name}</div>
-                                            <div className="text-xs text-text-muted">{line.description || '—'}<CategoryBadge category={line.category} /></div>
+                                            <div className="whitespace-pre-line text-xs text-text-muted">{line.description || '—'}<CategoryBadge category={line.category} /></div>
                                             {line.sourcing_note && <div className="mt-0.5 text-[11px] italic text-text-muted">Opsi: {line.sourcing_note}</div>}
                                         </td>
                                         <td className="px-4 py-3.5 text-text-muted">{line.qty} {line.unit}</td>

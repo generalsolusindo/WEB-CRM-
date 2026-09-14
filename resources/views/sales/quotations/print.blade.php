@@ -189,7 +189,7 @@
                             <td>{{ $qtyFmt($line) }}</td>
                             <td class="desc">
                                 <strong>{{ $line->item_name }}</strong>
-                                @if ($line->description)<div class="sub">{{ $line->description }}</div>@endif
+                                @if ($line->description)<div class="sub">{!! nl2br(e($line->description)) !!}</div>@endif
                                 @if ($line->sourcing_note)<div class="sub">Opsi: {{ $line->sourcing_note }}</div>@endif
                             </td>
                             <td class="num">{{ $rupiah($line->selling_price) }}</td>
