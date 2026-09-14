@@ -37,6 +37,8 @@ class ContactController extends Controller
             ->paginate(10)
             ->withQueryString();
 
+        $contacts->getCollection()->each(fn (Contact $contact) => $contact->whatsapp_number = $contact->whatsappNumber());
+
         return Inertia::render('Sales/Contacts/Index', [
             'contacts' => $contacts,
             'filters' => ['search' => $search],
@@ -72,6 +74,8 @@ class ContactController extends Controller
             ->where('sales_id', request()->user()->id)
             ->latest()
             ->get(['id', 'type', 'stage', 'source', 'created_at']);
+
+        $contact->whatsapp_number = $contact->whatsappNumber();
 
         return Inertia::render('Sales/Contacts/Show', [
             'contact' => $contact,

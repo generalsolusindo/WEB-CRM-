@@ -1,9 +1,13 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { FiUserPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { FiUserPlus, FiEdit2, FiTrash2, FiMessageCircle } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, CardHeader, Button, Info, InfoGrid, StatusBadge, EmptyState } from '../../../Components/ui';
+import { contactWhatsappLink } from '../../../Utils/whatsapp';
 
 export default function Show({ contact, leads, npwpDocumentUrl = null }) {
+    const salesName = usePage().props.auth?.user?.name;
+    const waLink = contactWhatsappLink(contact, salesName);
+
     function destroy() {
         if (confirm('Hapus contact ini?')) router.delete(`/sales/contacts/${contact.id}`);
     }
@@ -18,6 +22,16 @@ export default function Show({ contact, leads, npwpDocumentUrl = null }) {
                     back={{ href: '/sales/contacts', label: 'Kembali ke Contacts' }}
                     actions={
                         <>
+                            {waLink && (
+                                <Button
+                                    href={waLink}
+                                    external
+                                    icon={FiMessageCircle}
+                                    className="bg-success text-white hover:bg-success"
+                                >
+                                    Follow Up via WhatsApp
+                                </Button>
+                            )}
                             <Button href={`/sales/leads/create?contact_id=${contact.id}`} icon={FiUserPlus}>Buat Lead</Button>
                             <Button href={`/sales/contacts/${contact.id}/edit`} variant="outline" icon={FiEdit2}>Edit</Button>
                             <Button onClick={destroy} variant="ghost" icon={FiTrash2} className="text-danger hover:bg-danger-soft hover:text-danger">Hapus</Button>

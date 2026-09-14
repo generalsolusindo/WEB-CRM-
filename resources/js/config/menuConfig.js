@@ -18,6 +18,7 @@ import {
     FiPercent,
     FiBarChart2,
     FiBox,
+    FiHash,
 } from 'react-icons/fi';
 
 /**
@@ -84,6 +85,7 @@ const menuConfig = {
         { label: 'Master Data', href: '#', icon: FiDatabase },
         { label: 'Master Data · Pajak', href: '/admin/taxes', icon: FiPercent },
         { label: 'Tanda Tangan', href: '/admin/signature', icon: FiEdit3 },
+        { label: 'Penomoran Dokumen', href: '/admin/document-numbering', icon: FiHash },
     ],
     hr: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },

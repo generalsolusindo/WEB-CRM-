@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Models\BastDraft;
 use App\Models\DeliveryNote;
 use App\Models\Invoice;
+use App\Models\InvoiceNumberSetting;
 use App\Models\Quotation;
+use App\Models\QuotationNumberSetting;
 use App\Models\SalesOrder;
 use App\Models\Sow;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,11 +24,22 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class DocumentNumber
 {
+    /**
+     * Format: {urutan}/GS-PN/{MM}/{YYYY} — nomor urut reset tiap tahun.
+     *
+     * Admin bisa menentukan angka mulai lewat halaman Admin > Penomoran Dokumen
+     * (tabel quotation_number_settings), misalnya untuk menyambung nomor dari
+     * sistem manual sebelumnya. Setelah nomor asli di database melewati angka
+     * itu, setting-nya otomatis tidak berpengaruh lagi (self-correcting).
+     */
     public function nextQuotationNumber(): string
     {
+        $floor = QuotationNumberSetting::query()->where('year', now()->year)->value('next_sequence');
+
         return $this->nextSlashSequential(
             Quotation::query()->whereNull('parent_quotation_id'),
             'GS-PN',
+            $floor ? $floor - 1 : 0,
         );
     }
 
@@ -35,10 +48,19 @@ class DocumentNumber
         return $this->nextSequential(SalesOrder::query(), 'SO');
     }
 
-    /** Format: {urutan}/GS-INV/{MM}/{YYYY} — nomor urut reset tiap tahun. */
+    /**
+     * Format: {urutan}/GS-INV/{MM}/{YYYY} — nomor urut reset tiap tahun.
+     *
+     * Admin bisa menentukan angka mulai lewat halaman Admin > Penomoran Invoice
+     * (tabel invoice_number_settings), misalnya untuk menyambung nomor dari
+     * sistem manual sebelumnya. Setelah nomor asli di database melewati angka
+     * itu, setting-nya otomatis tidak berpengaruh lagi (self-correcting).
+     */
     public function nextInvoiceNumber(): string
     {
-        return $this->nextSlashSequential(Invoice::query(), 'GS-INV');
+        $floor = InvoiceNumberSetting::query()->where('year', now()->year)->value('next_sequence');
+
+        return $this->nextSlashSequential(Invoice::query(), 'GS-INV', $floor ? $floor - 1 : 0);
     }
 
     public function nextSurveyInvoiceNumber(): string
@@ -77,7 +99,7 @@ class DocumentNumber
             : "{$parentNumber}-R{$revisionNumber}";
     }
 
-    private function nextSlashSequential(Builder $query, string $middle): string
+    private function nextSlashSequential(Builder $query, string $middle, int $floor = 0): string
     {
         $now = now();
         $year = $now->year;
@@ -90,7 +112,9 @@ class DocumentNumber
             ->map(fn (string $number) => (int) explode('/', $number)[0])
             ->max() ?? 0;
 
-        return ($lastSequence + 1)."/{$middle}/{$month}/{$year}";
+        $sequence = max($lastSequence, $floor) + 1;
+
+        return "{$sequence}/{$middle}/{$month}/{$year}";
     }
 
     private function nextSequential(Builder $query, string $prefix): string
