@@ -79,8 +79,6 @@ Route::middleware('auth')->group(function () {
         Route::resource('taxes', TaxController::class)->except('show');
         Route::get('signature', [\App\Http\Controllers\Admin\SignatureController::class, 'edit'])->name('signature.edit');
         Route::post('signature', [\App\Http\Controllers\Admin\SignatureController::class, 'update'])->name('signature.update');
-        Route::get('document-numbering', [\App\Http\Controllers\Admin\DocumentNumberSettingController::class, 'edit'])->name('document-numbering.edit');
-        Route::post('document-numbering', [\App\Http\Controllers\Admin\DocumentNumberSettingController::class, 'update'])->name('document-numbering.update');
     });
 
     Route::prefix('management')->name('management.')->middleware('role:management')->group(function () {

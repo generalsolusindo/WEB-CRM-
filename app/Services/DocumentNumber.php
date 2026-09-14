@@ -5,9 +5,7 @@ namespace App\Services;
 use App\Models\BastDraft;
 use App\Models\DeliveryNote;
 use App\Models\Invoice;
-use App\Models\InvoiceNumberSetting;
 use App\Models\Quotation;
-use App\Models\QuotationNumberSetting;
 use App\Models\SalesOrder;
 use App\Models\Sow;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,19 +25,17 @@ class DocumentNumber
     /**
      * Format: {urutan}/GS-PN/{MM}/{YYYY} — nomor urut reset tiap tahun.
      *
-     * Admin bisa menentukan angka mulai lewat halaman Admin > Penomoran Dokumen
-     * (tabel quotation_number_settings), misalnya untuk menyambung nomor dari
-     * sistem manual sebelumnya. Setelah nomor asli di database melewati angka
+     * Angka mulai bisa disambung dari sistem manual/lama lewat .env
+     * (QUOTATION_NUMBER_START_YEAR + QUOTATION_NUMBER_START_SEQUENCE), tanpa
+     * perlu tabel/migration. Setelah nomor asli di database melewati angka
      * itu, setting-nya otomatis tidak berpengaruh lagi (self-correcting).
      */
     public function nextQuotationNumber(): string
     {
-        $floor = QuotationNumberSetting::query()->where('year', now()->year)->value('next_sequence');
-
         return $this->nextSlashSequential(
             Quotation::query()->whereNull('parent_quotation_id'),
             'GS-PN',
-            $floor ? $floor - 1 : 0,
+            $this->configuredFloor('quotation'),
         );
     }
 
@@ -51,16 +47,14 @@ class DocumentNumber
     /**
      * Format: {urutan}/GS-INV/{MM}/{YYYY} — nomor urut reset tiap tahun.
      *
-     * Admin bisa menentukan angka mulai lewat halaman Admin > Penomoran Invoice
-     * (tabel invoice_number_settings), misalnya untuk menyambung nomor dari
-     * sistem manual sebelumnya. Setelah nomor asli di database melewati angka
+     * Angka mulai bisa disambung dari sistem manual/lama lewat .env
+     * (INVOICE_NUMBER_START_YEAR + INVOICE_NUMBER_START_SEQUENCE), tanpa
+     * perlu tabel/migration. Setelah nomor asli di database melewati angka
      * itu, setting-nya otomatis tidak berpengaruh lagi (self-correcting).
      */
     public function nextInvoiceNumber(): string
     {
-        $floor = InvoiceNumberSetting::query()->where('year', now()->year)->value('next_sequence');
-
-        return $this->nextSlashSequential(Invoice::query(), 'GS-INV', $floor ? $floor - 1 : 0);
+        return $this->nextSlashSequential(Invoice::query(), 'GS-INV', $this->configuredFloor('invoice'));
     }
 
     public function nextSurveyInvoiceNumber(): string
@@ -97,6 +91,20 @@ class DocumentNumber
         return $revisionNumber <= 1
             ? $parentNumber
             : "{$parentNumber}-R{$revisionNumber}";
+    }
+
+    /** Ambil next_sequence dari config/document_numbering.php, hanya kalau tahunnya cocok dengan tahun berjalan. */
+    private function configuredFloor(string $documentType): int
+    {
+        $config = config("document_numbering.{$documentType}");
+
+        if (! $config || (int) ($config['year'] ?? 0) !== now()->year) {
+            return 0;
+        }
+
+        $nextSequence = (int) ($config['next_sequence'] ?? 0);
+
+        return $nextSequence > 0 ? $nextSequence - 1 : 0;
     }
 
     private function nextSlashSequential(Builder $query, string $middle, int $floor = 0): string
