@@ -321,6 +321,10 @@ class InvoiceController extends Controller
             'grouped' => ! $invoice->isSurvey(),
             'globalDiscount' => $invoice->salesOrder?->agreed_dpp !== null,
             'preparedBy' => $invoice->creator?->name,
+            'signatory' => [
+                'name' => 'Adila Swasdika Putra',
+                'title' => 'Direktur',
+            ],
             'company' => [
                 'name' => 'CV General Solusindo',
                 'tagline' => 'IT - Consultant Integrator Supplier Training',

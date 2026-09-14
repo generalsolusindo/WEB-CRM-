@@ -68,4 +68,21 @@ class InvoicePrintLayoutTest extends TestCase
         $this->assertStringContainsString('DP/Pelunasan', $html);
         $this->assertStringContainsString('30%', $html);
     }
+
+    public function test_signature_block_uses_fixed_director_name_and_centered_position(): void
+    {
+        $so = $this->confirmedOrder('material_only');
+        $finance = $this->finance();
+        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'full']);
+        $invoice = Invoice::where('sales_order_id', $so->id)->latest('id')->firstOrFail();
+
+        $html = $this->actingAs($finance)->get("/finance/invoices/{$invoice->id}/print")->assertOk()->getContent();
+
+        $this->assertStringContainsString('Adila Swasdika Putra', $html);
+        $this->assertStringContainsString('Direktur', $html);
+        $this->assertStringContainsString('text-align: center', $html);
+        $this->assertStringContainsString('silakan hubungi', $html);
+        $this->assertStringContainsString('THANK YOU FOR YOUR BUSINESS!', $html);
+        $this->assertStringNotContainsString('Riwayat Pembayaran', $html);
+    }
 }
