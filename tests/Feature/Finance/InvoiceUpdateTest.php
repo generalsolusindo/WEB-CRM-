@@ -208,4 +208,58 @@ class InvoiceUpdateTest extends TestCase
         // PPh 23 = 2% dari DPP baris jasa yang baru (8jt) = 160.000
         $this->assertSame(160000.0, (float) $invoice->fresh()->pph23_amount);
     }
+
+    public function test_recorded_bukti_potong_resets_when_pph23_amount_changes(): void
+    {
+        $invoice = $this->draftInvoice();
+        $invoice->update([
+            'pph23_enabled' => true, 'pph23_rate' => 2, 'pph23_amount' => 80000,
+            'pph23_bukti_potong_no' => 'BP-001', 'pph23_recorded_at' => now(), 'pph23_recorded_by' => $this->finance()->id,
+        ]);
+        $lines = $invoice->lines->sortBy('id')->values();
+        $finance = $this->finance();
+
+        // Ubah harga baris jasa supaya DPP jasa (dan pph23_amount) berubah dari sebelumnya.
+        $this->actingAs($finance)
+            ->put("/finance/invoices/{$invoice->id}", [
+                'lines' => [
+                    ['sales_order_line_id' => $lines[0]->sales_order_line_id, 'item_name' => $lines[0]->item_name, 'category' => 'material', 'qty' => 1, 'unit_price' => 6000000, 'discount_amount' => 0, 'tax_rate' => 0],
+                    ['sales_order_line_id' => $lines[1]->sales_order_line_id, 'item_name' => $lines[1]->item_name, 'category' => 'service', 'qty' => 1, 'unit_price' => 5000000, 'discount_amount' => 0, 'tax_rate' => 0],
+                ],
+            ])
+            ->assertRedirect();
+
+        $fresh = $invoice->fresh();
+        $this->assertNull($fresh->pph23_bukti_potong_no);
+        $this->assertNull($fresh->pph23_recorded_at);
+        $this->assertNull($fresh->pph23_recorded_by);
+    }
+
+    public function test_recorded_bukti_potong_kept_when_pph23_amount_unchanged(): void
+    {
+        $invoice = $this->draftInvoice();
+        $lines = $invoice->lines->sortBy('id')->values();
+        // pph23_amount di sini disamakan dengan hasil hitung riil dari baris jasa yang
+        // sudah ada (DP 50% dari 4jt = 2jt x 2% = 40.000), supaya submit ulang tanpa
+        // ubah baris memang menghasilkan angka yang identik (skenario "tidak berubah").
+        $realPph23Amount = round((float) $lines->firstWhere('category', 'service')->subtotal * 0.02);
+        $invoice->update([
+            'pph23_enabled' => true, 'pph23_rate' => 2, 'pph23_amount' => $realPph23Amount,
+            'pph23_bukti_potong_no' => 'BP-001', 'pph23_recorded_at' => now(), 'pph23_recorded_by' => $this->finance()->id,
+        ]);
+        $finance = $this->finance();
+
+        // Ubah hanya notes, baris & harga jasa tetap sama -> pph23_amount tidak berubah.
+        $this->actingAs($finance)
+            ->put("/finance/invoices/{$invoice->id}", [
+                'notes' => 'Cuma catatan yang diubah',
+                'lines' => [
+                    ['sales_order_line_id' => $lines[0]->sales_order_line_id, 'item_name' => $lines[0]->item_name, 'category' => 'material', 'qty' => $lines[0]->qty, 'unit_price' => $lines[0]->unit_price, 'discount_amount' => 0, 'tax_rate' => 0],
+                    ['sales_order_line_id' => $lines[1]->sales_order_line_id, 'item_name' => $lines[1]->item_name, 'category' => 'service', 'qty' => $lines[1]->qty, 'unit_price' => $lines[1]->unit_price, 'discount_amount' => 0, 'tax_rate' => 0],
+                ],
+            ])
+            ->assertRedirect();
+
+        $this->assertSame('BP-001', $invoice->fresh()->pph23_bukti_potong_no);
+    }
 }

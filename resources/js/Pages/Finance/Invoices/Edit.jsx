@@ -59,6 +59,8 @@ export default function Edit({ invoice }) {
     const subtotalTotal = r2(computed.reduce((s, l) => s + l.subtotal, 0));
     const taxTotal = r2(computed.reduce((s, l) => s + l.tax, 0));
     const grandTotal = r2(subtotalTotal + taxTotal);
+    const serviceDpp = r2(computed.filter((l) => l.category === 'service').reduce((s, l) => s + l.subtotal, 0));
+    const pph23Preview = invoice.pph23_enabled ? Math.round(serviceDpp * Number(invoice.pph23_rate || 0) / 100) : 0;
 
     return (
         <AppLayout>
@@ -151,6 +153,9 @@ export default function Edit({ invoice }) {
                                     <tr><td colSpan="6" className="px-4 py-2 text-right text-text-muted">DPP</td><td colSpan="2" className="px-4 py-2 text-right font-medium tabular-nums">{money(subtotalTotal)}</td></tr>
                                     <tr><td colSpan="6" className="px-4 py-2 text-right text-text-muted">Total PPN</td><td colSpan="2" className="px-4 py-2 text-right font-medium tabular-nums">{money(taxTotal)}</td></tr>
                                     <tr><td colSpan="6" className="px-4 py-4 text-right font-semibold">Total Tagihan</td><td colSpan="2" className="px-4 py-4 text-right text-lg font-bold tabular-nums">{money(grandTotal)}</td></tr>
+                                    {invoice.pph23_enabled && (
+                                        <tr><td colSpan="6" className="px-4 py-2 text-right text-xs text-text-muted">PPh 23 ({Number(invoice.pph23_rate)}%) — dihitung ulang otomatis dari baris jasa</td><td colSpan="2" className="px-4 py-2 text-right text-xs font-medium tabular-nums text-warning">− {money(pph23Preview)}</td></tr>
+                                    )}
                                 </tfoot>
                             </table>
                         </div>

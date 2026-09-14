@@ -60,7 +60,7 @@ class UpdateInvoice
                 $pph23Amount = $serviceDpp > 0 ? round($serviceDpp * (float) $locked->pph23_rate / 100) : 0.0;
             }
 
-            $locked->update([
+            $update = [
                 'due_date' => $dueDate,
                 'notes' => $notes,
                 'amount' => round($amount, 2),
@@ -69,7 +69,17 @@ class UpdateInvoice
                 // Angka berubah -> kembali ke Draft, invoice dianggap belum terkirim
                 // lagi ke customer dan perlu dikirim ulang.
                 'status' => InvoiceStatus::Draft->value,
-            ]);
+            ];
+
+            // Bukti potong PPh 23 yang sudah direkam jadi tidak sinkron kalau
+            // nominalnya berubah gara-gara baris diedit — reset, minta dicatat ulang.
+            if (round((float) $locked->pph23_amount, 2) !== round($pph23Amount, 2) && $locked->pph23_bukti_potong_no !== null) {
+                $update['pph23_bukti_potong_no'] = null;
+                $update['pph23_recorded_at'] = null;
+                $update['pph23_recorded_by'] = null;
+            }
+
+            $locked->update($update);
 
             return $locked->refresh();
         });
