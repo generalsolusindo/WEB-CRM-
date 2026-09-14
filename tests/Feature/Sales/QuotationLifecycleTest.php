@@ -147,6 +147,30 @@ class QuotationLifecycleTest extends TestCase
         $this->assertSame('50.00', $quotation->lines()->first()->markup_percent);
     }
 
+    /** Unit lama di luar daftar baku (mis. dari data lawas) tidak boleh menghalangi edit lain. */
+    public function test_editing_with_legacy_unit_value_still_succeeds(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $line = $quotation->lines()->firstOrFail();
+        $line->update(['unit' => 'pcs']); // nilai lama, di luar Requirement::UNITS
+
+        $this->actingAs($sales)
+            ->put("/sales/quotations/{$quotation->id}", [
+                'lines' => [
+                    [
+                        'procurement_request_line_id' => $line->procurement_request_line_id,
+                        'unit' => 'pcs',
+                        'selling_price' => 1450000,
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $fresh = $line->fresh();
+        $this->assertSame('pcs', $fresh->unit);
+        $this->assertSame('1450000.00', $fresh->selling_price);
+    }
+
     public function test_editing_can_change_item_name_qty_and_unit(): void
     {
         [$sales, $quotation] = $this->draftQuotation();
