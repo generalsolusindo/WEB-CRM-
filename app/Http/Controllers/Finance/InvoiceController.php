@@ -9,6 +9,7 @@ use App\Enums\InvoiceStatus;
 use App\Enums\OrderType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Finance\StoreInvoiceRequest;
+use App\Http\Requests\Finance\UpdateInvoiceNumberRequest;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\SalesOrder;
@@ -223,6 +224,7 @@ class InvoiceController extends Controller
             'permissions' => [
                 'send' => request()->user()->can('send', $invoice),
                 'sendWhatsapp' => request()->user()->can('sendWhatsapp', $invoice),
+                'updateNumber' => request()->user()->can('updateNumber', $invoice),
                 'managePph23' => request()->user()->can('managePph23', $invoice),
                 'cancel' => request()->user()->can('cancel', $invoice),
                 'recordPayment' => request()->user()->can('create', [Payment::class, $invoice]),
@@ -488,6 +490,14 @@ class InvoiceController extends Controller
         });
 
         return back()->with('success', 'Invoice ditandai sudah dikirim ke customer.');
+    }
+
+    /** Ubah nomor invoice secara manual, mis. menyambung dari sistem lama. */
+    public function updateNumber(UpdateInvoiceNumberRequest $request, Invoice $invoice): RedirectResponse
+    {
+        $invoice->update(['number' => $request->validated('number')]);
+
+        return back()->with('success', 'Nomor invoice berhasil diperbarui.');
     }
 
     public function cancel(Invoice $invoice): RedirectResponse

@@ -25,17 +25,16 @@ class DocumentNumber
     /**
      * Format: {urutan}/GS-PN/{MM}/{YYYY} — nomor urut reset tiap tahun.
      *
-     * Angka mulai bisa disambung dari sistem manual/lama lewat .env
-     * (QUOTATION_NUMBER_START_YEAR + QUOTATION_NUMBER_START_SEQUENCE), tanpa
-     * perlu tabel/migration. Setelah nomor asli di database melewati angka
-     * itu, setting-nya otomatis tidak berpengaruh lagi (self-correcting).
+     * Selalu lanjut dari nomor tertinggi yang ada di database. Kalau perlu
+     * menyambung dari sistem manual/lama, sales tinggal edit nomor di
+     * quotation manapun (lewat tombol "Ubah Nomor") — nomor berikutnya
+     * otomatis lanjut dari situ karena dihitung dari MAX(nomor) + 1.
      */
     public function nextQuotationNumber(): string
     {
         return $this->nextSlashSequential(
             Quotation::query()->whereNull('parent_quotation_id'),
             'GS-PN',
-            $this->configuredFloor('quotation'),
         );
     }
 
@@ -47,14 +46,14 @@ class DocumentNumber
     /**
      * Format: {urutan}/GS-INV/{MM}/{YYYY} — nomor urut reset tiap tahun.
      *
-     * Angka mulai bisa disambung dari sistem manual/lama lewat .env
-     * (INVOICE_NUMBER_START_YEAR + INVOICE_NUMBER_START_SEQUENCE), tanpa
-     * perlu tabel/migration. Setelah nomor asli di database melewati angka
-     * itu, setting-nya otomatis tidak berpengaruh lagi (self-correcting).
+     * Selalu lanjut dari nomor tertinggi yang ada di database. Kalau perlu
+     * menyambung dari sistem manual/lama, finance tinggal edit nomor di
+     * invoice manapun (lewat tombol "Ubah Nomor") — nomor berikutnya
+     * otomatis lanjut dari situ karena dihitung dari MAX(nomor) + 1.
      */
     public function nextInvoiceNumber(): string
     {
-        return $this->nextSlashSequential(Invoice::query(), 'GS-INV', $this->configuredFloor('invoice'));
+        return $this->nextSlashSequential(Invoice::query(), 'GS-INV');
     }
 
     public function nextSurveyInvoiceNumber(): string
@@ -93,21 +92,7 @@ class DocumentNumber
             : "{$parentNumber}-R{$revisionNumber}";
     }
 
-    /** Ambil next_sequence dari config/document_numbering.php, hanya kalau tahunnya cocok dengan tahun berjalan. */
-    private function configuredFloor(string $documentType): int
-    {
-        $config = config("document_numbering.{$documentType}");
-
-        if (! $config || (int) ($config['year'] ?? 0) !== now()->year) {
-            return 0;
-        }
-
-        $nextSequence = (int) ($config['next_sequence'] ?? 0);
-
-        return $nextSequence > 0 ? $nextSequence - 1 : 0;
-    }
-
-    private function nextSlashSequential(Builder $query, string $middle, int $floor = 0): string
+    private function nextSlashSequential(Builder $query, string $middle): string
     {
         $now = now();
         $year = $now->year;
@@ -120,9 +105,7 @@ class DocumentNumber
             ->map(fn (string $number) => (int) explode('/', $number)[0])
             ->max() ?? 0;
 
-        $sequence = max($lastSequence, $floor) + 1;
-
-        return "{$sequence}/{$middle}/{$month}/{$year}";
+        return ($lastSequence + 1)."/{$middle}/{$month}/{$year}";
     }
 
     private function nextSequential(Builder $query, string $prefix): string

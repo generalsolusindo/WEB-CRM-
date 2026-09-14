@@ -1,12 +1,19 @@
 import { Fragment } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
-import { FiPrinter, FiEdit2, FiSend, FiCheck, FiX, FiCopy, FiTrash2 } from 'react-icons/fi';
+import { FiPrinter, FiEdit2, FiSend, FiCheck, FiX, FiCopy, FiTrash2, FiHash } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import CategoryBadge from '../../../Components/CategoryBadge';
 import { PageHeader, Card, CardHeader, Button, Info, InfoGrid, StatusBadge } from '../../../Components/ui';
 
 export default function Show({ quotation, history, totals, permissions, customerHasWhatsapp = false }) {
     const number = quotation.number ?? `QT-${String(quotation.id).padStart(6, '0')} / R${quotation.revision_number}`;
+
+    function editNumber() {
+        const value = window.prompt('Nomor quotation baru:', quotation.number ?? '');
+        if (value && value.trim() !== '' && value.trim() !== quotation.number) {
+            router.patch(`/sales/quotations/${quotation.id}/number`, { number: value.trim() }, { preserveScroll: true });
+        }
+    }
     const validUntil = quotation.valid_until
         ? new Date(quotation.valid_until).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
         : null;
@@ -42,6 +49,7 @@ export default function Show({ quotation, history, totals, permissions, customer
                     actions={
                         <>
                             <Button href={`/sales/quotations/${quotation.id}/print`} external variant="outline" icon={FiPrinter}>Cetak / PDF</Button>
+                            {permissions.updateNumber && <Button onClick={editNumber} variant="outline" icon={FiHash}>Ubah Nomor</Button>}
                             {permissions.update && <Button href={`/sales/quotations/${quotation.id}/edit`} variant="outline" icon={FiEdit2}>Edit</Button>}
                             {permissions.sendWhatsapp && (
                                 <Button

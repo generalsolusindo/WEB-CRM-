@@ -195,6 +195,7 @@ Route::middleware('auth')->group(function () {
         Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
         Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('invoices.send');
         Route::post('invoices/{invoice}/send-whatsapp', [InvoiceController::class, 'sendWhatsapp'])->name('invoices.send-whatsapp');
+        Route::patch('invoices/{invoice}/number', [InvoiceController::class, 'updateNumber'])->name('invoices.number.update');
         Route::post('invoices/{invoice}/pph23', [InvoiceController::class, 'updatePph23'])->name('invoices.pph23');
         Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('invoices.cancel');
         Route::get('surveys', [FinanceSurveyController::class, 'index'])->name('surveys.index');
@@ -353,6 +354,8 @@ Route::middleware('auth')->group(function () {
             ->name('quotations.pdf');
         Route::post('quotations/{quotation}/send-whatsapp', [QuotationController::class, 'sendWhatsapp'])
             ->name('quotations.send-whatsapp');
+        Route::patch('quotations/{quotation}/number', [QuotationController::class, 'updateNumber'])
+            ->name('quotations.number.update');
         Route::get('procurement-requests/{procurementRequest}/quotations/create', [QuotationController::class, 'create'])
             ->name('procurement-requests.quotations.create');
         Route::post('procurement-requests/{procurementRequest}/quotations', [QuotationController::class, 'store'])

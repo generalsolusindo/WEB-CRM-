@@ -36,6 +36,12 @@ class QuotationPolicy
             && $quotation->status === QuotationStatus::Draft->value;
     }
 
+    /** Ubah nomor quotation secara manual (mis. menyambung dari sistem lama) — bisa di status apa saja. */
+    public function updateNumber(User $user, Quotation $quotation): bool
+    {
+        return $this->owns($user, $quotation);
+    }
+
     public function delete(User $user, Quotation $quotation): bool
     {
         return $this->update($user, $quotation)

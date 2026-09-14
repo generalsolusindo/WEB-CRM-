@@ -23,6 +23,12 @@ class InvoicePolicy
         return $this->isFinance($user);
     }
 
+    /** Ubah nomor invoice secara manual (mis. menyambung dari sistem lama) — bisa di status apa saja. */
+    public function updateNumber(User $user, Invoice $invoice): bool
+    {
+        return $this->isFinance($user);
+    }
+
     public function send(User $user, Invoice $invoice): bool
     {
         return $this->isFinance($user)

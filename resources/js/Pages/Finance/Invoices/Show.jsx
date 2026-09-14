@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { FiFileText, FiSend, FiXCircle } from 'react-icons/fi';
+import { FiFileText, FiSend, FiXCircle, FiHash } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { Totals } from '../../Sales/Quotations/Show';
 import { pickFile } from '../../../utils/fileValidation';
@@ -45,6 +45,13 @@ export default function Show({ invoice, payments, totals, totalPaid, customerHas
         if (confirm(msg)) router.post(url);
     }
 
+    function editNumber() {
+        const value = window.prompt('Nomor invoice baru:', invoice.number ?? '');
+        if (value && value.trim() !== '' && value.trim() !== invoice.number) {
+            router.patch(`/finance/invoices/${invoice.id}/number`, { number: value.trim() }, { preserveScroll: true });
+        }
+    }
+
     function submitPayment(e) {
         e.preventDefault();
         payForm.post(`/finance/invoices/${invoice.id}/payments`, {
@@ -71,6 +78,7 @@ export default function Show({ invoice, payments, totals, totalPaid, customerHas
                     actions={(
                         <>
                             <Button href={`/finance/invoices/${invoice.id}/pdf`} external variant="outline" icon={FiFileText}>Lihat PDF</Button>
+                            {permissions.updateNumber && <Button onClick={editNumber} variant="outline" icon={FiHash}>Ubah Nomor</Button>}
                             {permissions.sendWhatsapp && (
                                 <Button
                                     onClick={sendWhatsapp}

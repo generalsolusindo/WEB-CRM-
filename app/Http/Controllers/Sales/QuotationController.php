@@ -7,6 +7,7 @@ use App\Actions\Sales\UpdateQuotation;
 use App\Enums\QuotationStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Sales\SaveQuotationRequest;
+use App\Http\Requests\Sales\UpdateQuotationNumberRequest;
 use App\Models\ProcurementRequest;
 use App\Models\Quotation;
 use App\Models\Tax;
@@ -123,6 +124,7 @@ class QuotationController extends Controller
                 'delete' => request()->user()->can('delete', $quotation),
                 'send' => request()->user()->can('send', $quotation),
                 'sendWhatsapp' => request()->user()->can('sendWhatsapp', $quotation),
+                'updateNumber' => request()->user()->can('updateNumber', $quotation),
                 'revise' => request()->user()->can('revise', $quotation),
                 'reject' => request()->user()->can('reject', $quotation),
                 'confirm' => request()->user()->can('confirm', $quotation),
@@ -247,6 +249,14 @@ class QuotationController extends Controller
 
         return redirect()->route('sales.quotations.index')
             ->with('success', 'Quotation draft berhasil dihapus.');
+    }
+
+    /** Ubah nomor quotation secara manual, mis. menyambung dari sistem lama. */
+    public function updateNumber(UpdateQuotationNumberRequest $request, Quotation $quotation): RedirectResponse
+    {
+        $quotation->update(['number' => $request->validated('number')]);
+
+        return back()->with('success', 'Nomor quotation berhasil diperbarui.');
     }
 
     public function send(Quotation $quotation): RedirectResponse
