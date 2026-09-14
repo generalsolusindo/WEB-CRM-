@@ -1,9 +1,10 @@
 import { Head, useForm } from '@inertiajs/react';
 import { useState } from 'react';
+import { FiFileText } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import CategoryBadge from '../../../Components/CategoryBadge';
 import { Totals } from '../../Sales/Quotations/Show';
-import { PageHeader } from '../../../Components/ui';
+import { PageHeader, Button } from '../../../Components/ui';
 
 export default function Show({ quotation, canReview, role }) {
     const base = role === 'management' ? '/management/quotations' : '/project-manager/quotations';
@@ -29,6 +30,7 @@ export default function Show({ quotation, canReview, role }) {
                     )}
                     subtitle={`${quotation.company || quotation.customer} · Sales: ${quotation.sales}`}
                     back={{ href: base, label: 'Kembali' }}
+                    actions={<Button href={`/sales/quotations/${quotation.id}/print`} external variant="outline" icon={FiFileText}>Lihat PDF</Button>}
                 />
 
                 <section className="grid gap-x-6 gap-y-4 card p-6 sm:grid-cols-2">

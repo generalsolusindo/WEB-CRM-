@@ -13,9 +13,10 @@ class InvoicePolicy
         return $this->isFinance($user) || $this->isManagement($user);
     }
 
+    /** Management cuma boleh lihat (termasuk PDF), tidak ada tombol aksi apa pun untuk mereka. */
     public function view(User $user, Invoice $invoice): bool
     {
-        return $this->isFinance($user);
+        return $this->isFinance($user) || $this->isManagement($user);
     }
 
     public function create(User $user): bool

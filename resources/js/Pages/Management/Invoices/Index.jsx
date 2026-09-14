@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
+import { FiFileText } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, PillTabs, DataTable, StatusBadge, EmptyState, Pagination } from '../../../Components/ui';
+import { PageHeader, PillTabs, DataTable, StatusBadge, EmptyState, Pagination, Button } from '../../../Components/ui';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(v || 0));
@@ -30,6 +31,16 @@ export default function Index({ invoices, filters, statusOptions }) {
         { key: 'grand_total', label: 'Total Tagihan', align: 'right', render: (inv) => <span className="tabular-nums">{money(inv.grand_total)}</span> },
         { key: 'paid_total', label: 'Sudah Dibayar', align: 'right', render: (inv) => <span className="tabular-nums text-text-muted">{money(inv.paid_total)}</span> },
         { key: 'due_date', label: 'Jatuh Tempo', render: (inv) => inv.due_date || '—' },
+        {
+            key: 'pdf',
+            label: '',
+            align: 'right',
+            render: (inv) => (
+                <Button href={`/finance/invoices/${inv.id}/pdf`} external variant="outline" icon={FiFileText} className="text-xs">
+                    Lihat PDF
+                </Button>
+            ),
+        },
     ];
 
     return (

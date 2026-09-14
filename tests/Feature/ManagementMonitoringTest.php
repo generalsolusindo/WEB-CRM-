@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Contact;
 use App\Models\Lead;
 use App\Models\ProcurementRequest;
-use App\Models\Quotation;
 use App\Models\SalesOrder;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -64,6 +63,37 @@ class ManagementMonitoringTest extends TestCase
         $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
 
         $this->actingAs($finance)->get('/management/invoices')->assertForbidden();
+    }
+
+    public function test_management_can_view_invoice_pdf(): void
+    {
+        $so = $this->confirmedSalesOrder();
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'full']);
+        $invoice = \App\Models\Invoice::latest('id')->firstOrFail();
+
+        $this->actingAs($this->management())->get("/finance/invoices/{$invoice->id}/pdf")->assertOk();
+    }
+
+    public function test_management_can_view_all_quotations_tracking_and_pdf(): void
+    {
+        $so = $this->confirmedSalesOrder();
+        $quotation = $so->quotation;
+
+        $this->actingAs($this->management())->get('/management/quotations-overview')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Management/Quotations/Index')
+                ->where('quotations.total', 1));
+
+        $this->actingAs($this->management())->get("/sales/quotations/{$quotation->id}/print")->assertOk();
+    }
+
+    public function test_sales_role_cannot_reach_management_quotation_overview_route(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $this->actingAs($sales)->get('/management/quotations-overview')->assertForbidden();
     }
 
     public function test_management_can_view_surveys_list(): void

@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Management;
 
 use App\Actions\Sales\ReviewQuotation;
+use App\Enums\QuotationStatus;
 use App\Http\Controllers\Concerns\BuildsQuotationReview;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Management\ReviewQuotationRequest;
 use App\Models\Quotation;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -34,6 +37,35 @@ class QuotationController extends Controller
         return Inertia::render('Quotations/Review/Index', [
             'quotations' => $quotations,
             'role' => 'management',
+        ]);
+    }
+
+    /**
+     * Monitoring read-only SEMUA quotation (bukan cuma yang menunggu approval
+     * Manager) — dipakai untuk tracking, bukan aksi. Beda dari index() di atas
+     * yang khusus jadi inbox "Verifikasi Quotation".
+     */
+    public function all(Request $request): Response
+    {
+        Gate::authorize('viewAny', Quotation::class);
+
+        $filters = $request->validate([
+            'status' => ['nullable', Rule::enum(QuotationStatus::class)],
+        ]);
+
+        $quotations = Quotation::query()
+            ->with(['contact:id,name,company_name', 'sales:id,name'])
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->latest()
+            ->paginate(15)
+            ->withQueryString();
+
+        $quotations->through(fn (Quotation $quotation) => $this->quotationRow($quotation));
+
+        return Inertia::render('Management/Quotations/Index', [
+            'quotations' => $quotations,
+            'filters' => ['status' => $filters['status'] ?? ''],
+            'statusOptions' => QuotationStatus::options(),
         ]);
     }
 

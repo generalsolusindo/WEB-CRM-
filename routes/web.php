@@ -99,6 +99,7 @@ Route::middleware('auth')->group(function () {
         Route::get('opportunities/{lead}', [ManagementOpportunityController::class, 'show'])->name('opportunities.show');
         Route::put('opportunities/{lead}/delegate', [ManagementOpportunityController::class, 'delegate'])->name('opportunities.delegate');
         Route::get('quotations', [ManagementQuotationController::class, 'index'])->name('quotations.index');
+        Route::get('quotations-overview', [ManagementQuotationController::class, 'all'])->name('quotations.all');
         Route::get('quotations/{quotation}', [ManagementQuotationController::class, 'show'])->name('quotations.show');
         Route::post('quotations/{quotation}/review', [ManagementQuotationController::class, 'review'])->name('quotations.review');
         Route::get('sows', [ManagementSowController::class, 'index'])->name('sows.index');
@@ -197,8 +198,6 @@ Route::middleware('auth')->group(function () {
             ->name('sales-orders.invoices.create');
         Route::post('sales-orders/{salesOrder}/final-invoice', [InvoiceController::class, 'storeFinal'])
             ->name('sales-orders.final-invoice');
-        Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
-        Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
         Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('invoices.send');
         Route::post('invoices/{invoice}/send-whatsapp', [InvoiceController::class, 'sendWhatsapp'])->name('invoices.send-whatsapp');
         Route::patch('invoices/{invoice}/number', [InvoiceController::class, 'updateNumber'])->name('invoices.number.update');
@@ -216,6 +215,12 @@ Route::middleware('auth')->group(function () {
         Route::get('procurement-payments/{procurementPayment}', [FinanceProcurementPaymentController::class, 'show'])->name('procurement-payments.show');
         Route::post('procurement-payments/{procurementPayment}/pay', [FinanceProcurementPaymentController::class, 'pay'])->name('procurement-payments.pay');
         Route::resource('invoices', InvoiceController::class)->only(['index', 'store', 'show']);
+    });
+
+    // Lihat PDF invoice (bukan cuma buat/kelola) — Management juga boleh, buat tracking read-only.
+    Route::prefix('finance')->name('finance.')->middleware('role:finance,management')->group(function () {
+        Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
+        Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
     });
 
     Route::prefix('technician')->name('technician.')->middleware('role:technician')->group(function () {
@@ -356,10 +361,6 @@ Route::middleware('auth')->group(function () {
         Route::delete('leads/{lead}/meetings/{meeting}', [MeetingController::class, 'destroy'])
             ->name('leads.meetings.destroy');
         Route::get('reports/leads', LeadReportController::class)->name('reports.leads');
-        Route::get('quotations/{quotation}/print', [QuotationController::class, 'print'])
-            ->name('quotations.print');
-        Route::get('quotations/{quotation}/pdf', [QuotationController::class, 'pdf'])
-            ->name('quotations.pdf');
         Route::post('quotations/{quotation}/send-whatsapp', [QuotationController::class, 'sendWhatsapp'])
             ->name('quotations.send-whatsapp');
         Route::patch('quotations/{quotation}/number', [QuotationController::class, 'updateNumber'])
@@ -385,6 +386,15 @@ Route::middleware('auth')->group(function () {
             ->name('sales-orders.documents');
         Route::resource('sales-orders', SalesOrderController::class)->only(['index', 'show']);
         Route::resource('leads', LeadController::class);
+    });
+
+    // Lihat PDF quotation (bukan cuma buat/kelola) — Management & Project Manager
+    // juga boleh (dipakai di layar verifikasi/tracking mereka), buat tracking read-only.
+    Route::prefix('sales')->name('sales.')->middleware('role:sales,management,project_manager')->group(function () {
+        Route::get('quotations/{quotation}/print', [QuotationController::class, 'print'])
+            ->name('quotations.print');
+        Route::get('quotations/{quotation}/pdf', [QuotationController::class, 'pdf'])
+            ->name('quotations.pdf');
     });
 });
 

@@ -67,6 +67,7 @@ const menuConfig = {
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
         { label: 'Opportunity', href: '/management/opportunities', icon: FiUsers },
         { label: 'Verifikasi Quotation', href: '/management/quotations', icon: FiFileText },
+        { label: 'Semua Quotation', href: '/management/quotations-overview', icon: FiFileText },
         { label: 'Procurement Request', href: '/management/procurement-requests', icon: FiClipboard },
         { label: 'Invoice', href: '/management/invoices', icon: FiCreditCard },
         { label: 'Survey', href: '/management/surveys', icon: FiTool },
