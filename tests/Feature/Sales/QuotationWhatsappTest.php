@@ -59,6 +59,28 @@ class QuotationWhatsappTest extends TestCase
         $this->assertNotNull($quotation->whatsapp_sent_by);
     }
 
+    /**
+     * Regresi: setelah dikirim lewat WhatsApp (otomatis jadi status Sent), tombol
+     * "Tandai Terkirim" terpisah tidak boleh masih bisa diklik — sebelum diperbaiki,
+     * policy send() cuma numpang lewat update() (yang sudah dilonggarkan dari
+     * Draft-only), jadi tombolnya tetap aktif di UI dan begitu diklik gagal dengan
+     * error 409 mentah di controller alih-alih 403 yang wajar dari policy.
+     */
+    public function test_marking_sent_after_already_sent_via_whatsapp_is_forbidden_not_a_server_error(): void
+    {
+        $quotation = $this->approvedQuotationForContact();
+        $sales = $this->sales($quotation);
+
+        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/send-whatsapp");
+        $this->assertSame('sent', $quotation->fresh()->status);
+
+        $this->actingAs($sales)->get("/sales/quotations/{$quotation->id}")
+            ->assertInertia(fn ($page) => $page->where('permissions.send', false));
+
+        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/send")
+            ->assertForbidden();
+    }
+
     public function test_send_whatsapp_fails_without_valid_number(): void
     {
         $quotation = $this->approvedQuotationForContact(phone: '');

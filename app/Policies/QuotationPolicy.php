@@ -71,9 +71,19 @@ class QuotationPolicy
         return ! $salesOrder->invoices()->exists() && ! $salesOrder->projects()->exists();
     }
 
+    /**
+     * Cuma bisa ditandai terkirim selama masih Draft — controller sendiri menegakkan ini
+     * (abort_unless status===draft), jadi syaratnya juga wajib dicek eksplisit di sini,
+     * bukan cuma numpang lewat update() yang sekarang sudah lebih longgar dari Draft-only.
+     * Tanpa ini, tombol "Tandai Terkirim" bisa masih tampil aktif walau quotation sudah
+     * berstatus Sent (mis. sudah dikirim duluan lewat WhatsApp), lalu diklik akan gagal
+     * dengan error 409 mentah, bukan tombolnya yang hilang dari tampilan.
+     */
     public function send(User $user, Quotation $quotation): bool
     {
-        return $this->update($user, $quotation) && $quotation->isFullyApproved();
+        return $this->update($user, $quotation)
+            && $quotation->status === QuotationStatus::Draft->value
+            && $quotation->isFullyApproved();
     }
 
     /** Kirim tautan PDF quotation ke WhatsApp customer — sekaligus menandai terkirim bila masih draft. */
