@@ -15,7 +15,7 @@ export default function Show({
 }) {
     const stageLabel = stageOptions.find((s) => s.value === lead.stage)?.label ?? lead.stage;
     const sourceLabel = sourceOptions.find((s) => s.value === lead.source)?.label ?? lead.source;
-    function convert() { if (confirm('Konversi lead ini menjadi opportunity?')) router.post(`/sales/leads/${lead.id}/convert`); }
+    function convert() { if (confirm('Tandai lead ini Terkualifikasi & lanjutkan sebagai opportunity?')) router.post(`/sales/leads/${lead.id}/convert`); }
     function destroy() { if (confirm('Hapus lead ini?')) router.delete(`/sales/leads/${lead.id}`); }
 
     return (
@@ -30,8 +30,8 @@ export default function Show({
                         <>
                             {lead.type === 'lead' && (
                                 convertBlockReason
-                                    ? <Button variant="primary" disabled title={convertBlockReason} icon={FiArrowUpRight}>Jadikan Opportunity</Button>
-                                    : <Button onClick={convert} icon={FiArrowUpRight}>Jadikan Opportunity</Button>
+                                    ? <Button variant="primary" disabled title={convertBlockReason} icon={FiArrowUpRight}>Tandai Terkualifikasi & Lanjutkan</Button>
+                                    : <Button onClick={convert} icon={FiArrowUpRight}>Tandai Terkualifikasi & Lanjutkan</Button>
                             )}
                             {leadEditable && <Button href={`/sales/leads/${lead.id}/edit`} variant="outline" icon={FiEdit2}>Edit</Button>}
                             {canDelete && <Button onClick={destroy} variant="ghost" icon={FiTrash2} className="text-danger hover:bg-danger-soft hover:text-danger">Hapus</Button>}

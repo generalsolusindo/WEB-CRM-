@@ -9,11 +9,6 @@ use Illuminate\Support\Facades\Hash;
 
 class UserSeeder extends Seeder
 {
-    /**
-     * Seed one user per role for local testing. Login memakai username
-     * (huruf kecil), bukan email — nama & username di bawah ini mengikuti
-     * pemetaan nama asli tiap pemegang role di General Solusindo.
-     */
     public function run(): void
     {
         $roles = [

@@ -243,6 +243,10 @@ class LeadController extends Controller
             ->with('success', 'Lead berhasil dihapus.');
     }
 
+    /**
+     * Tandai lead Terkualifikasi sekaligus konversi jadi opportunity dalam satu langkah —
+     * sebelumnya Sales harus ubah stage ke Qualified dulu secara terpisah baru bisa convert.
+     */
     public function convert(Lead $lead): RedirectResponse
     {
         Gate::authorize('convert', $lead);
@@ -251,10 +255,13 @@ class LeadController extends Controller
             return back()->with('error', $blocker);
         }
 
-        $lead->update(['type' => LeadType::Opportunity->value]);
+        $lead->update([
+            'type' => LeadType::Opportunity->value,
+            'stage' => LeadStage::Qualified->value,
+        ]);
 
         return redirect()->route('sales.leads.show', $lead)
-            ->with('success', 'Lead berhasil dikonversi menjadi opportunity.');
+            ->with('success', 'Lead berhasil ditandai Terkualifikasi & dikonversi menjadi opportunity.');
     }
 
     /**
@@ -265,10 +272,6 @@ class LeadController extends Controller
     {
         if ($lead->type === LeadType::Opportunity->value) {
             return 'Lead ini sudah menjadi opportunity.';
-        }
-
-        if ($lead->stage !== LeadStage::Qualified->value) {
-            return 'Ubah stage lead menjadi "Terkualifikasi" terlebih dahulu.';
         }
 
         $contact = $lead->contact;

@@ -108,7 +108,7 @@ class LeadManagementTest extends TestCase
         $this->actingAs($sales)->post("/sales/leads/{$lead->id}/convert")->assertForbidden();
     }
 
-    public function test_owner_can_convert_qualified_lead_with_reachable_contact(): void
+    public function test_owner_can_convert_new_lead_with_reachable_contact_in_one_step(): void
     {
         $sales = User::factory()->create(['role' => 'sales']);
         $contact = Contact::create([
@@ -120,9 +120,10 @@ class LeadManagementTest extends TestCase
             'contact_id' => $contact->id,
             'sales_id' => $sales->id,
             'type' => 'lead',
-            'stage' => 'qualified',
+            'stage' => 'new',
         ]);
 
+        // Convert langsung dari stage 'new' -> tidak perlu diubah ke Qualified secara terpisah dulu.
         $this->actingAs($sales)->post("/sales/leads/{$lead->id}/convert")
             ->assertRedirectToRoute('sales.leads.show', $lead);
 
@@ -131,7 +132,7 @@ class LeadManagementTest extends TestCase
         $this->assertSame('qualified', $lead->stage);
     }
 
-    public function test_convert_is_blocked_until_qualified_and_contact_reachable(): void
+    public function test_convert_is_blocked_until_contact_is_reachable(): void
     {
         $sales = User::factory()->create(['role' => 'sales']);
         $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
@@ -142,22 +143,17 @@ class LeadManagementTest extends TestCase
             'stage' => 'new',
         ]);
 
-        // Stage masih 'new'.
+        // Kontak belum punya telepon/email.
         $this->actingAs($sales)->post("/sales/leads/{$lead->id}/convert")
             ->assertSessionHas('error');
         $this->assertSame('lead', $lead->fresh()->type);
 
-        // Qualified tapi kontak tanpa telepon/email.
-        $lead->update(['stage' => 'qualified']);
-        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/convert")
-            ->assertSessionHas('error');
-        $this->assertSame('lead', $lead->fresh()->type);
-
-        // Lengkapi kontak -> berhasil.
+        // Lengkapi kontak -> berhasil, sekaligus otomatis jadi Qualified.
         $contact->update(['phone' => '08123456789']);
         $this->actingAs($sales)->post("/sales/leads/{$lead->id}/convert")
             ->assertSessionHas('success');
         $this->assertSame('opportunity', $lead->fresh()->type);
+        $this->assertSame('qualified', $lead->fresh()->stage);
     }
 
     public function test_invalid_stage_is_rejected(): void
