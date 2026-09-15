@@ -8,6 +8,7 @@ use App\Enums\QuotationStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Sales\SaveQuotationRequest;
 use App\Http\Requests\Sales\UpdateQuotationNumberRequest;
+use App\Models\Notification;
 use App\Models\ProcurementRequest;
 use App\Models\Quotation;
 use App\Models\Tax;
@@ -247,7 +248,16 @@ class QuotationController extends Controller
     public function destroy(Quotation $quotation): RedirectResponse
     {
         Gate::authorize('delete', $quotation);
-        $quotation->delete();
+
+        DB::transaction(function () use ($quotation) {
+            // Bersihkan notifikasi PM/Manager/Sales yang menunjuk ke quotation ini
+            // (mis. "perlu diverifikasi") supaya tidak ada link mati di bell notifikasi.
+            Notification::where('related_type', $quotation->getMorphClass())
+                ->where('related_id', $quotation->id)
+                ->delete();
+
+            $quotation->delete();
+        });
 
         return redirect()->route('sales.quotations.index')
             ->with('success', 'Quotation berhasil dihapus.');

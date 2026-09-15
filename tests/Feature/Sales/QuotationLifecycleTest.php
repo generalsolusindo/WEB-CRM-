@@ -459,6 +459,32 @@ class QuotationLifecycleTest extends TestCase
         $this->assertDatabaseHas('quotations', ['id' => $quotation->id]);
     }
 
+    public function test_deleting_a_quotation_also_clears_its_dangling_notifications(): void
+    {
+        $pm = User::factory()->create(['role' => 'project_manager', 'is_active' => true]);
+        [$sales, $pr] = $this->readyProcurementRequest();
+        $pr->lead->update(['delegated_to' => $pm->id]);
+        $line = $pr->lines()->firstOrFail();
+
+        $this->actingAs($sales)->post("/sales/procurement-requests/{$pr->id}/quotations", [
+            'lines' => [['procurement_request_line_id' => $line->id, 'selling_price' => 1300000]],
+        ]);
+        $quotation = Quotation::firstOrFail();
+
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $pm->id,
+            'type' => 'quotation.pending_pm_review',
+            'related_id' => $quotation->id,
+        ]);
+
+        $this->actingAs($sales)->delete("/sales/quotations/{$quotation->id}")->assertRedirect();
+
+        $this->assertDatabaseMissing('notifications', [
+            'related_type' => (new Quotation)->getMorphClass(),
+            'related_id' => $quotation->id,
+        ]);
+    }
+
     public function test_only_the_owning_sales_can_delete_a_quotation(): void
     {
         [, $quotation] = $this->draftQuotation();

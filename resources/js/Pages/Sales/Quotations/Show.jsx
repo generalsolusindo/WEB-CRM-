@@ -22,7 +22,10 @@ export default function Show({ quotation, history, totals, permissions, customer
     );
     function action(path, message) { if (confirm(message)) router.post(path); }
     function destroy() {
-        if (confirm(`Hapus quotation ${number} ini? Tindakan ini tidak bisa dibatalkan.`)) {
+        const warning = quotation.whatsapp_sent_at
+            ? `Quotation ${number} ini sudah pernah dikirim ke customer lewat WhatsApp. Menghapusnya tidak akan menarik kembali pesan yang sudah diterima customer, dan tidak bisa dibatalkan. Tetap hapus?`
+            : `Hapus quotation ${number} ini? Tindakan ini tidak bisa dibatalkan.`;
+        if (confirm(warning)) {
             router.delete(`/sales/quotations/${quotation.id}`);
         }
     }
