@@ -17,9 +17,9 @@ class UserSeeder extends Seeder
             'operational' => ['name' => 'Aini', 'username' => 'aini'],
             'technician' => ['name' => 'Riky', 'username' => 'riky'],
             'finance' => ['name' => 'Farah', 'username' => 'farah'],
-            'management' => ['name' => 'Pak Adi', 'username' => 'pakadi'],
+            'management' => ['name' => 'Pak Adi', 'username' => 'pakadi', 'password' => 'Gsindonesi4'],
             'administrator' => ['name' => 'Administrator', 'username' => 'administrator'],
-            'project_manager' => ['name' => 'project manager', 'username' => 'projectmanager'],
+            'project_manager' => ['name' => 'project manager', 'username' => 'projectmanager', 'password' => 'Gsindonesi4'],
             'hr' => ['name' => 'Ferdina', 'username' => 'ferdina'],
             'warehouse' => ['name' => 'warehouse', 'username' => 'warehouse'],
         ];
@@ -30,7 +30,7 @@ class UserSeeder extends Seeder
                 [
                     'name' => $identity['name'],
                     'username' => $identity['username'],
-                    'password' => Hash::make('password'),
+                    'password' => Hash::make($identity['password'] ?? 'password'),
                     'role' => $role,
                     'is_active' => true,
                 ],
