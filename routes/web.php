@@ -101,6 +101,10 @@ Route::middleware('auth')->group(function () {
         Route::put('opportunities/{lead}/delegate', [ManagementOpportunityController::class, 'delegate'])->name('opportunities.delegate');
         Route::get('quotations', [ManagementQuotationController::class, 'index'])->name('quotations.index');
         Route::get('quotations-overview', [ManagementQuotationController::class, 'all'])->name('quotations.all');
+        // Alias URL untuk baris di "Semua Quotation" — controller show() sama persis, cuma
+        // beda prefix supaya sidebar tetap highlight "Semua Quotation", bukan "Verifikasi
+        // Quotation" (yang juga hidup di prefix /management/quotations).
+        Route::get('quotations-overview/{quotation}', [ManagementQuotationController::class, 'show'])->name('quotations.overview-show');
         Route::get('quotations/{quotation}', [ManagementQuotationController::class, 'show'])->name('quotations.show');
         Route::post('quotations/{quotation}/review', [ManagementQuotationController::class, 'review'])->name('quotations.review');
         Route::get('sows', [ManagementSowController::class, 'index'])->name('sows.index');

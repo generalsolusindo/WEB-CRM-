@@ -89,6 +89,31 @@ class ManagementMonitoringTest extends TestCase
         $this->actingAs($this->management())->get("/sales/quotations/{$quotation->id}/print")->assertOk();
     }
 
+    /**
+     * "Semua Quotation" dan "Verifikasi Quotation" berbagi controller show() yang sama,
+     * tapi harus punya URL & backHref berbeda supaya sidebar menyorot menu yang benar
+     * sesuai dari mana user datang (bukan selalu "Verifikasi Quotation" karena kebetulan
+     * satu prefix URL).
+     */
+    public function test_quotation_detail_reached_from_overview_list_has_overview_back_href(): void
+    {
+        $so = $this->confirmedSalesOrder();
+        $quotation = $so->quotation;
+        $management = $this->management();
+
+        $this->actingAs($management)->get("/management/quotations-overview/{$quotation->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Quotations/Review/Show')
+                ->where('backHref', '/management/quotations-overview'));
+
+        $this->actingAs($management)->get("/management/quotations/{$quotation->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Quotations/Review/Show')
+                ->where('backHref', '/management/quotations'));
+    }
+
     public function test_management_can_see_cost_and_margin_per_line_on_quotation_detail(): void
     {
         $so = $this->confirmedSalesOrder();

@@ -91,10 +91,16 @@ class QuotationController extends Controller
     {
         Gate::authorize('view', $quotation);
 
+        // Dua URL beda (halaman "Semua Quotation" vs "Verifikasi Quotation") memanggil
+        // method yang sama — backHref & activeMenu dibedakan berdasarkan rute mana yang
+        // dipakai, supaya tombol Kembali dan sidebar aktif konsisten dengan dari mana user datang.
+        $fromOverview = request()->routeIs('management.quotations.overview-show');
+
         return Inertia::render('Quotations/Review/Show', [
             'quotation' => $this->quotationDetail($quotation, includeCost: true),
             'canReview' => request()->user()->can('reviewAsManager', $quotation),
             'role' => 'management',
+            'backHref' => $fromOverview ? '/management/quotations-overview' : '/management/quotations',
         ]);
     }
 

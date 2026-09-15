@@ -6,7 +6,7 @@ import CategoryBadge from '../../../Components/CategoryBadge';
 import { Totals } from '../../Sales/Quotations/Show';
 import { PageHeader, Button } from '../../../Components/ui';
 
-export default function Show({ quotation, canReview, role }) {
+export default function Show({ quotation, canReview, role, backHref }) {
     const isMgmt = role === 'management';
     const base = isMgmt ? '/management/quotations' : '/project-manager/quotations';
     const form = useForm({ approved: true, notes: '' });
@@ -30,7 +30,7 @@ export default function Show({ quotation, canReview, role }) {
                         </span>
                     )}
                     subtitle={`${quotation.company || quotation.customer} · Sales: ${quotation.sales}`}
-                    back={{ href: base, label: 'Kembali' }}
+                    back={{ href: backHref || base, label: 'Kembali' }}
                     actions={<Button href={`/sales/quotations/${quotation.id}/print`} external variant="outline" icon={FiFileText}>Lihat PDF</Button>}
                 />
 

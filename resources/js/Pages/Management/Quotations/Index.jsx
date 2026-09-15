@@ -67,7 +67,7 @@ export default function Index({ quotations, filters, statusOptions }) {
                     columns={columns}
                     rows={quotations.data}
                     rowKey="id"
-                    rowHref={(q) => `/management/quotations/${q.id}`}
+                    rowHref={(q) => `/management/quotations-overview/${q.id}`}
                     empty={<EmptyState title="Belum ada quotation." />}
                     footer={<Pagination links={quotations.links} />}
                 />
