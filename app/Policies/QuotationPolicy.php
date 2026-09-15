@@ -48,13 +48,16 @@ class QuotationPolicy
         return $this->owns($user, $quotation);
     }
 
-    /** Hapus tetap hanya untuk Draft (beda dari update() yang sekarang lebih longgar). */
+    /**
+     * Bisa dihapus di status apa saja (Draft/Sent/Rejected) — sama seperti update() —
+     * selama belum jadi Sales Order (akan mengorbankan jejak Invoice/Project di baliknya)
+     * dan belum punya revisi (akan memutus rantai riwayat revisi).
+     */
     public function delete(User $user, Quotation $quotation): bool
     {
         return $this->owns($user, $quotation)
-            && $quotation->status === QuotationStatus::Draft->value
-            && ! $quotation->revisions()->exists()
-            && ! $quotation->salesOrder()->exists();
+            && ! $quotation->salesOrder()->exists()
+            && ! $quotation->revisions()->exists();
     }
 
     public function send(User $user, Quotation $quotation): bool

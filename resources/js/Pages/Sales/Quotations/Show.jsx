@@ -21,7 +21,11 @@ export default function Show({ quotation, history, totals, permissions, customer
         (a, b) => (a.category === 'material' ? 0 : 1) - (b.category === 'material' ? 0 : 1),
     );
     function action(path, message) { if (confirm(message)) router.post(path); }
-    function destroy() { if (confirm('Hapus quotation draft ini?')) router.delete(`/sales/quotations/${quotation.id}`); }
+    function destroy() {
+        if (confirm(`Hapus quotation ${number} ini? Tindakan ini tidak bisa dibatalkan.`)) {
+            router.delete(`/sales/quotations/${quotation.id}`);
+        }
+    }
 
     function sendWhatsapp() {
         router.post(`/sales/quotations/${quotation.id}/send-whatsapp`, {}, {

@@ -250,7 +250,7 @@ class QuotationController extends Controller
         $quotation->delete();
 
         return redirect()->route('sales.quotations.index')
-            ->with('success', 'Quotation draft berhasil dihapus.');
+            ->with('success', 'Quotation berhasil dihapus.');
     }
 
     /** Ubah nomor quotation secara manual, mis. menyambung dari sistem lama. */

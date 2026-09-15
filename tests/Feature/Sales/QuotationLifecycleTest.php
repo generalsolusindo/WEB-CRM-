@@ -398,6 +398,79 @@ class QuotationLifecycleTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_draft_quotation_can_be_deleted_by_its_owner(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+
+        $this->actingAs($sales)
+            ->delete("/sales/quotations/{$quotation->id}")
+            ->assertRedirect('/sales/quotations');
+
+        $this->assertDatabaseMissing('quotations', ['id' => $quotation->id]);
+        $this->assertDatabaseCount('quotation_lines', 0);
+    }
+
+    public function test_sent_quotation_can_also_be_deleted(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $quotation->update(['status' => 'sent']);
+
+        $this->actingAs($sales)
+            ->delete("/sales/quotations/{$quotation->id}")
+            ->assertRedirect('/sales/quotations');
+
+        $this->assertDatabaseMissing('quotations', ['id' => $quotation->id]);
+    }
+
+    public function test_rejected_quotation_can_also_be_deleted(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $quotation->update(['status' => 'rejected']);
+
+        $this->actingAs($sales)
+            ->delete("/sales/quotations/{$quotation->id}")
+            ->assertRedirect('/sales/quotations');
+
+        $this->assertDatabaseMissing('quotations', ['id' => $quotation->id]);
+    }
+
+    public function test_quotation_that_already_became_a_sales_order_cannot_be_deleted(): void
+    {
+        [$sales, $salesOrder] = $this->confirmedSalesOrder('material_only');
+        $quotation = $salesOrder->quotation;
+
+        $this->actingAs($sales)
+            ->delete("/sales/quotations/{$quotation->id}")
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('quotations', ['id' => $quotation->id]);
+    }
+
+    public function test_quotation_with_a_revision_cannot_be_deleted(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $quotation->update(['status' => 'sent']);
+        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/revisions");
+
+        $this->actingAs($sales)
+            ->delete("/sales/quotations/{$quotation->id}")
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('quotations', ['id' => $quotation->id]);
+    }
+
+    public function test_only_the_owning_sales_can_delete_a_quotation(): void
+    {
+        [, $quotation] = $this->draftQuotation();
+        $other = User::factory()->create(['role' => 'sales']);
+
+        $this->actingAs($other)
+            ->delete("/sales/quotations/{$quotation->id}")
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('quotations', ['id' => $quotation->id]);
+    }
+
     public function test_sales_role_cannot_create_invoices_through_any_route(): void
     {
         $sales = User::factory()->create(['role' => 'sales']);
