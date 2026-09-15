@@ -16,7 +16,11 @@ export default function Show({
     const stageLabel = stageOptions.find((s) => s.value === lead.stage)?.label ?? lead.stage;
     const sourceLabel = sourceOptions.find((s) => s.value === lead.source)?.label ?? lead.source;
     function convert() { if (confirm('Tandai lead ini Terkualifikasi & lanjutkan sebagai opportunity?')) router.post(`/sales/leads/${lead.id}/convert`); }
-    function destroy() { if (confirm('Hapus lead ini?')) router.delete(`/sales/leads/${lead.id}`); }
+    function destroy() {
+        if (confirm('Hapus lead ini? Requirement, Procurement Request, Quotation, dan Survey di bawahnya akan ikut terhapus sekaligus. Tindakan ini tidak bisa dibatalkan.')) {
+            router.delete(`/sales/leads/${lead.id}`);
+        }
+    }
 
     return (
         <AppLayout>

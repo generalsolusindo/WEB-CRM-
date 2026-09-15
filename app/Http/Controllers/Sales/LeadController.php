@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Sales;
 
+use App\Actions\Sales\DeleteLead;
 use App\Enums\LeadSource;
 use App\Enums\LeadStage;
 use App\Enums\LeadType;
@@ -225,19 +226,11 @@ class LeadController extends Controller
             ->with('success', 'Lead berhasil diperbarui.');
     }
 
-    public function destroy(Lead $lead): RedirectResponse
+    public function destroy(Lead $lead, DeleteLead $action): RedirectResponse
     {
         Gate::authorize('delete', $lead);
 
-        if ($lead->procurementRequests()->exists()) {
-            return back()->with('error', 'Lead yang sudah dikirim ke Procurement tidak dapat dihapus.');
-        }
-
-        if ($lead->requirements()->exists()) {
-            return back()->with('error', 'Lead dengan requirement tidak dapat dihapus.');
-        }
-
-        $lead->delete();
+        $action->handle($lead);
 
         return redirect()->route('sales.leads.index')
             ->with('success', 'Lead berhasil dihapus.');

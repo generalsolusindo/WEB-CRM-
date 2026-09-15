@@ -116,4 +116,9 @@ class Lead extends Model
     {
         return $this->hasMany(Survey::class);
     }
+
+    public function quotations(): HasMany
+    {
+        return $this->hasMany(Quotation::class);
+    }
 }

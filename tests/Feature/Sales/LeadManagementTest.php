@@ -4,8 +4,15 @@ namespace Tests\Feature\Sales;
 
 use App\Models\Contact;
 use App\Models\Lead;
+use App\Models\Notification;
+use App\Models\ProcurementRequest;
+use App\Models\Project;
+use App\Models\Quotation;
+use App\Models\SalesOrder;
+use App\Models\Survey;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class LeadManagementTest extends TestCase
@@ -165,5 +172,148 @@ class LeadManagementTest extends TestCase
             'contact_id' => $contact->id,
             'stage' => 'anything',
         ])->assertSessionHasErrors('stage');
+    }
+
+    public function test_empty_lead_can_be_deleted(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
+        $lead = Lead::create([
+            'contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'lead', 'stage' => 'new',
+        ]);
+
+        $this->actingAs($sales)->delete("/sales/leads/{$lead->id}")->assertRedirect('/sales/leads');
+
+        $this->assertDatabaseMissing('leads', ['id' => $lead->id]);
+    }
+
+    public function test_deleting_lead_cascades_requirement_procurement_request_and_quotation(): void
+    {
+        [$sales, $quotation] = $this->quotationForLead();
+        $lead = $quotation->lead;
+        $pr = $quotation->procurementRequest;
+
+        $this->actingAs($sales)->delete("/sales/leads/{$lead->id}")->assertRedirect('/sales/leads');
+
+        $this->assertDatabaseMissing('leads', ['id' => $lead->id]);
+        $this->assertDatabaseMissing('requirements', ['lead_id' => $lead->id]);
+        $this->assertDatabaseMissing('procurement_requests', ['id' => $pr->id]);
+        $this->assertDatabaseMissing('quotations', ['id' => $quotation->id]);
+    }
+
+    public function test_lead_cannot_be_deleted_once_a_quotation_sales_order_has_invoice(): void
+    {
+        [$sales, $salesOrder] = $this->confirmedSalesOrder();
+        $lead = $salesOrder->quotation->lead;
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $salesOrder->id, 'phase' => 'full']);
+
+        $this->actingAs($sales)->delete("/sales/leads/{$lead->id}")->assertForbidden();
+
+        $this->assertDatabaseHas('leads', ['id' => $lead->id]);
+        $this->assertDatabaseHas('sales_orders', ['id' => $salesOrder->id]);
+    }
+
+    public function test_lead_cannot_be_deleted_once_a_quotation_sales_order_has_project(): void
+    {
+        [$sales, $salesOrder] = $this->confirmedSalesOrder('mixed');
+        $lead = $salesOrder->quotation->lead;
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $salesOrder->id, 'phase' => 'dp']);
+        $invoice = $salesOrder->invoices()->latest('id')->firstOrFail();
+        $this->actingAs($finance)->post("/finance/invoices/{$invoice->id}/payments", [
+            'amount_paid' => (float) $invoice->amount + (float) $invoice->tax_amount,
+            'paid_at' => now()->toDateTimeString(),
+        ]);
+        $this->assertDatabaseHas('projects', ['sales_order_id' => $salesOrder->id]);
+
+        $this->actingAs($sales)->delete("/sales/leads/{$lead->id}")->assertForbidden();
+
+        $this->assertDatabaseHas('leads', ['id' => $lead->id]);
+    }
+
+    public function test_lead_cannot_be_deleted_once_a_survey_has_invoice(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
+        $lead = Lead::create([
+            'contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified',
+        ]);
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/surveys", [
+            'site_address' => 'Jl. Uji Coba No. 1',
+            'site_region' => 'Sidoarjo',
+            'delivery_mode' => 'vendor',
+            'billable' => true,
+        ]);
+        $survey = Survey::where('lead_id', $lead->id)->firstOrFail();
+        $survey->update(['status' => 'finance_review', 'cost' => 500000]);
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+        $this->actingAs($finance)->post("/finance/surveys/{$survey->id}/invoice", [])->assertSessionHas('success');
+
+        $this->actingAs($sales)->delete("/sales/leads/{$lead->id}")->assertForbidden();
+
+        $this->assertDatabaseHas('leads', ['id' => $lead->id]);
+        $this->assertDatabaseHas('surveys', ['id' => $survey->id]);
+    }
+
+    public function test_deleting_lead_removes_sales_order_attachments_and_notifications(): void
+    {
+        Storage::fake('local');
+        [$sales, $salesOrder] = $this->confirmedSalesOrder();
+        $quotation = $salesOrder->quotation;
+        $lead = $quotation->lead;
+
+        $salesOrder->attachments()->create([
+            'category' => 'quotation_signed',
+            'file_path' => 'sales-orders/signed-quotation.pdf',
+            'uploaded_by' => $sales->id,
+        ]);
+        Storage::disk('local')->put('sales-orders/signed-quotation.pdf', 'dummy');
+
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+        Notification::create([
+            'user_id' => $finance->id,
+            'type' => 'sales_order.created',
+            'message' => 'Sales Order siap dibuatkan invoice.',
+            'related_type' => $salesOrder->getMorphClass(),
+            'related_id' => $salesOrder->id,
+            'is_sent' => true,
+        ]);
+
+        $this->actingAs($sales)->delete("/sales/leads/{$lead->id}")->assertRedirect();
+
+        $this->assertDatabaseMissing('attachments', ['attachable_type' => $salesOrder->getMorphClass(), 'attachable_id' => $salesOrder->id]);
+        Storage::disk('local')->assertMissing('sales-orders/signed-quotation.pdf');
+        $this->assertDatabaseMissing('notifications', ['related_type' => $salesOrder->getMorphClass(), 'related_id' => $salesOrder->id]);
+    }
+
+    /** @return array{User, Quotation} */
+    private function quotationForLead(): array
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
+        $lead = Lead::create([
+            'contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified',
+        ]);
+        $lead->requirements()->create(['item_name' => 'Router', 'qty' => 1, 'unit' => 'unit', 'created_by' => $sales->id]);
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/submit-procurement");
+        $pr = ProcurementRequest::where('lead_id', $lead->id)->with('lines')->latest('id')->firstOrFail();
+        $pr->lines()->update(['cost_price' => 1000000, 'availability_status' => 'available']);
+        $pr->update(['status' => 'ready']);
+        $this->actingAs($sales)->post("/sales/procurement-requests/{$pr->id}/quotations", [
+            'lines' => [['procurement_request_line_id' => $pr->lines()->first()->id, 'selling_price' => 1300000]],
+        ]);
+
+        return [$sales, Quotation::where('procurement_request_id', $pr->id)->with('lead', 'procurementRequest')->firstOrFail()];
+    }
+
+    /** @return array{User, SalesOrder} */
+    private function confirmedSalesOrder(string $orderType = 'material_only'): array
+    {
+        [$sales, $quotation] = $this->quotationForLead();
+        $quotation->update(['status' => 'sent']);
+        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload($orderType));
+
+        return [$sales, SalesOrder::with('quotation.lead')->where('quotation_id', $quotation->id)->firstOrFail()];
     }
 }

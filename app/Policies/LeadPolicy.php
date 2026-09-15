@@ -35,10 +35,28 @@ class LeadPolicy
             && ! $lead->procurementRequests()->exists();
     }
 
+    /**
+     * Bisa dihapus di tahap apa pun — Requirement, Procurement Request, dan Quotation
+     * di bawahnya ikut terhapus sekaligus (cascade) — SELAMA belum ada data transaksi
+     * nyata di baliknya: quotation yang sudah jadi Sales Order dengan Invoice/Project,
+     * atau survey yang sudah punya invoice sendiri. Begitu salah satunya ada, Lead
+     * terkunci permanen dari hapus supaya jejak transaksi/pembayaran tidak hilang.
+     */
     public function delete(User $user, Lead $lead): bool
     {
-        return $this->owns($user, $lead)
-            && ! $lead->procurementRequests()->exists();
+        if (! $this->owns($user, $lead)) {
+            return false;
+        }
+
+        foreach ($lead->quotations as $quotation) {
+            $salesOrder = $quotation->salesOrder;
+
+            if ($salesOrder && ($salesOrder->invoices()->exists() || $salesOrder->projects()->exists())) {
+                return false;
+            }
+        }
+
+        return ! $lead->surveys()->whereHas('invoice')->exists();
     }
 
     public function convert(User $user, Lead $lead): bool
