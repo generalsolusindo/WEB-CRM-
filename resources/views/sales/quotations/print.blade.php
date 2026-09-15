@@ -55,7 +55,7 @@
 
         table.header-table { margin: 0; }
         table.header-table td.title-cell { text-align: right; }
-        .brand img { height: 46px; display: block; }
+        .brand img { height: 62px; display: block; }
         .brand .tag { font-size: 9px; font-style: italic; color: #475569; margin-top: 4px; letter-spacing: .2px; }
         .brand .web { font-size: 9px; color: #2563EB; }
         h1 { font-size: 34px; font-weight: 300; letter-spacing: 3px; color: #64748B; }
