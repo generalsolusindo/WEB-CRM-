@@ -86,7 +86,7 @@ const menuConfig = {
     ],
     administrator: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
-        { label: 'Manajemen User', href: '#', icon: FiUserCheck },
+        { label: 'Manajemen User', href: '/admin/users', icon: FiUserCheck },
         { label: 'Master Data', href: '#', icon: FiDatabase },
         { label: 'Master Data · Pajak', href: '/admin/taxes', icon: FiPercent },
         { label: 'Tanda Tangan', href: '/admin/signature', icon: FiEdit3 },

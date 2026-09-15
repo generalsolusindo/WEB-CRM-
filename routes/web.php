@@ -77,6 +77,8 @@ Route::middleware('auth')->group(function () {
         ->name('notifications.read');
 
     Route::prefix('admin')->name('admin.')->middleware('role:administrator')->group(function () {
+        Route::resource('users', \App\Http\Controllers\Admin\UserController::class)
+            ->except(['show', 'destroy']);
         Route::resource('taxes', TaxController::class)->except('show');
         Route::get('signature', [\App\Http\Controllers\Admin\SignatureController::class, 'edit'])->name('signature.edit');
         Route::post('signature', [\App\Http\Controllers\Admin\SignatureController::class, 'update'])->name('signature.update');

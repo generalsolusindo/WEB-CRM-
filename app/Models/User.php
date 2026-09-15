@@ -17,6 +17,27 @@ class User extends Authenticatable
     use HasFactory, Notifiable;
 
     /**
+     * Role yang bisa dibuat/dikelola langsung lewat "Manajemen User" Administrator.
+     * "vendor" sengaja dikecualikan — akun vendor wajib terhubung ke satu baris Vendor
+     * (vendor_id) dan sudah punya alur pembuatan sendiri di Procurement > Akun PIC Vendor
+     * yang menjaga aturan itu (satu vendor cuma boleh satu akun PIC).
+     *
+     * @var array<string, string>
+     */
+    public const ADMIN_ASSIGNABLE_ROLES = [
+        'sales' => 'Sales',
+        'procurement' => 'Procurement',
+        'operational' => 'Operasional',
+        'technician' => 'Teknisi',
+        'finance' => 'Finance',
+        'management' => 'Manajemen',
+        'administrator' => 'Administrator',
+        'project_manager' => 'Project Manager',
+        'hr' => 'HR',
+        'warehouse' => 'Gudang',
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
