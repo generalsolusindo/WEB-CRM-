@@ -27,13 +27,6 @@ class UpdateQuotation
                 throw ValidationException::withMessages(['quotation' => 'Quotation ini sudah punya revisi yang lebih baru, tidak dapat diubah lagi.']);
             }
 
-            $byId = collect($data['lines'])->keyBy(fn (array $line) => (int) $line['procurement_request_line_id']);
-            $sourceIds = $locked->lines->pluck('procurement_request_line_id')->sort()->values();
-
-            if ($sourceIds->all() !== $byId->keys()->sort()->values()->all()) {
-                throw ValidationException::withMessages(['lines' => 'Line quotation tidak valid.']);
-            }
-
             $locked->update([
                 // Angka berubah -> kembali ke Draft supaya wajib direview & dikirim ulang
                 // ke customer, apa pun status sebelumnya (Sent/Rejected).
@@ -55,34 +48,60 @@ class UpdateQuotation
 
             $taxRates = Tax::pluck('rate', 'id');
 
-            foreach ($locked->lines as $line) {
-                $input = $byId->get($line->procurement_request_line_id);
+            // Snapshot baris lama SEBELUM dihapus, dikunci per procurement_request_line_id —
+            // dipakai dua hal: (1) fallback nilai field yang tidak dikirim ulang oleh client
+            // untuk baris lama (payload boleh parsial), (2) sumber cost_price yang sesungguhnya
+            // untuk baris lama (tidak pernah dipercaya dari input client, supaya Sales tidak
+            // bisa memalsukan margin pada item yang sudah divalidasi Procurement).
+            $existingByPrLineId = $locked->lines->keyBy('procurement_request_line_id');
 
-                $taxId = array_key_exists('tax_id', $input) ? $input['tax_id'] : $line->tax_id;
-                $taxRate = $input['tax_rate'] ?? ($taxId ? (float) ($taxRates[$taxId] ?? 0) : 0.0);
-                $qty = isset($input['qty']) && $input['qty'] !== '' ? (float) $input['qty'] : (float) $line->qty;
+            // Ganti seluruh baris (bukan cuma update satu-satu yang harus selalu cocok dengan
+            // set procurement_request_line_id semula) — supaya Sales bisa bebas menambah &
+            // menghapus item saat edit, bukan cuma mengubah nilai item yang sudah ada. Pola ini
+            // sama seperti UpdateInvoice.
+            $locked->lines()->delete();
+
+            foreach ($data['lines'] as $input) {
+                $prLineId = isset($input['procurement_request_line_id']) ? (int) $input['procurement_request_line_id'] : null;
+                $existing = $prLineId !== null ? $existingByPrLineId->get($prLineId) : null;
+
+                $costPrice = $existing !== null
+                    ? (float) $existing->cost_price
+                    : round((float) ($input['cost_price'] ?? 0), 2);
+
+                $qty = isset($input['qty']) && $input['qty'] !== '' ? (float) $input['qty'] : (float) ($existing->qty ?? 0);
+                $itemName = ($input['item_name'] ?? '') !== '' ? $input['item_name'] : ($existing->item_name ?? '');
+                $unit = ($input['unit'] ?? '') !== '' ? $input['unit'] : ($existing->unit ?? '');
+                $category = in_array($input['category'] ?? null, ['material', 'service', 'reimburse'], true)
+                    ? $input['category']
+                    : ($existing->category ?? 'material');
+                $description = array_key_exists('description', $input)
+                    ? ($input['description'] ?: null)
+                    : ($existing->description ?? null);
+                $sourcingNote = array_key_exists('sourcing_note', $input)
+                    ? ($input['sourcing_note'] ?: null)
+                    : ($existing->sourcing_note ?? null);
+
+                $taxId = array_key_exists('tax_id', $input) ? $input['tax_id'] : ($existing->tax_id ?? null);
+                $taxRate = $input['tax_rate'] ?? ($taxId ? (float) ($taxRates[$taxId] ?? 0) : (float) ($existing->tax_rate ?? 0));
 
                 $priced = LinePricing::resolve(
                     $qty,
                     (float) $input['selling_price'],
-                    (float) $line->cost_price,
+                    $costPrice,
                     isset($input['discount_percent']) ? (float) $input['discount_percent'] : null,
                     isset($input['discount_amount']) ? (float) $input['discount_amount'] : null,
                 );
 
-                $line->update([
-                    'item_name' => ($input['item_name'] ?? '') !== '' ? $input['item_name'] : $line->item_name,
-                    'description' => array_key_exists('description', $input)
-                        ? ($input['description'] ?: null)
-                        : $line->description,
+                $locked->lines()->create([
+                    'procurement_request_line_id' => $prLineId,
+                    'item_name' => $itemName,
+                    'category' => $category,
+                    'description' => $description,
+                    'sourcing_note' => $sourcingNote,
                     'qty' => $qty,
-                    'unit' => ($input['unit'] ?? '') !== '' ? $input['unit'] : $line->unit,
-                    'category' => in_array($input['category'] ?? null, ['material', 'service', 'reimburse'], true)
-                        ? $input['category']
-                        : $line->category,
-                    'sourcing_note' => array_key_exists('sourcing_note', $input)
-                        ? ($input['sourcing_note'] ?: null)
-                        : $line->sourcing_note,
+                    'unit' => $unit,
+                    'cost_price' => $costPrice,
                     'selling_price' => $input['selling_price'],
                     'discount_percent' => $priced['discount_percent'],
                     'discount_amount' => $priced['discount_amount'],
@@ -93,8 +112,10 @@ class UpdateQuotation
                 ]);
             }
 
+            $locked->load('lines');
+
             if ($locked->agreed_dpp !== null) {
-                AgreedDpp::distribute($locked->lines()->get(), (float) $locked->agreed_dpp);
+                AgreedDpp::distribute($locked->lines, (float) $locked->agreed_dpp);
             }
 
             $pm = $locked->lead?->delegatedTo;

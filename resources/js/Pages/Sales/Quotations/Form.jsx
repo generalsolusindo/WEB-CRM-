@@ -1,5 +1,6 @@
-import { Fragment } from "react";
+import { Fragment, useRef } from "react";
 import { Head, Link, useForm } from "@inertiajs/react";
+import { FiPlus, FiTrash2 } from "react-icons/fi";
 import { PageHeader, Button, CurrencyInput } from "../../../Components/ui";
 import AppLayout from '../../../Layouts/AppLayout';
 
@@ -18,6 +19,7 @@ function initialLine(line, taxes) {
     if (taxId && taxes.some((t) => String(t.id) === String(taxId))) taxMode = 'master';
     else if (rate != null && rate > 0) taxMode = 'custom';
     return {
+        _key: `src-${line.id}`,
         procurement_request_line_id: line.procurement_request_line_id ?? line.id,
         item_name: line.item_name ?? '',
         description: line.description ?? '',
@@ -25,6 +27,7 @@ function initialLine(line, taxes) {
         unit: line.unit ?? '',
         category: line.category ?? line.vendor_product?.category ?? 'material',
         sourcing_note: line.sourcing_note ?? '',
+        cost_price: line.cost_price != null ? String(line.cost_price) : '',
         selling_price: line.selling_price ?? suggestedPrice(line.cost_price),
         discount_mode: dp && dp > 0 ? 'percent' : (da > 0 ? 'amount' : 'percent'),
         discount_percent: dp && dp > 0 ? String(dp) : '',
@@ -35,10 +38,32 @@ function initialLine(line, taxes) {
     };
 }
 
+function blankLine(key) {
+    return {
+        _key: key,
+        procurement_request_line_id: null,
+        item_name: '',
+        description: '',
+        qty: '1',
+        unit: '',
+        category: 'material',
+        sourcing_note: '',
+        cost_price: '',
+        selling_price: '',
+        discount_mode: 'percent',
+        discount_percent: '',
+        discount_amount: '',
+        tax_mode: 'none',
+        tax_id: '',
+        tax_rate: '',
+    };
+}
+
 export default function Form({ procurementRequest = null, quotation = null, taxes = [], defaultTerms = '', unitOptions = [] }) {
     const editing = Boolean(quotation);
     const sourceLines = editing ? quotation.lines : procurementRequest.lines;
     const customer = editing ? quotation.contact : procurementRequest.lead.contact;
+    const newLineCounter = useRef(0);
 
     const { data, setData, post, put, processing, errors, transform } = useForm({
         notes: quotation?.notes ?? '',
@@ -48,7 +73,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
     });
 
     const groupRank = (i) => (data.lines[i].category === 'material' ? 0 : 1);
-    const orderedIdx = sourceLines
+    const orderedIdx = data.lines
         .map((_, i) => i)
         .sort((a, b) => groupRank(a) - groupRank(b) || a - b);
 
@@ -63,6 +88,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
             unit: l.unit,
             category: l.category,
             sourcing_note: l.sourcing_note,
+            cost_price: l.procurement_request_line_id === null ? (l.cost_price === '' ? null : Number(l.cost_price)) : undefined,
             selling_price: l.selling_price,
             discount_percent: l.discount_mode === 'percent' && l.discount_percent !== '' ? Number(l.discount_percent) : null,
             discount_amount: l.discount_mode === 'amount' && l.discount_amount !== '' ? Number(l.discount_amount) : null,
@@ -75,13 +101,22 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
         setData('lines', data.lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
     }
 
-    const grossAll = r2(sourceLines.reduce((s, line, i) => s + Number(data.lines[i].qty || 0) * Number(data.lines[i].selling_price || 0), 0));
+    function addLine() {
+        newLineCounter.current += 1;
+        setData('lines', [...data.lines, blankLine(`new-${newLineCounter.current}`)]);
+    }
+
+    function removeLine(i) {
+        setData('lines', data.lines.filter((_, idx) => idx !== i));
+    }
+
+    const grossAll = r2(data.lines.reduce((s, l) => s + Number(l.qty || 0) * Number(l.selling_price || 0), 0));
     const agreedDpp = data.agreed_dpp !== '' ? Number(data.agreed_dpp) : null;
     const agreedFactor = agreedDpp != null && agreedDpp > 0 && grossAll > 0
         ? Math.min(agreedDpp, grossAll) / grossAll
         : null;
 
-    function calc(line, i) {
+    function calc(i) {
         const d = data.lines[i];
         const qty = Number(d.qty || 0);
         const gross = r2(qty * Number(d.selling_price || 0));
@@ -92,7 +127,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
         else if (d.discount_mode === 'amount' && d.discount_amount !== '') discount = Math.min(Number(d.discount_amount), gross);
         const dpp = r2(gross - discount);
         const tax = r2(dpp * Number(d.tax_rate || 0) / 100);
-        const cost = Number(line.cost_price);
+        const cost = Number(d.cost_price || 0);
         const totalCost = r2(qty * cost);
         return {
             gross, discount, dpp, tax,
@@ -101,7 +136,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
         };
     }
 
-    function onDiscountPercent(i, line, value) {
+    function onDiscountPercent(i, value) {
         const gross = r2(Number(data.lines[i].qty || 0) * Number(data.lines[i].selling_price || 0));
         setLine(i, {
             discount_mode: 'percent',
@@ -109,7 +144,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
             discount_amount: value === '' ? '' : String(r2(gross * Number(value) / 100)),
         });
     }
-    function onDiscountAmount(i, line, value) {
+    function onDiscountAmount(i, value) {
         const gross = r2(Number(data.lines[i].qty || 0) * Number(data.lines[i].selling_price || 0));
         setLine(i, {
             discount_mode: 'amount',
@@ -124,11 +159,11 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
         setLine(i, { tax_mode: 'master', tax_id: value, tax_rate: t ? String(Number(t.rate)) : '' });
     }
 
-    const totals = sourceLines.reduce((acc, line, i) => {
-        const c = calc(line, i);
+    const totals = data.lines.reduce((acc, l, i) => {
+        const c = calc(i);
         acc.gross += c.gross; acc.discount += c.discount; acc.dpp += c.dpp; acc.tax += c.tax;
-        acc.cost += r2(Number(data.lines[i].qty || 0) * Number(line.cost_price));
-        if (data.lines[i].category === 'service') acc.serviceDpp += c.dpp;
+        acc.cost += r2(Number(l.qty || 0) * Number(l.cost_price || 0));
+        if (l.category === 'service') acc.serviceDpp += c.dpp;
         return acc;
     }, { gross: 0, discount: 0, dpp: 0, tax: 0, cost: 0, serviceDpp: 0 });
     const grand = r2(totals.dpp + totals.tax);
@@ -192,7 +227,10 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                     <section className="card overflow-hidden p-0">
                         <div className="border-b border-border p-5">
                             <h2 className="font-semibold text-text">Line Items</h2>
-                            <p className="text-sm text-text-muted">Nama item, deskripsi, qty & unit bisa diubah bebas. Cost tetap mengikuti data Procurement.</p>
+                            <p className="text-sm text-text-muted">
+                                Nama item, deskripsi, qty & unit bisa diubah bebas. Cost item lama tetap mengikuti data Procurement.
+                                {editing && ' Bisa tambah item baru atau hapus item yang tidak jadi dipakai.'}
+                            </p>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
@@ -205,19 +243,21 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                         <th className="px-3 py-3">Diskon</th>
                                         <th className="px-3 py-3">Pajak %</th>
                                         <th className="px-3 py-3 text-right">DPP</th>
+                                        {editing && <th className="px-3 py-3"></th>}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                     {orderedIdx.map((i, pos) => {
-                                        const line = sourceLines[i];
-                                        const c = calc(line, i);
-                                        const group = data.lines[i].category === 'material' ? 'material' : 'service';
+                                        const line = data.lines[i];
+                                        const c = calc(i);
+                                        const isNew = line.procurement_request_line_id === null;
+                                        const group = line.category === 'material' ? 'material' : 'service';
                                         const prevGroup = pos === 0 ? null : (data.lines[orderedIdx[pos - 1]].category === 'material' ? 'material' : 'service');
                                         return (
-                                          <Fragment key={line.id}>
+                                          <Fragment key={line._key}>
                                             {group !== prevGroup && (
                                                 <tr className="bg-surface-2">
-                                                    <td colSpan="7" className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
+                                                    <td colSpan={editing ? 8 : 7} className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
                                                         {group === 'material' ? 'Material' : 'Jasa'}
                                                     </td>
                                                 </tr>
@@ -230,6 +270,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                                         className="w-full rounded border border-border px-1.5 py-1 text-sm font-medium text-text"
                                                     />
                                                     {errors[`lines.${i}.item_name`] && <span className="text-xs text-danger">{errors[`lines.${i}.item_name`]}</span>}
+                                                    {errors[`lines.${i}.procurement_request_line_id`] && <span className="block text-xs text-danger">{errors[`lines.${i}.procurement_request_line_id`]}</span>}
                                                     <textarea
                                                         rows="2" value={data.lines[i].description}
                                                         onChange={(e) => setLine(i, { description: e.target.value })}
@@ -266,17 +307,27 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                                         )}
                                                     </select>
                                                     {errors[`lines.${i}.qty`] && <span className="text-xs text-danger">{errors[`lines.${i}.qty`]}</span>}
+                                                    {errors[`lines.${i}.unit`] && <span className="block text-xs text-danger">{errors[`lines.${i}.unit`]}</span>}
                                                 </td>
-                                                <td className="px-3 py-3 text-right text-text-muted">{money(line.cost_price)}</td>
+                                                <td className="min-w-28 px-3 py-3 text-right">
+                                                    {isNew ? (
+                                                        <>
+                                                            <CurrencyInput value={data.lines[i].cost_price} onChange={(e) => setLine(i, { cost_price: e.target.value })} placeholder="Harga beli" className="w-full rounded-lg border border-border px-2 py-1.5 text-right outline-none focus:border-navy" />
+                                                            {errors[`lines.${i}.cost_price`] && <span className="text-xs text-danger">{errors[`lines.${i}.cost_price`]}</span>}
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-text-muted">{money(line.cost_price)}</span>
+                                                    )}
+                                                </td>
                                                 <td className="min-w-36 px-3 py-3">
                                                     <CurrencyInput value={data.lines[i].selling_price} onChange={(e) => setLine(i, { selling_price: e.target.value })} className="w-full rounded-lg border border-border px-2 py-1.5 text-right outline-none focus:border-navy" />
                                                     {errors[`lines.${i}.selling_price`] && <span className="text-xs text-danger">{errors[`lines.${i}.selling_price`]}</span>}
                                                 </td>
                                                 <td className="min-w-40 px-3 py-3">
                                                     <div className="flex items-center gap-1">
-                                                        <input type="number" min="0" max="100" step="0.01" placeholder="%" disabled={agreedFactor != null} value={data.lines[i].discount_percent} onChange={(e) => onDiscountPercent(i, line, e.target.value)} className="w-16 rounded-lg border border-border px-2 py-1.5 text-right text-xs disabled:bg-bg" />
+                                                        <input type="number" min="0" max="100" step="0.01" placeholder="%" disabled={agreedFactor != null} value={data.lines[i].discount_percent} onChange={(e) => onDiscountPercent(i, e.target.value)} className="w-16 rounded-lg border border-border px-2 py-1.5 text-right text-xs disabled:bg-bg" />
                                                         <span className="text-xs text-text-muted">/</span>
-                                                        <CurrencyInput placeholder="Rp" disabled={agreedFactor != null} value={data.lines[i].discount_amount} onChange={(e) => onDiscountAmount(i, line, e.target.value)} className="w-full rounded-lg border border-border px-2 py-1.5 text-right text-xs disabled:bg-bg" />
+                                                        <CurrencyInput placeholder="Rp" disabled={agreedFactor != null} value={data.lines[i].discount_amount} onChange={(e) => onDiscountAmount(i, e.target.value)} className="w-full rounded-lg border border-border px-2 py-1.5 text-right text-xs disabled:bg-bg" />
                                                     </div>
                                                     {c.discount > 0 && <div className="mt-0.5 text-right text-[10px] text-text-muted">−{money(c.discount)}{agreedFactor != null ? ' (dari Nilai DPP)' : ''}</div>}
                                                 </td>
@@ -297,25 +348,43 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                                     {errors[`lines.${i}.tax_rate`] && <span className="text-xs text-danger">{errors[`lines.${i}.tax_rate`]}</span>}
                                                 </td>
                                                 <td className="px-3 py-3 text-right font-medium text-text">{money(c.dpp)}</td>
+                                                {editing && (
+                                                    <td className="px-3 py-3 text-right">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeLine(i)}
+                                                            disabled={data.lines.length <= 1}
+                                                            title={data.lines.length <= 1 ? 'Minimal satu item' : 'Hapus item ini'}
+                                                            className="rounded-lg p-1.5 text-danger hover:bg-danger-soft disabled:cursor-not-allowed disabled:text-text-faint disabled:hover:bg-transparent"
+                                                        >
+                                                            <FiTrash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </td>
+                                                )}
                                             </tr>
                                           </Fragment>
                                         );
                                     })}
                                 </tbody>
                                 <tfoot className="border-t border-border bg-surface-2 text-text">
-                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Subtotal Bruto</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.gross)}</td></tr>
-                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Total Diskon{discPct > 0 ? ` (${discPct}%)` : ''}</td><td className="px-3 py-1.5 text-right font-medium text-danger">−{money(totals.discount)}</td></tr>
-                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">DPP</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.dpp)}</td></tr>
-                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Total PPN</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.tax)}</td></tr>
-                                    <tr><td colSpan="6" className="px-3 py-3 text-right font-semibold">Grand Total</td><td className="px-3 py-3 text-right text-lg font-bold">{money(grand)}</td></tr>
+                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Subtotal Bruto</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.gross)}</td>{editing && <td></td>}</tr>
+                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Total Diskon{discPct > 0 ? ` (${discPct}%)` : ''}</td><td className="px-3 py-1.5 text-right font-medium text-danger">−{money(totals.discount)}</td>{editing && <td></td>}</tr>
+                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">DPP</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.dpp)}</td>{editing && <td></td>}</tr>
+                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Total PPN</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.tax)}</td>{editing && <td></td>}</tr>
+                                    <tr><td colSpan="6" className="px-3 py-3 text-right font-semibold">Grand Total</td><td className="px-3 py-3 text-right text-lg font-bold">{money(grand)}</td>{editing && <td></td>}</tr>
                                     {pph23Estimate > 0 && <>
-                                        <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi PPh 23 (2%) — jika customer memotong</td><td className="px-3 py-1.5 text-right text-xs font-medium text-warning">−{money(pph23Estimate)}</td></tr>
-                                        <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi diterima tunai</td><td className="px-3 py-1.5 text-right text-xs font-medium">{money(r2(grand - pph23Estimate))}</td></tr>
+                                        <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi PPh 23 (2%) — jika customer memotong</td><td className="px-3 py-1.5 text-right text-xs font-medium text-warning">−{money(pph23Estimate)}</td>{editing && <td></td>}</tr>
+                                        <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi diterima tunai</td><td className="px-3 py-1.5 text-right text-xs font-medium">{money(r2(grand - pph23Estimate))}</td>{editing && <td></td>}</tr>
                                     </>}
-                                    {marginPct != null && <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi margin keseluruhan</td><td className={`px-3 py-1.5 text-right text-xs font-medium ${marginPct < 0 ? 'text-danger' : 'text-success'}`}>{money(marginRp)} ({marginPct}%)</td></tr>}
+                                    {marginPct != null && <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi margin keseluruhan</td><td className={`px-3 py-1.5 text-right text-xs font-medium ${marginPct < 0 ? 'text-danger' : 'text-success'}`}>{money(marginRp)} ({marginPct}%)</td>{editing && <td></td>}</tr>}
                                 </tfoot>
                             </table>
                         </div>
+                        {editing && (
+                            <div className="border-t border-border p-4">
+                                <Button type="button" variant="outline" icon={FiPlus} onClick={addLine}>Tambah Item</Button>
+                            </div>
+                        )}
                     </section>
 
                     <div className="flex justify-end gap-3">

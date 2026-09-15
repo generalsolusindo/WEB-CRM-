@@ -8,6 +8,7 @@ use App\Enums\QuotationStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Sales\SaveQuotationRequest;
 use App\Http\Requests\Sales\UpdateQuotationNumberRequest;
+use App\Http\Requests\Sales\UpdateQuotationRequest;
 use App\Models\Notification;
 use App\Models\ProcurementRequest;
 use App\Models\Quotation;
@@ -235,7 +236,7 @@ class QuotationController extends Controller
     }
 
     public function update(
-        SaveQuotationRequest $request,
+        UpdateQuotationRequest $request,
         Quotation $quotation,
         UpdateQuotation $action,
     ): RedirectResponse {

@@ -166,7 +166,7 @@ class QuotationLifecycleTest extends TestCase
             ])
             ->assertRedirect();
 
-        $fresh = $line->fresh();
+        $fresh = $quotation->lines()->firstOrFail();
         $this->assertSame('pcs', $fresh->unit);
         $this->assertSame('1450000.00', $fresh->selling_price);
     }
@@ -214,10 +214,147 @@ class QuotationLifecycleTest extends TestCase
             ])
             ->assertRedirect();
 
-        $fresh = $line->fresh();
+        $fresh = $quotation->lines()->firstOrFail();
         $this->assertSame($originalName, $fresh->item_name);
         $this->assertSame($originalQty, $fresh->qty);
         $this->assertSame($originalUnit, $fresh->unit);
+    }
+
+    public function test_editing_can_add_a_new_line_not_from_procurement(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $line = $quotation->lines()->firstOrFail();
+
+        $this->actingAs($sales)
+            ->put("/sales/quotations/{$quotation->id}", [
+                'lines' => [
+                    ['procurement_request_line_id' => $line->procurement_request_line_id, 'selling_price' => 1300000],
+                    [
+                        'procurement_request_line_id' => null,
+                        'item_name' => 'Kabel Tambahan',
+                        'qty' => 2,
+                        'unit' => 'meter',
+                        'category' => 'material',
+                        'cost_price' => 20000,
+                        'selling_price' => 30000,
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(2, $quotation->lines()->count());
+        $newLine = $quotation->lines()->where('item_name', 'Kabel Tambahan')->firstOrFail();
+        $this->assertNull($newLine->procurement_request_line_id);
+        $this->assertSame('20000.00', $newLine->cost_price);
+        $this->assertSame('30000.00', $newLine->selling_price);
+        $this->assertSame('60000.00', $newLine->subtotal);
+    }
+
+    public function test_adding_a_new_line_without_cost_price_is_rejected(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $line = $quotation->lines()->firstOrFail();
+        $originalCount = $quotation->lines()->count();
+
+        $this->actingAs($sales)
+            ->put("/sales/quotations/{$quotation->id}", [
+                'lines' => [
+                    ['procurement_request_line_id' => $line->procurement_request_line_id, 'selling_price' => 1300000],
+                    [
+                        'procurement_request_line_id' => null,
+                        'item_name' => 'Item Tanpa Harga Beli',
+                        'qty' => 1,
+                        'unit' => 'unit',
+                        'category' => 'material',
+                        'selling_price' => 50000,
+                    ],
+                ],
+            ])
+            ->assertSessionHasErrors('lines.1.cost_price');
+
+        $this->assertSame($originalCount, $quotation->fresh()->lines()->count());
+    }
+
+    public function test_a_new_line_cannot_supply_its_own_procurement_request_line_id_from_elsewhere(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $line = $quotation->lines()->firstOrFail();
+
+        // Quotation kedua yang sepenuhnya lepas dari helper draftQuotation()/readyProcurementRequest()
+        // (keduanya pakai firstOrFail() tanpa scope, jadi tidak aman dipanggil dua kali di test yang sama).
+        $otherSales = User::factory()->create(['role' => 'sales']);
+        $otherContact = Contact::create(['name' => 'Customer Lain', 'created_by' => $otherSales->id]);
+        $otherLead = Lead::create([
+            'contact_id' => $otherContact->id, 'sales_id' => $otherSales->id, 'type' => 'opportunity', 'stage' => 'qualified',
+        ]);
+        $otherLead->requirements()->create(['item_name' => 'Kabel Lain', 'qty' => 1, 'unit' => 'unit', 'created_by' => $otherSales->id]);
+        $this->actingAs($otherSales)->post("/sales/leads/{$otherLead->id}/submit-procurement");
+        $otherPr = ProcurementRequest::where('lead_id', $otherLead->id)->with('lines')->firstOrFail();
+        $otherPr->lines()->update(['cost_price' => 500000, 'availability_status' => 'available']);
+        $otherPr->update(['status' => 'ready']);
+        $this->actingAs($otherSales)->post("/sales/procurement-requests/{$otherPr->id}/quotations", [
+            'lines' => [['procurement_request_line_id' => $otherPr->lines()->first()->id, 'selling_price' => 700000]],
+        ]);
+        $otherQuotation = Quotation::where('lead_id', $otherLead->id)->with('lines')->firstOrFail();
+        $otherLine = $otherQuotation->lines()->firstOrFail();
+
+        $this->actingAs($sales)
+            ->put("/sales/quotations/{$quotation->id}", [
+                'lines' => [
+                    ['procurement_request_line_id' => $line->procurement_request_line_id, 'selling_price' => 1300000],
+                    ['procurement_request_line_id' => $otherLine->procurement_request_line_id, 'selling_price' => 1300000],
+                ],
+            ])
+            ->assertSessionHasErrors('lines.1.procurement_request_line_id');
+    }
+
+    public function test_editing_can_delete_an_existing_line_leaving_at_least_one(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $line = $quotation->lines()->firstOrFail();
+
+        // Tambah satu line dulu supaya ada 2 baris, baru hapus salah satunya.
+        $this->actingAs($sales)->put("/sales/quotations/{$quotation->id}", [
+            'lines' => [
+                ['procurement_request_line_id' => $line->procurement_request_line_id, 'selling_price' => 1300000],
+                [
+                    'procurement_request_line_id' => null, 'item_name' => 'Item Kedua', 'qty' => 1,
+                    'unit' => 'unit', 'category' => 'material', 'cost_price' => 10000, 'selling_price' => 15000,
+                ],
+            ],
+        ]);
+        $this->assertSame(2, $quotation->lines()->count());
+
+        $this->actingAs($sales)
+            ->put("/sales/quotations/{$quotation->id}", [
+                'lines' => [
+                    ['procurement_request_line_id' => $line->procurement_request_line_id, 'selling_price' => 1300000],
+                ],
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(1, $quotation->lines()->count());
+        $this->assertDatabaseMissing('quotation_lines', ['item_name' => 'Item Kedua']);
+    }
+
+    public function test_cost_price_sent_by_client_for_an_existing_line_is_ignored(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $line = $quotation->lines()->firstOrFail();
+        $realCost = $line->cost_price;
+
+        $this->actingAs($sales)
+            ->put("/sales/quotations/{$quotation->id}", [
+                'lines' => [[
+                    'procurement_request_line_id' => $line->procurement_request_line_id,
+                    'selling_price' => 1300000,
+                    'cost_price' => 1, // mencoba memalsukan harga beli jadi nyaris 0 (margin palsu)
+                ]],
+            ])
+            ->assertRedirect();
+
+        $fresh = $quotation->lines()->firstOrFail();
+        $this->assertSame($realCost, $fresh->cost_price);
     }
 
     public function test_sent_quotation_can_still_be_updated_but_resets_to_draft_and_clears_review(): void
