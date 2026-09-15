@@ -14,6 +14,7 @@ export default function Index({ projectManagers, filters }) {
 
     const columns = [
         { key: 'name', label: 'Nama', render: (pm) => <span className="font-medium text-text">{pm.name}</span> },
+        { key: 'username', label: 'Username', render: (pm) => <span className="text-text-muted">{pm.username}</span> },
         { key: 'email', label: 'Email', render: (pm) => <span className="text-text-muted">{pm.email}</span> },
         { key: 'phone', label: 'Telepon', render: (pm) => pm.phone || '—' },
         {

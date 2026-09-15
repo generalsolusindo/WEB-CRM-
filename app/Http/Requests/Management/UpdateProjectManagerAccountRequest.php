@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Management;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
@@ -20,6 +21,7 @@ class UpdateProjectManagerAccountRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:255', 'alpha_dash', Rule::unique('users', 'username')->ignore($user->id)],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:50'],
             'password' => ['nullable', 'confirmed', Password::min(8)],
@@ -29,6 +31,9 @@ class UpdateProjectManagerAccountRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge(['is_active' => $this->boolean('is_active', true)]);
+        $this->merge([
+            'is_active' => $this->boolean('is_active', true),
+            'username' => Str::lower(trim((string) $this->input('username'))),
+        ]);
     }
 }

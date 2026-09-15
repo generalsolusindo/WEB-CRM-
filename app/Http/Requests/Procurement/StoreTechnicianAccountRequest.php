@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Procurement;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 
 class StoreTechnicianAccountRequest extends FormRequest
@@ -17,6 +18,7 @@ class StoreTechnicianAccountRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:255', 'alpha_dash', 'unique:users,username'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:50'],
             'nik' => ['nullable', 'string', 'max:50'],
@@ -32,6 +34,7 @@ class StoreTechnicianAccountRequest extends FormRequest
         $this->merge([
             'is_active' => $this->boolean('is_active', true),
             'vendor_id' => $this->input('vendor_id') ?: null,
+            'username' => Str::lower(trim((string) $this->input('username'))),
         ]);
     }
 }

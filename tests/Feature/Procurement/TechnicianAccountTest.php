@@ -23,6 +23,7 @@ class TechnicianAccountTest extends TestCase
     {
         $this->actingAs($this->procurement())->post('/procurement/technicians', [
             'name' => 'Budi Surveyor',
+            'username' => 'budisurveyor',
             'email' => 'budi@ho.test',
             'phone' => '0811',
             'password' => 'rahasia123',
@@ -42,6 +43,7 @@ class TechnicianAccountTest extends TestCase
 
         $this->actingAs($this->procurement())->post('/procurement/technicians', [
             'name' => 'Andi Vendor',
+            'username' => 'andivendor',
             'email' => 'andi@vendor.test',
             'password' => 'rahasia123',
             'password_confirmation' => 'rahasia123',
@@ -63,6 +65,7 @@ class TechnicianAccountTest extends TestCase
 
         $this->actingAs($this->procurement())->put("/procurement/technicians/{$tech->id}", [
             'name' => 'Baru',
+            'username' => $tech->username,
             'email' => $tech->email,
             'is_active' => false,
         ])->assertRedirect('/procurement/technicians');
@@ -88,6 +91,7 @@ class TechnicianAccountTest extends TestCase
 
         $this->actingAs($this->procurement())->post('/procurement/technicians', [
             'name' => 'X',
+            'username' => 'xduptech',
             'email' => 'dup@test.test',
             'password' => 'rahasia123',
             'password_confirmation' => 'rahasia123',
@@ -112,6 +116,7 @@ class TechnicianAccountTest extends TestCase
 
         $this->actingAs($this->procurement())->post('/procurement/technicians', [
             'name' => 'Budi Surveyor',
+            'username' => 'budiktp',
             'email' => 'budi-ktp@ho.test',
             'password' => 'rahasia123',
             'password_confirmation' => 'rahasia123',
@@ -136,6 +141,7 @@ class TechnicianAccountTest extends TestCase
 
         $this->actingAs($this->procurement())->put("/procurement/technicians/{$tech->id}", [
             'name' => $tech->name,
+            'username' => $tech->username,
             'email' => $tech->email,
             'nik' => '3201234567890004',
             'ktp_document' => UploadedFile::fake()->image('ktp-updated.jpg'),

@@ -1,11 +1,11 @@
 import { Head, useForm } from '@inertiajs/react';
 import { useState } from 'react';
-import { FiMail, FiLock, FiEye, FiEyeOff, FiShield } from 'react-icons/fi';
+import { FiUser, FiLock, FiEye, FiEyeOff, FiShield } from 'react-icons/fi';
 import { Button } from '../../Components/ui';
 
 export default function Login() {
     const { data, setData, post, processing, errors, reset } = useForm({
-        email: '',
+        username: '',
         password: '',
         remember: false,
     });
@@ -70,23 +70,24 @@ export default function Login() {
 
                         <form onSubmit={submit} className="space-y-4">
                             <div>
-                                <label htmlFor="email" className="mb-1 block text-sm font-medium text-text">
-                                    Email
+                                <label htmlFor="username" className="mb-1 block text-sm font-medium text-text">
+                                    Username
                                 </label>
                                 <div className="relative">
-                                    <FiMail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+                                    <FiUser className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
                                     <input
-                                        id="email"
-                                        type="email"
-                                        value={data.email}
+                                        id="username"
+                                        type="text"
+                                        value={data.username}
                                         autoComplete="username"
+                                        autoCapitalize="none"
                                         autoFocus
-                                        onChange={(e) => setData('email', e.target.value)}
+                                        onChange={(e) => setData('username', e.target.value.toLowerCase())}
                                         className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm text-text outline-none transition hover:border-text-faint focus:border-primary focus:shadow-[0_0_0_3px_var(--color-primary-ring)]"
                                     />
                                 </div>
-                                {errors.email && (
-                                    <p className="mt-1 text-sm text-danger">{errors.email}</p>
+                                {errors.username && (
+                                    <p className="mt-1 text-sm text-danger">{errors.username}</p>
                                 )}
                             </div>
 

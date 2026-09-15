@@ -32,6 +32,7 @@ class ProjectManagerAccountController extends Controller
             ->through(fn (User $user) => [
                 'id' => $user->id,
                 'name' => $user->name,
+                'username' => $user->username,
                 'email' => $user->email,
                 'phone' => $user->phone,
                 'is_active' => $user->is_active,
@@ -56,6 +57,7 @@ class ProjectManagerAccountController extends Controller
 
         User::create([
             'name' => $data['name'],
+            'username' => $data['username'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'password' => Hash::make($data['password']),
@@ -73,7 +75,7 @@ class ProjectManagerAccountController extends Controller
         abort_unless($projectManager->role === 'project_manager', 404);
 
         return Inertia::render('Management/ProjectManagers/Form', [
-            'projectManager' => $projectManager->only('id', 'name', 'email', 'phone', 'is_active'),
+            'projectManager' => $projectManager->only('id', 'name', 'username', 'email', 'phone', 'is_active'),
         ]);
     }
 
@@ -85,6 +87,7 @@ class ProjectManagerAccountController extends Controller
 
         $projectManager->fill([
             'name' => $data['name'],
+            'username' => $data['username'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'is_active' => $data['is_active'] ?? true,

@@ -14,6 +14,7 @@ export default function Index({ accounts, filters }) {
 
     const columns = [
         { key: 'name', label: 'Nama', render: (a) => <span className="font-medium text-text">{a.name}</span> },
+        { key: 'username', label: 'Username', render: (a) => <span className="text-text-muted">{a.username}</span> },
         { key: 'email', label: 'Email', render: (a) => <span className="text-text-muted">{a.email}</span> },
         { key: 'phone', label: 'Telepon', render: (a) => a.phone || '—' },
         { key: 'vendor', label: 'Vendor', render: (a) => a.vendor || '—' },

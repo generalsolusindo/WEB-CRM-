@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Management;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 
 class StoreProjectManagerAccountRequest extends FormRequest
@@ -17,6 +18,7 @@ class StoreProjectManagerAccountRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:255', 'alpha_dash', 'unique:users,username'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:50'],
             'password' => ['required', 'confirmed', Password::min(8)],
@@ -26,6 +28,9 @@ class StoreProjectManagerAccountRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge(['is_active' => $this->boolean('is_active', true)]);
+        $this->merge([
+            'is_active' => $this->boolean('is_active', true),
+            'username' => Str::lower(trim((string) $this->input('username'))),
+        ]);
     }
 }

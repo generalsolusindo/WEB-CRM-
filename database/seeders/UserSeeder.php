@@ -10,28 +10,31 @@ use Illuminate\Support\Facades\Hash;
 class UserSeeder extends Seeder
 {
     /**
-     * Seed one dummy user per role for local testing.
+     * Seed one user per role for local testing. Login memakai username
+     * (huruf kecil), bukan email — nama & username di bawah ini mengikuti
+     * pemetaan nama asli tiap pemegang role di General Solusindo.
      */
     public function run(): void
     {
         $roles = [
-            'sales',
-            'procurement',
-            'operational',
-            'technician',
-            'finance',
-            'management',
-            'administrator',
-            'project_manager',
-            'hr',
-            'warehouse',
+            'sales' => ['name' => 'Hana', 'username' => 'hana'],
+            'procurement' => ['name' => 'Safira', 'username' => 'safira'],
+            'operational' => ['name' => 'Aini', 'username' => 'aini'],
+            'technician' => ['name' => 'Riky', 'username' => 'riky'],
+            'finance' => ['name' => 'Farah', 'username' => 'farah'],
+            'management' => ['name' => 'Pak Adi', 'username' => 'pakadi'],
+            'administrator' => ['name' => 'Administrator', 'username' => 'administrator'],
+            'project_manager' => ['name' => 'project manager', 'username' => 'projectmanager'],
+            'hr' => ['name' => 'Ferdina', 'username' => 'ferdina'],
+            'warehouse' => ['name' => 'warehouse', 'username' => 'warehouse'],
         ];
 
-        foreach ($roles as $role) {
+        foreach ($roles as $role => $identity) {
             User::updateOrCreate(
                 ['email' => "{$role}@gscrm.test"],
                 [
-                    'name' => ucfirst($role).' User',
+                    'name' => $identity['name'],
+                    'username' => $identity['username'],
                     'password' => Hash::make('password'),
                     'role' => $role,
                     'is_active' => true,
@@ -48,6 +51,7 @@ class UserSeeder extends Seeder
             ['email' => 'vendor@gscrm.test'],
             [
                 'name' => 'Vendor User',
+                'username' => 'vendor',
                 'password' => Hash::make('password'),
                 'role' => 'vendor',
                 'vendor_id' => $vendor->id,

@@ -20,6 +20,7 @@ class VendorAccountTest extends TestCase
 
         $this->actingAs($procurement)->post('/procurement/vendor-accounts', [
             'name' => 'PIC Vendor A',
+            'username' => 'picvendora',
             'email' => 'pic-a@vendor.test',
             'phone' => '08123456789',
             'password' => 'password123',
@@ -30,6 +31,7 @@ class VendorAccountTest extends TestCase
         $account = User::where('email', 'pic-a@vendor.test')->firstOrFail();
         $this->assertSame('vendor', $account->role);
         $this->assertSame($vendor->id, $account->vendor_id);
+        $this->assertSame('picvendora', $account->username);
     }
 
     public function test_a_vendor_can_only_have_one_pic_account(): void
@@ -40,6 +42,7 @@ class VendorAccountTest extends TestCase
 
         $this->actingAs($procurement)->post('/procurement/vendor-accounts', [
             'name' => 'PIC Kedua',
+            'username' => 'pickedua',
             'email' => 'pic-kedua@vendor.test',
             'password' => 'password123',
             'password_confirmation' => 'password123',
@@ -57,6 +60,7 @@ class VendorAccountTest extends TestCase
 
         $this->actingAs($procurement)->post('/procurement/vendor-accounts', [
             'name' => 'PIC Vendor A',
+            'username' => 'picvendorktp',
             'email' => 'pic-a@vendor.test',
             'password' => 'password123',
             'password_confirmation' => 'password123',
@@ -84,6 +88,7 @@ class VendorAccountTest extends TestCase
 
         $this->actingAs($procurement)->put("/procurement/vendor-accounts/{$account->id}", [
             'name' => $account->name,
+            'username' => $account->username,
             'email' => $account->email,
             'vendor_id' => $vendor->id,
             'nik' => '3201234567890002',

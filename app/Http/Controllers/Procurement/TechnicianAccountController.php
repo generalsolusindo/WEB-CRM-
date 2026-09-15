@@ -35,6 +35,7 @@ class TechnicianAccountController extends Controller
             ->through(fn (User $user) => [
                 'id' => $user->id,
                 'name' => $user->name,
+                'username' => $user->username,
                 'email' => $user->email,
                 'phone' => $user->phone,
                 'is_active' => $user->is_active,
@@ -62,6 +63,7 @@ class TechnicianAccountController extends Controller
 
         $technician = User::create([
             'name' => $data['name'],
+            'username' => $data['username'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'nik' => $data['nik'] ?? null,
@@ -83,7 +85,7 @@ class TechnicianAccountController extends Controller
         abort_unless($technician->role === 'technician', 404);
 
         return Inertia::render('Procurement/Technicians/Form', [
-            'technician' => $technician->only('id', 'name', 'email', 'phone', 'nik', 'vendor_id', 'is_active'),
+            'technician' => $technician->only('id', 'name', 'username', 'email', 'phone', 'nik', 'vendor_id', 'is_active'),
             'vendorOptions' => $this->vendorOptions(),
             'ktpDocumentUrl' => $this->ktpDocumentUrl($technician),
         ]);
@@ -97,6 +99,7 @@ class TechnicianAccountController extends Controller
 
         $technician->fill([
             'name' => $data['name'],
+            'username' => $data['username'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'nik' => $data['nik'] ?? null,

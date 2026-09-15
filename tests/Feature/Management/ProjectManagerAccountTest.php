@@ -21,6 +21,7 @@ class ProjectManagerAccountTest extends TestCase
 
         $this->actingAs($manager)->post('/management/project-managers', [
             'name' => 'Budi PM',
+            'username' => 'budipm',
             'email' => 'budi.pm@gscrm.test',
             'phone' => '0812-0000-0001',
             'password' => 'password123',
@@ -30,6 +31,7 @@ class ProjectManagerAccountTest extends TestCase
 
         $pm = User::where('email', 'budi.pm@gscrm.test')->firstOrFail();
         $this->assertSame('project_manager', $pm->role);
+        $this->assertSame('budipm', $pm->username);
         $this->assertTrue($pm->is_active);
     }
 
@@ -40,6 +42,7 @@ class ProjectManagerAccountTest extends TestCase
 
         $this->actingAs($manager)->put("/management/project-managers/{$pm->id}", [
             'name' => 'Baru',
+            'username' => $pm->username,
             'email' => $pm->email,
             'is_active' => false,
         ])->assertRedirect('/management/project-managers');

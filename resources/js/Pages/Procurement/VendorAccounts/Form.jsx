@@ -6,6 +6,7 @@ export default function Form({ account = null, vendorOptions = [], ktpDocumentUr
     const editing = Boolean(account);
     const { data, setData, post, put, processing, errors } = useForm({
         name: account?.name ?? '',
+        username: account?.username ?? '',
         email: account?.email ?? '',
         phone: account?.phone ?? '',
         nik: account?.nik ?? '',
@@ -36,6 +37,9 @@ export default function Form({ account = null, vendorOptions = [], ktpDocumentUr
                         <div className="grid gap-5 sm:grid-cols-2">
                             <Field label="Nama" required error={errors.name}>
                                 <Input value={data.name} onChange={(e) => setData('name', e.target.value)} />
+                            </Field>
+                            <Field label="Username (untuk login)" required error={errors.username} hint="Huruf kecil, dipakai untuk login menggantikan email.">
+                                <Input value={data.username} onChange={(e) => setData('username', e.target.value.toLowerCase())} />
                             </Field>
                             <Field label="Email" required error={errors.email}>
                                 <Input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)} />

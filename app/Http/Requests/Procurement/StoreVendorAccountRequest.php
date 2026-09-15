@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Procurement;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
@@ -18,6 +19,7 @@ class StoreVendorAccountRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:255', 'alpha_dash', 'unique:users,username'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:50'],
             'nik' => ['nullable', 'string', 'max:50'],
@@ -43,6 +45,9 @@ class StoreVendorAccountRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge(['is_active' => $this->boolean('is_active', true)]);
+        $this->merge([
+            'is_active' => $this->boolean('is_active', true),
+            'username' => Str::lower(trim((string) $this->input('username'))),
+        ]);
     }
 }

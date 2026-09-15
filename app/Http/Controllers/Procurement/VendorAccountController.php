@@ -35,6 +35,7 @@ class VendorAccountController extends Controller
             ->through(fn (User $user) => [
                 'id' => $user->id,
                 'name' => $user->name,
+                'username' => $user->username,
                 'email' => $user->email,
                 'phone' => $user->phone,
                 'is_active' => $user->is_active,
@@ -62,6 +63,7 @@ class VendorAccountController extends Controller
 
         $account = User::create([
             'name' => $data['name'],
+            'username' => $data['username'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'nik' => $data['nik'] ?? null,
@@ -83,7 +85,7 @@ class VendorAccountController extends Controller
         abort_unless($vendorAccount->role === 'vendor', 404);
 
         return Inertia::render('Procurement/VendorAccounts/Form', [
-            'account' => $vendorAccount->only('id', 'name', 'email', 'phone', 'nik', 'vendor_id', 'is_active'),
+            'account' => $vendorAccount->only('id', 'name', 'username', 'email', 'phone', 'nik', 'vendor_id', 'is_active'),
             'vendorOptions' => $this->availableVendorOptions($vendorAccount->vendor_id),
             'ktpDocumentUrl' => $this->ktpDocumentUrl($vendorAccount),
         ]);
@@ -97,6 +99,7 @@ class VendorAccountController extends Controller
 
         $vendorAccount->fill([
             'name' => $data['name'],
+            'username' => $data['username'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'nik' => $data['nik'] ?? null,

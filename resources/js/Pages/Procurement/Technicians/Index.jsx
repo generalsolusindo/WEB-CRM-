@@ -14,6 +14,7 @@ export default function Index({ technicians, filters }) {
 
     const columns = [
         { key: 'name', label: 'Nama', render: (t) => <span className="font-medium text-text">{t.name}</span> },
+        { key: 'username', label: 'Username', render: (t) => <span className="text-text-muted">{t.username}</span> },
         { key: 'email', label: 'Email', render: (t) => <span className="text-text-muted">{t.email}</span> },
         { key: 'phone', label: 'Telepon', render: (t) => t.phone || '—' },
         { key: 'origin', label: 'Asal' },
