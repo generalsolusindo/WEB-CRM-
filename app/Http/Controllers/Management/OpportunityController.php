@@ -25,11 +25,15 @@ class OpportunityController extends Controller
 
         $filters = $request->validate([
             'stage' => ['nullable', Rule::enum(LeadStage::class)],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
         ]);
 
         $leads = Lead::query()
             ->where('type', 'opportunity')
             ->when($filters['stage'] ?? null, fn ($q, $stage) => $q->where('stage', $stage))
+            ->when($filters['from'] ?? null, fn ($q, $from) => $q->whereDate('created_at', '>=', $from))
+            ->when($filters['to'] ?? null, fn ($q, $to) => $q->whereDate('created_at', '<=', $to))
             ->with(['contact:id,name,company_name', 'sales:id,name', 'delegatedTo:id,name'])
             ->latest()
             ->paginate(15)
@@ -39,7 +43,11 @@ class OpportunityController extends Controller
 
         return Inertia::render('Opportunities/Overview/Index', [
             'opportunities' => $leads,
-            'filters' => ['stage' => $filters['stage'] ?? ''],
+            'filters' => [
+                'stage' => $filters['stage'] ?? '',
+                'from' => $filters['from'] ?? '',
+                'to' => $filters['to'] ?? '',
+            ],
             'stageOptions' => LeadStage::options(),
             'role' => 'management',
         ]);

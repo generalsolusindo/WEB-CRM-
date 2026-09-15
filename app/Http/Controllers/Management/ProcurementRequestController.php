@@ -20,12 +20,16 @@ class ProcurementRequestController extends Controller
 
         $filters = $request->validate([
             'status' => ['nullable', Rule::enum(ProcurementRequestStatus::class)],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
         ]);
 
         $requests = ProcurementRequest::query()
             ->with(['lead.contact:id,name,company_name'])
             ->withCount('lines')
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('created_at', '>=', $from))
+            ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('created_at', '<=', $to))
             ->latest()
             ->paginate(15)
             ->withQueryString();
@@ -42,7 +46,11 @@ class ProcurementRequestController extends Controller
 
         return Inertia::render('Management/ProcurementRequests/Index', [
             'requests' => $requests,
-            'filters' => ['status' => $filters['status'] ?? ''],
+            'filters' => [
+                'status' => $filters['status'] ?? '',
+                'from' => $filters['from'] ?? '',
+                'to' => $filters['to'] ?? '',
+            ],
             'statusOptions' => ProcurementRequestStatus::options(),
         ]);
     }

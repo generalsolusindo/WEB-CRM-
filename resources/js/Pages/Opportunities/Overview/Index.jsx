@@ -1,13 +1,30 @@
 import { Head, router } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, DataTable, StatusBadge, EmptyState, Pagination, PillTabs } from '../../../Components/ui';
+import { PageHeader, DataTable, StatusBadge, EmptyState, Pagination, PillTabs, DateRangeFilter } from '../../../Components/ui';
 
 export default function Index({ opportunities, filters = {}, stageOptions = [], role }) {
     const base = role === 'management' ? '/management/opportunities' : '/project-manager/opportunities';
     const isMgmt = role === 'management';
 
+    function query(overrides) {
+        return {
+            ...(filters.stage ? { stage: filters.stage } : {}),
+            ...(filters.from ? { from: filters.from } : {}),
+            ...(filters.to ? { to: filters.to } : {}),
+            ...overrides,
+        };
+    }
+
     function setStage(stage) {
-        router.get(base, stage ? { stage } : {}, { preserveState: true, replace: true });
+        router.get(base, query({ stage: stage || undefined }), { preserveState: true, replace: true });
+    }
+
+    function applyDates(from, to) {
+        router.get(base, query({ from: from || undefined, to: to || undefined }), { preserveState: true, replace: true });
+    }
+
+    function resetDates() {
+        router.get(base, query({ from: undefined, to: undefined }), { preserveState: true, replace: true });
     }
 
     const tabs = [{ value: '', label: 'Semua' }, ...stageOptions.map((o) => ({ value: o.value, label: o.label }))];
@@ -37,6 +54,7 @@ export default function Index({ opportunities, filters = {}, stageOptions = [], 
                         : 'Opportunity yang didelegasikan Manager kepada Anda.'}
                 />
                 <PillTabs tabs={tabs} value={filters.stage || ''} onChange={setStage} />
+                {isMgmt && <DateRangeFilter from={filters.from} to={filters.to} onApply={applyDates} onReset={resetDates} />}
                 <DataTable
                     columns={columns}
                     rows={opportunities.data}

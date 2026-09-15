@@ -25,11 +25,15 @@ class ProjectController extends Controller
 
         $filters = $request->validate([
             'status' => ['nullable', Rule::enum(ProjectStatus::class)],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
         ]);
 
         $projects = Project::query()
             ->with(['salesOrder:id,number,contact_id,status', 'salesOrder.contact:id,name', 'salesOrder.lines:id,sales_order_id,category,qty', 'delegatedTo:id,name'])
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($filters['from'] ?? null, fn ($q, $from) => $q->whereDate('created_at', '>=', $from))
+            ->when($filters['to'] ?? null, fn ($q, $to) => $q->whereDate('created_at', '<=', $to))
             ->latest()
             ->paginate(15)
             ->withQueryString();
@@ -38,7 +42,11 @@ class ProjectController extends Controller
 
         return Inertia::render('Projects/Overview/Index', [
             'projects' => $projects,
-            'filters' => ['status' => $filters['status'] ?? ''],
+            'filters' => [
+                'status' => $filters['status'] ?? '',
+                'from' => $filters['from'] ?? '',
+                'to' => $filters['to'] ?? '',
+            ],
             'statusOptions' => ProjectStatus::options(),
             'role' => 'management',
         ]);

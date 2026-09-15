@@ -8,6 +8,7 @@ export { default as DataTable } from './DataTable';
 export { default as EmptyState } from './EmptyState';
 export { default as Modal } from './Modal';
 export { default as Toolbar, SearchInput, FilterSelect } from './Toolbar';
+export { default as DateRangeFilter } from './DateRangeFilter';
 export { Field, Input, Textarea, Select } from './Field';
 export { default as CurrencyInput } from './CurrencyInput';
 export { default as FormActions } from './FormActions';

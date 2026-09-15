@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Sow;
 use App\Services\AdministratorSignature;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -17,21 +18,31 @@ class SowController extends Controller
     use BuildsSowReview;
 
     /** Antrean tanda tangan Management — hanya project yang belum didelegasikan ke Project Manager mana pun. */
-    public function index(): Response
+    public function index(Request $request): Response
     {
         Gate::authorize('viewAny', Sow::class);
+
+        $filters = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
 
         $sows = Sow::query()
             ->where('status', \App\Enums\SowStatus::PendingDirectorSignature->value)
             ->whereHas('project', fn ($q) => $q->whereNull('delegated_to'))
             ->with('project.salesOrder.contact:id,name')
+            ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('created_at', '>=', $from))
+            ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('created_at', '<=', $to))
             ->latest()
             ->paginate(15)
             ->withQueryString();
 
         $sows->through(fn (Sow $sow) => $this->sowRow($sow));
 
-        return Inertia::render('Management/Sows/Index', ['sows' => $sows]);
+        return Inertia::render('Management/Sows/Index', [
+            'sows' => $sows,
+            'filters' => ['from' => $filters['from'] ?? '', 'to' => $filters['to'] ?? ''],
+        ]);
     }
 
     public function show(Sow $sow): Response

@@ -1,6 +1,6 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, DataTable, EmptyState, Pagination } from '../../../Components/ui';
+import { PageHeader, DataTable, EmptyState, Pagination, DateRangeFilter } from '../../../Components/ui';
 
 function ReviewBadge({ status }) {
     if (status === 'approved') return <span className="badge badge-success">Disetujui</span>;
@@ -8,9 +8,17 @@ function ReviewBadge({ status }) {
     return <span className="badge badge-warning">Menunggu verifikasi</span>;
 }
 
-export default function Index({ quotations, role }) {
+export default function Index({ quotations, role, filters = {} }) {
     const base = role === 'management' ? '/management/quotations' : '/project-manager/quotations';
     const isMgmt = role === 'management';
+
+    function applyDates(from, to) {
+        router.get(base, { ...(from ? { from } : {}), ...(to ? { to } : {}) }, { preserveState: true, replace: true });
+    }
+
+    function resetDates() {
+        router.get(base, {}, { preserveState: true, replace: true });
+    }
 
     const columns = [
         {
@@ -38,6 +46,7 @@ export default function Index({ quotations, role }) {
                         ? 'Quotation yang sudah disetujui Project Manager, menunggu verifikasi akhir Anda.'
                         : 'Quotation dari opportunity yang didelegasikan kepada Anda, menunggu verifikasi Anda sebelum lanjut ke Manager.'}
                 />
+                {isMgmt && <DateRangeFilter from={filters.from} to={filters.to} onApply={applyDates} onReset={resetDates} />}
                 <DataTable
                     columns={columns}
                     rows={quotations.data}

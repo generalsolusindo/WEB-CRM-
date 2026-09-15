@@ -20,11 +20,15 @@ class SurveyController extends Controller
 
         $filters = $request->validate([
             'status' => ['nullable', Rule::enum(SurveyStatus::class)],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
         ]);
 
         $surveys = Survey::query()
             ->with('lead.contact:id,name,company_name')
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('created_at', '>=', $from))
+            ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('created_at', '<=', $to))
             ->latest()
             ->paginate(15)
             ->withQueryString();
@@ -41,7 +45,11 @@ class SurveyController extends Controller
 
         return Inertia::render('Management/Surveys/Index', [
             'surveys' => $surveys,
-            'filters' => ['status' => $filters['status'] ?? ''],
+            'filters' => [
+                'status' => $filters['status'] ?? '',
+                'from' => $filters['from'] ?? '',
+                'to' => $filters['to'] ?? '',
+            ],
             'statusOptions' => SurveyStatus::options(),
         ]);
     }

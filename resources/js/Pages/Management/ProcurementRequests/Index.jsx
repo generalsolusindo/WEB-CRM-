@@ -1,10 +1,27 @@
 import { Head, router } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, PillTabs, DataTable, StatusBadge, EmptyState, Pagination } from '../../../Components/ui';
+import { PageHeader, PillTabs, DataTable, StatusBadge, EmptyState, Pagination, DateRangeFilter } from '../../../Components/ui';
 
 export default function Index({ requests, filters, statusOptions }) {
+    function query(overrides) {
+        return {
+            ...(filters.status ? { status: filters.status } : {}),
+            ...(filters.from ? { from: filters.from } : {}),
+            ...(filters.to ? { to: filters.to } : {}),
+            ...overrides,
+        };
+    }
+
     function setStatus(status) {
-        router.get('/management/procurement-requests', status ? { status } : {}, { preserveState: true, replace: true });
+        router.get('/management/procurement-requests', query({ status: status || undefined }), { preserveState: true, replace: true });
+    }
+
+    function applyDates(from, to) {
+        router.get('/management/procurement-requests', query({ from: from || undefined, to: to || undefined }), { preserveState: true, replace: true });
+    }
+
+    function resetDates() {
+        router.get('/management/procurement-requests', query({ from: undefined, to: undefined }), { preserveState: true, replace: true });
     }
 
     const tabs = [{ value: '', label: 'Semua' }, ...statusOptions.map((o) => ({ value: o.value, label: o.label }))];
@@ -36,6 +53,7 @@ export default function Index({ requests, filters, statusOptions }) {
                     back={{ href: '/dashboard', label: 'Kembali ke Dashboard' }}
                 />
                 <PillTabs tabs={tabs} value={filters.status || ''} onChange={setStatus} />
+                <DateRangeFilter from={filters.from} to={filters.to} onApply={applyDates} onReset={resetDates} />
                 <DataTable
                     columns={columns}
                     rows={requests.data}

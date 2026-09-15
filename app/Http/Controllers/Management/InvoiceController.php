@@ -20,6 +20,8 @@ class InvoiceController extends Controller
 
         $filters = $request->validate([
             'status' => ['nullable', Rule::enum(InvoiceStatus::class)],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
         ]);
 
         $invoices = Invoice::query()
@@ -27,6 +29,8 @@ class InvoiceController extends Controller
             ->with(['salesOrder:id,number,contact_id', 'salesOrder.contact:id,name,company_name'])
             ->withSum('payments as paid_total', 'amount_paid')
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('created_at', '>=', $from))
+            ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('created_at', '<=', $to))
             ->latest()
             ->paginate(15)
             ->withQueryString();
@@ -45,7 +49,11 @@ class InvoiceController extends Controller
 
         return Inertia::render('Management/Invoices/Index', [
             'invoices' => $invoices,
-            'filters' => ['status' => $filters['status'] ?? ''],
+            'filters' => [
+                'status' => $filters['status'] ?? '',
+                'from' => $filters['from'] ?? '',
+                'to' => $filters['to'] ?? '',
+            ],
             'statusOptions' => InvoiceStatus::options(),
         ]);
     }

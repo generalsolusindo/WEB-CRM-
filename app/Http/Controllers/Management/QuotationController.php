@@ -19,15 +19,22 @@ class QuotationController extends Controller
 {
     use BuildsQuotationReview;
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
         Gate::authorize('viewAny', Quotation::class);
+
+        $filters = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
 
         $quotations = Quotation::query()
             ->where('status', 'draft')
             ->where('pm_review_status', 'approved')
             ->where('manager_review_status', null)
             ->with(['contact:id,name,company_name', 'sales:id,name'])
+            ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('created_at', '>=', $from))
+            ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('created_at', '<=', $to))
             ->latest()
             ->paginate(15)
             ->withQueryString();
@@ -37,6 +44,7 @@ class QuotationController extends Controller
         return Inertia::render('Quotations/Review/Index', [
             'quotations' => $quotations,
             'role' => 'management',
+            'filters' => ['from' => $filters['from'] ?? '', 'to' => $filters['to'] ?? ''],
         ]);
     }
 
@@ -51,11 +59,15 @@ class QuotationController extends Controller
 
         $filters = $request->validate([
             'status' => ['nullable', Rule::enum(QuotationStatus::class)],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
         ]);
 
         $quotations = Quotation::query()
             ->with(['contact:id,name,company_name', 'sales:id,name'])
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('created_at', '>=', $from))
+            ->when($filters['to'] ?? null, fn ($query, $to) => $query->whereDate('created_at', '<=', $to))
             ->latest()
             ->paginate(15)
             ->withQueryString();
@@ -64,7 +76,11 @@ class QuotationController extends Controller
 
         return Inertia::render('Management/Quotations/Index', [
             'quotations' => $quotations,
-            'filters' => ['status' => $filters['status'] ?? ''],
+            'filters' => [
+                'status' => $filters['status'] ?? '',
+                'from' => $filters['from'] ?? '',
+                'to' => $filters['to'] ?? '',
+            ],
             'statusOptions' => QuotationStatus::options(),
         ]);
     }

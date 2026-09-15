@@ -117,6 +117,146 @@ class ManagementMonitoringTest extends TestCase
                 ->where('surveys.total', 1));
     }
 
+    public function test_procurement_requests_list_can_be_filtered_by_date_range(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Cust', 'created_by' => $sales->id]);
+        $lead = Lead::create([
+            'contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified',
+        ]);
+        $lead->requirements()->create(['item_name' => 'Router', 'qty' => 1, 'unit' => 'unit', 'created_by' => $sales->id]);
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/submit-procurement");
+        $pr = ProcurementRequest::where('lead_id', $lead->id)->latest('id')->firstOrFail();
+        $pr->forceFill(['created_at' => now()->subDays(10)])->save();
+
+        $management = $this->management();
+
+        $this->actingAs($management)->get('/management/procurement-requests?from='.now()->subDay()->toDateString())
+            ->assertInertia(fn ($page) => $page->where('requests.total', 0));
+
+        $this->actingAs($management)
+            ->get('/management/procurement-requests?from='.now()->subDays(15)->toDateString().'&to='.now()->subDays(5)->toDateString())
+            ->assertInertia(fn ($page) => $page->where('requests.total', 1));
+    }
+
+    public function test_invoices_list_can_be_filtered_by_date_range(): void
+    {
+        $so = $this->confirmedSalesOrder();
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'full']);
+        $invoice = \App\Models\Invoice::latest('id')->firstOrFail();
+        $invoice->forceFill(['created_at' => now()->subDays(10)])->save();
+
+        $management = $this->management();
+
+        $this->actingAs($management)->get('/management/invoices?from='.now()->subDay()->toDateString())
+            ->assertInertia(fn ($page) => $page->where('invoices.total', 0));
+
+        $this->actingAs($management)
+            ->get('/management/invoices?from='.now()->subDays(15)->toDateString().'&to='.now()->subDays(5)->toDateString())
+            ->assertInertia(fn ($page) => $page->where('invoices.total', 1));
+    }
+
+    public function test_surveys_list_can_be_filtered_by_date_range(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Cust', 'created_by' => $sales->id]);
+        $lead = Lead::create([
+            'contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified',
+        ]);
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/surveys", [
+            'site_address' => 'Jl. Uji Coba No. 1',
+            'site_region' => 'Sidoarjo',
+            'delivery_mode' => 'vendor',
+            'billable' => true,
+        ]);
+        $survey = \App\Models\Survey::latest('id')->firstOrFail();
+        $survey->forceFill(['created_at' => now()->subDays(10)])->save();
+
+        $management = $this->management();
+
+        $this->actingAs($management)->get('/management/surveys?from='.now()->subDay()->toDateString())
+            ->assertInertia(fn ($page) => $page->where('surveys.total', 0));
+
+        $this->actingAs($management)
+            ->get('/management/surveys?from='.now()->subDays(15)->toDateString().'&to='.now()->subDays(5)->toDateString())
+            ->assertInertia(fn ($page) => $page->where('surveys.total', 1));
+    }
+
+    public function test_semua_quotation_list_can_be_filtered_by_date_range(): void
+    {
+        $so = $this->confirmedSalesOrder();
+        $so->quotation->forceFill(['created_at' => now()->subDays(10)])->save();
+
+        $management = $this->management();
+
+        $this->actingAs($management)->get('/management/quotations-overview?from='.now()->subDay()->toDateString())
+            ->assertInertia(fn ($page) => $page->where('quotations.total', 0));
+
+        $this->actingAs($management)
+            ->get('/management/quotations-overview?from='.now()->subDays(15)->toDateString().'&to='.now()->subDays(5)->toDateString())
+            ->assertInertia(fn ($page) => $page->where('quotations.total', 1));
+    }
+
+    public function test_opportunities_list_can_be_filtered_by_date_range(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Cust', 'created_by' => $sales->id]);
+        $lead = Lead::create([
+            'contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified',
+        ]);
+        $lead->forceFill(['created_at' => now()->subDays(10)])->save();
+
+        $management = $this->management();
+
+        $this->actingAs($management)->get('/management/opportunities?from='.now()->subDay()->toDateString())
+            ->assertInertia(fn ($page) => $page->where('opportunities.total', 0));
+
+        $this->actingAs($management)
+            ->get('/management/opportunities?from='.now()->subDays(15)->toDateString().'&to='.now()->subDays(5)->toDateString())
+            ->assertInertia(fn ($page) => $page->where('opportunities.total', 1));
+    }
+
+    public function test_semua_project_list_can_be_filtered_by_date_range(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Cust', 'created_by' => $sales->id]);
+        $lead = Lead::create([
+            'contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified',
+        ]);
+        $lead->requirements()->create(['item_name' => 'Router', 'qty' => 2, 'unit' => 'unit', 'created_by' => $sales->id]);
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/submit-procurement");
+        $pr = ProcurementRequest::with('lines')->latest('id')->firstOrFail();
+        $pr->lines()->update(['cost_price' => 1000000, 'availability_status' => 'available']);
+        $pr->update(['status' => 'ready']);
+        $this->actingAs($sales)->post("/sales/procurement-requests/{$pr->id}/quotations", [
+            'lines' => [['procurement_request_line_id' => $pr->lines()->first()->id, 'selling_price' => 1300000]],
+        ]);
+        $quotation = \App\Models\Quotation::latest('id')->firstOrFail();
+        $quotation->update(['status' => 'sent']);
+        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload('mixed'));
+        $so = $quotation->salesOrder()->firstOrFail();
+
+        $finance = User::factory()->create(['role' => 'finance']);
+        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'dp']);
+        $invoice = $so->invoices()->latest('id')->firstOrFail();
+        $this->actingAs($finance)->post("/finance/invoices/{$invoice->id}/payments", [
+            'amount_paid' => (float) $invoice->amount + (float) $invoice->tax_amount,
+            'paid_at' => now()->toDateTimeString(),
+        ]);
+        $project = \App\Models\Project::where('sales_order_id', $so->id)->firstOrFail();
+        $project->forceFill(['created_at' => now()->subDays(10)])->save();
+
+        $management = $this->management();
+
+        $this->actingAs($management)->get('/management/projects?from='.now()->subDay()->toDateString())
+            ->assertInertia(fn ($page) => $page->where('projects.total', 0));
+
+        $this->actingAs($management)
+            ->get('/management/projects?from='.now()->subDays(15)->toDateString().'&to='.now()->subDays(5)->toDateString())
+            ->assertInertia(fn ($page) => $page->where('projects.total', 1));
+    }
+
     /** @return SalesOrder */
     private function confirmedSalesOrder()
     {
