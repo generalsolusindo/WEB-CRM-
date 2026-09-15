@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Management;
 
 use App\Enums\ProcurementRequestStatus;
+use App\Http\Controllers\Concerns\NormalizesDateRangeFilter;
 use App\Http\Controllers\Controller;
 use App\Models\ProcurementRequest;
 use Illuminate\Http\Request;
@@ -14,15 +15,17 @@ use Inertia\Response;
 /** Monitoring read-only untuk Management — tidak ada aksi/detail, cuma daftar lengkap. */
 class ProcurementRequestController extends Controller
 {
+    use NormalizesDateRangeFilter;
+
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', ProcurementRequest::class);
 
-        $filters = $request->validate([
+        $filters = $this->normalizeDateRange($request->validate([
             'status' => ['nullable', Rule::enum(ProcurementRequestStatus::class)],
             'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date', 'after_or_equal:from'],
-        ]);
+            'to' => ['nullable', 'date'],
+        ]));
 
         $requests = ProcurementRequest::query()
             ->with(['lead.contact:id,name,company_name'])

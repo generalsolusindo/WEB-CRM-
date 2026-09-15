@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Management;
 
 use App\Enums\LeadStage;
 use App\Http\Controllers\Concerns\BuildsOpportunityOverview;
+use App\Http\Controllers\Concerns\NormalizesDateRangeFilter;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Management\DelegateOpportunityRequest;
 use App\Models\Lead;
@@ -18,16 +19,17 @@ use Inertia\Response;
 class OpportunityController extends Controller
 {
     use BuildsOpportunityOverview;
+    use NormalizesDateRangeFilter;
 
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', Lead::class);
 
-        $filters = $request->validate([
+        $filters = $this->normalizeDateRange($request->validate([
             'stage' => ['nullable', Rule::enum(LeadStage::class)],
             'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date', 'after_or_equal:from'],
-        ]);
+            'to' => ['nullable', 'date'],
+        ]));
 
         $leads = Lead::query()
             ->where('type', 'opportunity')

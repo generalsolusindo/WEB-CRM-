@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Management;
 
 use App\Enums\SurveyStatus;
+use App\Http\Controllers\Concerns\NormalizesDateRangeFilter;
 use App\Http\Controllers\Controller;
 use App\Models\Survey;
 use Illuminate\Http\Request;
@@ -14,15 +15,17 @@ use Inertia\Response;
 /** Monitoring read-only untuk Management — tidak ada aksi/detail, cuma daftar lengkap. */
 class SurveyController extends Controller
 {
+    use NormalizesDateRangeFilter;
+
     public function index(Request $request): Response
     {
         Gate::authorize('viewAnyManagement', Survey::class);
 
-        $filters = $request->validate([
+        $filters = $this->normalizeDateRange($request->validate([
             'status' => ['nullable', Rule::enum(SurveyStatus::class)],
             'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date', 'after_or_equal:from'],
-        ]);
+            'to' => ['nullable', 'date'],
+        ]));
 
         $surveys = Survey::query()
             ->with('lead.contact:id,name,company_name')

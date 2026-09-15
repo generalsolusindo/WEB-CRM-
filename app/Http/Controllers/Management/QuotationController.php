@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Management;
 use App\Actions\Sales\ReviewQuotation;
 use App\Enums\QuotationStatus;
 use App\Http\Controllers\Concerns\BuildsQuotationReview;
+use App\Http\Controllers\Concerns\NormalizesDateRangeFilter;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Management\ReviewQuotationRequest;
 use App\Models\Quotation;
@@ -18,15 +19,16 @@ use Inertia\Response;
 class QuotationController extends Controller
 {
     use BuildsQuotationReview;
+    use NormalizesDateRangeFilter;
 
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', Quotation::class);
 
-        $filters = $request->validate([
+        $filters = $this->normalizeDateRange($request->validate([
             'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date', 'after_or_equal:from'],
-        ]);
+            'to' => ['nullable', 'date'],
+        ]));
 
         $quotations = Quotation::query()
             ->where('status', 'draft')
@@ -57,11 +59,11 @@ class QuotationController extends Controller
     {
         Gate::authorize('viewAny', Quotation::class);
 
-        $filters = $request->validate([
+        $filters = $this->normalizeDateRange($request->validate([
             'status' => ['nullable', Rule::enum(QuotationStatus::class)],
             'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date', 'after_or_equal:from'],
-        ]);
+            'to' => ['nullable', 'date'],
+        ]));
 
         $quotations = Quotation::query()
             ->with(['contact:id,name,company_name', 'sales:id,name'])

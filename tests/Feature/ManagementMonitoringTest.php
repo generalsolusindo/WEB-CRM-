@@ -217,6 +217,30 @@ class ManagementMonitoringTest extends TestCase
             ->assertInertia(fn ($page) => $page->where('opportunities.total', 1));
     }
 
+    /**
+     * Rentang tanggal terbalik (from > to) TIDAK boleh melempar ValidationException —
+     * halaman ini berbasis query-string GET, bukan form submit, jadi kegagalan
+     * validasi akan redirect ke url()->previous() yang bisa jadi URL ini sendiri
+     * (mis. link yang dibagikan/bookmark dibuka langsung tanpa "previous" di sesi),
+     * menyebabkan infinite redirect loop. Baris ini terbukti benar-benar terjadi
+     * saat diverifikasi manual sebelum diperbaiki. Sekarang harus dinormalkan
+     * (ditukar) secara diam-diam, bukan gagal.
+     */
+    public function test_reversed_date_range_is_normalized_not_rejected(): void
+    {
+        $so = $this->confirmedSalesOrder();
+        $so->quotation->forceFill(['created_at' => now()->subDays(10)])->save();
+
+        $management = $this->management();
+
+        $response = $this->actingAs($management)->get(
+            '/management/quotations-overview?from='.now()->subDays(5)->toDateString().'&to='.now()->subDays(15)->toDateString()
+        );
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->where('quotations.total', 1));
+    }
+
     public function test_semua_project_list_can_be_filtered_by_date_range(): void
     {
         $sales = User::factory()->create(['role' => 'sales']);

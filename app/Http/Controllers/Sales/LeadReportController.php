@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Sales;
 
 use App\Enums\LeadSource;
 use App\Enums\LeadStage;
+use App\Http\Controllers\Concerns\NormalizesDateRangeFilter;
 use App\Http\Controllers\Controller;
 use App\Models\Lead;
 use Illuminate\Http\Request;
@@ -13,14 +14,16 @@ use Inertia\Response;
 
 class LeadReportController extends Controller
 {
+    use NormalizesDateRangeFilter;
+
     public function __invoke(Request $request): Response
     {
         Gate::authorize('viewAny', Lead::class);
 
-        $filters = $request->validate([
+        $filters = $this->normalizeDateRange($request->validate([
             'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date', 'after_or_equal:from'],
-        ]);
+            'to' => ['nullable', 'date'],
+        ]));
 
         $base = Lead::query()
             ->where('sales_id', $request->user()->id)

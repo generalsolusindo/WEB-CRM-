@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Management;
 
 use App\Enums\ProjectStatus;
 use App\Http\Controllers\Concerns\BuildsProjectOverview;
+use App\Http\Controllers\Concerns\NormalizesDateRangeFilter;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Management\DelegateProjectRequest;
 use App\Models\Project;
@@ -18,16 +19,17 @@ use Inertia\Response;
 class ProjectController extends Controller
 {
     use BuildsProjectOverview;
+    use NormalizesDateRangeFilter;
 
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', Project::class);
 
-        $filters = $request->validate([
+        $filters = $this->normalizeDateRange($request->validate([
             'status' => ['nullable', Rule::enum(ProjectStatus::class)],
             'from' => ['nullable', 'date'],
-            'to' => ['nullable', 'date', 'after_or_equal:from'],
-        ]);
+            'to' => ['nullable', 'date'],
+        ]));
 
         $projects = Project::query()
             ->with(['salesOrder:id,number,contact_id,status', 'salesOrder.contact:id,name', 'salesOrder.lines:id,sales_order_id,category,qty', 'delegatedTo:id,name'])
