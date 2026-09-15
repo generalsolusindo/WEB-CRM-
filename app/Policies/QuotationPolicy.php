@@ -49,15 +49,26 @@ class QuotationPolicy
     }
 
     /**
-     * Bisa dihapus di status apa saja (Draft/Sent/Rejected) — sama seperti update() —
-     * selama belum jadi Sales Order (akan mengorbankan jejak Invoice/Project di baliknya)
-     * dan belum punya revisi (akan memutus rantai riwayat revisi).
+     * Bisa dihapus di status apa saja termasuk Confirmed, selama belum punya revisi
+     * (akan memutus rantai riwayat revisi) DAN — kalau sudah jadi Sales Order — Sales
+     * Order itu belum punya Invoice atau Project sama sekali. Begitu Finance atau
+     * Operational mulai memproses (Invoice/Project dibuat), quotation & Sales Order-nya
+     * terkunci permanen dari hapus, supaya tidak pernah ada skenario menghapus quotation
+     * ikut menghilangkan jejak transaksi/pembayaran/pekerjaan yang sudah nyata terjadi.
      */
     public function delete(User $user, Quotation $quotation): bool
     {
-        return $this->owns($user, $quotation)
-            && ! $quotation->salesOrder()->exists()
-            && ! $quotation->revisions()->exists();
+        if (! $this->owns($user, $quotation) || $quotation->revisions()->exists()) {
+            return false;
+        }
+
+        $salesOrder = $quotation->salesOrder;
+
+        if ($salesOrder === null) {
+            return true;
+        }
+
+        return ! $salesOrder->invoices()->exists() && ! $salesOrder->projects()->exists();
     }
 
     public function send(User $user, Quotation $quotation): bool

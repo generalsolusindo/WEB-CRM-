@@ -22,9 +22,12 @@ export default function Show({ quotation, history, totals, permissions, customer
     );
     function action(path, message) { if (confirm(message)) router.post(path); }
     function destroy() {
-        const warning = quotation.whatsapp_sent_at
-            ? `Quotation ${number} ini sudah pernah dikirim ke customer lewat WhatsApp. Menghapusnya tidak akan menarik kembali pesan yang sudah diterima customer, dan tidak bisa dibatalkan. Tetap hapus?`
-            : `Hapus quotation ${number} ini? Tindakan ini tidak bisa dibatalkan.`;
+        let warning = `Hapus quotation ${number} ini? Tindakan ini tidak bisa dibatalkan.`;
+        if (quotation.status === 'confirmed') {
+            warning = `Quotation ${number} ini sudah Confirmed — Sales Order-nya akan ikut terhapus sekaligus. Tindakan ini tidak bisa dibatalkan. Tetap hapus?`;
+        } else if (quotation.whatsapp_sent_at) {
+            warning = `Quotation ${number} ini sudah pernah dikirim ke customer lewat WhatsApp. Menghapusnya tidak akan menarik kembali pesan yang sudah diterima customer, dan tidak bisa dibatalkan. Tetap hapus?`;
+        }
         if (confirm(warning)) {
             router.delete(`/sales/quotations/${quotation.id}`);
         }

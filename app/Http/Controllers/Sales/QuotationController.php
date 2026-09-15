@@ -18,6 +18,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -249,6 +250,8 @@ class QuotationController extends Controller
     {
         Gate::authorize('delete', $quotation);
 
+        $hadSalesOrder = $quotation->salesOrder()->exists();
+
         DB::transaction(function () use ($quotation) {
             // Bersihkan notifikasi PM/Manager/Sales yang menunjuk ke quotation ini
             // (mis. "perlu diverifikasi") supaya tidak ada link mati di bell notifikasi.
@@ -256,11 +259,30 @@ class QuotationController extends Controller
                 ->where('related_id', $quotation->id)
                 ->delete();
 
+            // Quotation Confirmed yang belum ada Invoice/Project (dijamin policy delete())
+            // boleh dihapus sekalian dengan Sales Order-nya — bersihkan juga dokumen
+            // (signed quotation/PO) dan notifikasi Finance yang menunjuk ke Sales Order itu,
+            // supaya tidak ada file/notifikasi menggantung setelah Sales Order-nya hilang.
+            if ($salesOrder = $quotation->salesOrder) {
+                $salesOrder->attachments()->get()->each(
+                    fn ($attachment) => Storage::disk('local')->delete($attachment->file_path)
+                );
+                $salesOrder->attachments()->delete();
+
+                Notification::where('related_type', $salesOrder->getMorphClass())
+                    ->where('related_id', $salesOrder->id)
+                    ->delete();
+
+                $salesOrder->delete();
+            }
+
             $quotation->delete();
         });
 
         return redirect()->route('sales.quotations.index')
-            ->with('success', 'Quotation berhasil dihapus.');
+            ->with('success', $hadSalesOrder
+                ? 'Quotation dan Sales Order-nya berhasil dihapus.'
+                : 'Quotation berhasil dihapus.');
     }
 
     /** Ubah nomor quotation secara manual, mis. menyambung dari sistem lama. */

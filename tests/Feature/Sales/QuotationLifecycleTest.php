@@ -434,18 +434,6 @@ class QuotationLifecycleTest extends TestCase
         $this->assertDatabaseMissing('quotations', ['id' => $quotation->id]);
     }
 
-    public function test_quotation_that_already_became_a_sales_order_cannot_be_deleted(): void
-    {
-        [$sales, $salesOrder] = $this->confirmedSalesOrder('material_only');
-        $quotation = $salesOrder->quotation;
-
-        $this->actingAs($sales)
-            ->delete("/sales/quotations/{$quotation->id}")
-            ->assertForbidden();
-
-        $this->assertDatabaseHas('quotations', ['id' => $quotation->id]);
-    }
-
     public function test_quotation_with_a_revision_cannot_be_deleted(): void
     {
         [$sales, $quotation] = $this->draftQuotation();
@@ -495,6 +483,86 @@ class QuotationLifecycleTest extends TestCase
             ->assertForbidden();
 
         $this->assertDatabaseHas('quotations', ['id' => $quotation->id]);
+    }
+
+    public function test_confirmed_quotation_can_be_deleted_when_sales_order_has_no_invoice_or_project(): void
+    {
+        [$sales, $salesOrder] = $this->confirmedSalesOrder('material_only');
+        $quotation = $salesOrder->quotation;
+
+        $this->actingAs($sales)
+            ->delete("/sales/quotations/{$quotation->id}")
+            ->assertRedirect('/sales/quotations');
+
+        $this->assertDatabaseMissing('quotations', ['id' => $quotation->id]);
+        $this->assertDatabaseMissing('sales_orders', ['id' => $salesOrder->id]);
+        $this->assertDatabaseCount('sales_order_lines', 0);
+    }
+
+    public function test_confirmed_quotation_cannot_be_deleted_once_an_invoice_exists(): void
+    {
+        [$sales, $salesOrder] = $this->confirmedSalesOrder('material_only');
+        $quotation = $salesOrder->quotation;
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $salesOrder->id, 'phase' => 'full']);
+
+        $this->actingAs($sales)
+            ->delete("/sales/quotations/{$quotation->id}")
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('quotations', ['id' => $quotation->id]);
+        $this->assertDatabaseHas('sales_orders', ['id' => $salesOrder->id]);
+    }
+
+    public function test_confirmed_quotation_cannot_be_deleted_once_a_project_exists(): void
+    {
+        [$sales, $salesOrder] = $this->confirmedSalesOrder('mixed');
+        $quotation = $salesOrder->quotation;
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $salesOrder->id, 'phase' => 'dp']);
+        $invoice = $salesOrder->invoices()->latest('id')->firstOrFail();
+        $this->actingAs($finance)->post("/finance/invoices/{$invoice->id}/payments", [
+            'amount_paid' => (float) $invoice->amount + (float) $invoice->tax_amount,
+            'paid_at' => now()->toDateTimeString(),
+        ]);
+        $this->assertDatabaseHas('projects', ['sales_order_id' => $salesOrder->id]);
+
+        $this->actingAs($sales)
+            ->delete("/sales/quotations/{$quotation->id}")
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('quotations', ['id' => $quotation->id]);
+        $this->assertDatabaseHas('sales_orders', ['id' => $salesOrder->id]);
+    }
+
+    public function test_deleting_confirmed_quotation_also_removes_sales_order_attachments_and_notifications(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        [$sales, $salesOrder] = $this->confirmedSalesOrder('material_only');
+        $quotation = $salesOrder->quotation;
+
+        $salesOrder->attachments()->create([
+            'category' => 'quotation_signed',
+            'file_path' => 'sales-orders/signed-quotation.pdf',
+            'uploaded_by' => $sales->id,
+        ]);
+        \Illuminate\Support\Facades\Storage::disk('local')->put('sales-orders/signed-quotation.pdf', 'dummy');
+
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+        \App\Models\Notification::create([
+            'user_id' => $finance->id,
+            'type' => 'sales_order.created',
+            'message' => 'Sales Order siap dibuatkan invoice.',
+            'related_type' => $salesOrder->getMorphClass(),
+            'related_id' => $salesOrder->id,
+            'is_sent' => true,
+        ]);
+
+        $this->actingAs($sales)->delete("/sales/quotations/{$quotation->id}")->assertRedirect();
+
+        $this->assertDatabaseMissing('attachments', ['attachable_type' => $salesOrder->getMorphClass(), 'attachable_id' => $salesOrder->id]);
+        \Illuminate\Support\Facades\Storage::disk('local')->assertMissing('sales-orders/signed-quotation.pdf');
+        $this->assertDatabaseMissing('notifications', ['related_type' => $salesOrder->getMorphClass(), 'related_id' => $salesOrder->id]);
     }
 
     public function test_sales_role_cannot_create_invoices_through_any_route(): void
