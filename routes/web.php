@@ -11,6 +11,7 @@ use App\Http\Controllers\Hr\SowController as HrSowController;
 use App\Http\Controllers\Management\OpportunityController as ManagementOpportunityController;
 use App\Http\Controllers\Management\ProjectController as ManagementProjectController;
 use App\Http\Controllers\Management\ProjectManagerAccountController;
+use App\Http\Controllers\Management\ProjectProfitController;
 use App\Http\Controllers\Management\QuotationController as ManagementQuotationController;
 use App\Http\Controllers\Management\SowController as ManagementSowController;
 use App\Http\Controllers\NotificationController;
@@ -111,6 +112,8 @@ Route::middleware('auth')->group(function () {
             ->name('invoices.index');
         Route::get('surveys', [\App\Http\Controllers\Management\SurveyController::class, 'index'])
             ->name('surveys.index');
+        Route::get('project-profit', [ProjectProfitController::class, 'index'])
+            ->name('project-profit.index');
     });
 
     Route::prefix('project-manager')->name('project-manager.')->middleware('role:project_manager')->group(function () {

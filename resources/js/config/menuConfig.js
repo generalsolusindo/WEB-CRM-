@@ -72,6 +72,7 @@ const menuConfig = {
         { label: 'Invoice', href: '/management/invoices', icon: FiCreditCard },
         { label: 'Survey', href: '/management/surveys', icon: FiTool },
         { label: 'Semua Project', href: '/management/projects', icon: FiCalendar },
+        { label: 'Profit Project', href: '/management/project-profit', icon: FiPercent },
         { label: 'Project Manager', href: '/management/project-managers', icon: FiUserCheck },
         { label: 'SOW Menunggu TTD', href: '/management/sows', icon: FiFileText },
     ],
