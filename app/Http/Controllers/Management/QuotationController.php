@@ -92,7 +92,7 @@ class QuotationController extends Controller
         Gate::authorize('view', $quotation);
 
         return Inertia::render('Quotations/Review/Show', [
-            'quotation' => $this->quotationDetail($quotation),
+            'quotation' => $this->quotationDetail($quotation, includeCost: true),
             'canReview' => request()->user()->can('reviewAsManager', $quotation),
             'role' => 'management',
         ]);

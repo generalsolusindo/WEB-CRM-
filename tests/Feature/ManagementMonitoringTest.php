@@ -89,6 +89,22 @@ class ManagementMonitoringTest extends TestCase
         $this->actingAs($this->management())->get("/sales/quotations/{$quotation->id}/print")->assertOk();
     }
 
+    public function test_management_can_see_cost_and_margin_per_line_on_quotation_detail(): void
+    {
+        $so = $this->confirmedSalesOrder();
+        $quotation = $so->quotation;
+        $line = $quotation->lines()->firstOrFail();
+
+        $this->actingAs($this->management())->get("/management/quotations/{$quotation->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Quotations/Review/Show')
+                ->where('quotation.lines.0.cost_price', $line->cost_price)
+                ->where('quotation.lines.0.selling_price', $line->selling_price)
+                ->where('quotation.totals.margin_amount', 300000)
+                ->where('quotation.totals.margin_percent', 30));
+    }
+
     public function test_sales_role_cannot_reach_management_quotation_overview_route(): void
     {
         $sales = User::factory()->create(['role' => 'sales']);

@@ -133,4 +133,37 @@ class QuotationVerificationTest extends TestCase
         $this->actingAs($pmB)->post("/project-manager/quotations/{$quotation->id}/review", ['approved' => true])
             ->assertForbidden();
     }
+
+    /**
+     * Harga beli & margin itu domain Manager (bisnis/pricing), bukan Project Manager
+     * (kelayakan teknis/pengiriman) — jadi cost_price tidak boleh ikut terkirim sama
+     * sekali ke payload halaman PM, bukan cuma disembunyikan di tampilan.
+     */
+    public function test_project_manager_does_not_receive_cost_price_or_margin_in_payload(): void
+    {
+        $pm = User::factory()->create(['role' => 'project_manager', 'is_active' => true]);
+        [$quotation] = $this->draftQuotation($pm);
+
+        $this->actingAs($pm)->get("/project-manager/quotations/{$quotation->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Quotations/Review/Show')
+                ->where('quotation.lines.0.cost_price', null)
+                ->where('quotation.totals.margin_amount', null)
+                ->where('quotation.totals.margin_percent', null));
+    }
+
+    public function test_manager_does_receive_cost_price_and_margin_in_payload(): void
+    {
+        [$quotation, , $management] = $this->draftQuotation(null);
+        $quotation->update(['pm_review_status' => 'approved']);
+
+        $this->actingAs($management)->get("/management/quotations/{$quotation->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Quotations/Review/Show')
+                ->where('quotation.lines.0.cost_price', '1000000.00')
+                ->where('quotation.totals.margin_amount', 600000)
+                ->where('quotation.totals.margin_percent', 30));
+    }
 }

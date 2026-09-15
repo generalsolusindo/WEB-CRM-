@@ -7,7 +7,8 @@ import { Totals } from '../../Sales/Quotations/Show';
 import { PageHeader, Button } from '../../../Components/ui';
 
 export default function Show({ quotation, canReview, role }) {
-    const base = role === 'management' ? '/management/quotations' : '/project-manager/quotations';
+    const isMgmt = role === 'management';
+    const base = isMgmt ? '/management/quotations' : '/project-manager/quotations';
     const form = useForm({ approved: true, notes: '' });
     const [action, setAction] = useState(null);
 
@@ -42,19 +43,39 @@ export default function Show({ quotation, canReview, role }) {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
                             <thead className="bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
-                                <tr><th className="px-4 py-3">Item</th><th className="px-4 py-3">Qty</th><th className="px-4 py-3 text-right">Harga Jual</th><th className="px-4 py-3 text-right">Subtotal</th></tr>
+                                <tr>
+                                    <th className="px-4 py-3">Item</th>
+                                    <th className="px-4 py-3">Qty</th>
+                                    {isMgmt && <th className="px-4 py-3 text-right">Harga Beli</th>}
+                                    <th className="px-4 py-3 text-right">Harga Jual</th>
+                                    {isMgmt && <th className="px-4 py-3 text-right">Selisih</th>}
+                                    <th className="px-4 py-3 text-right">Subtotal</th>
+                                </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {quotation.lines.map((line) => (
-                                    <tr key={line.id}>
-                                        <td className="px-4 py-3"><div className="font-medium text-text">{line.item_name}</div><CategoryBadge category={line.category} /></td>
-                                        <td className="px-4 py-3 text-text-muted">{line.qty} {line.unit}</td>
-                                        <td className="px-4 py-3 text-right text-text">{money(line.selling_price)}</td>
-                                        <td className="px-4 py-3 text-right font-medium text-text">{money(line.subtotal)}</td>
-                                    </tr>
-                                ))}
+                                {quotation.lines.map((line) => {
+                                    const lineMargin = Number(line.subtotal) - Number(line.qty) * Number(line.cost_price || 0);
+                                    const marginPercent = Number(line.cost_price) > 0
+                                        ? (lineMargin / (Number(line.qty) * Number(line.cost_price)) * 100)
+                                        : null;
+                                    return (
+                                        <tr key={line.id}>
+                                            <td className="px-4 py-3"><div className="font-medium text-text">{line.item_name}</div><CategoryBadge category={line.category} /></td>
+                                            <td className="px-4 py-3 text-text-muted">{line.qty} {line.unit}</td>
+                                            {isMgmt && <td className="px-4 py-3 text-right text-text-muted">{money(line.cost_price)}</td>}
+                                            <td className="px-4 py-3 text-right text-text">{money(line.selling_price)}</td>
+                                            {isMgmt && (
+                                                <td className={`px-4 py-3 text-right font-medium ${lineMargin < 0 ? 'text-danger' : 'text-success'}`}>
+                                                    {money(lineMargin)}
+                                                    {marginPercent !== null && <span className="ml-1 text-xs font-normal text-text-faint">({marginPercent.toFixed(1)}%)</span>}
+                                                </td>
+                                            )}
+                                            <td className="px-4 py-3 text-right font-medium text-text">{money(line.subtotal)}</td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
-                            <Totals totals={quotation.totals} span={3} />
+                            <Totals totals={quotation.totals} span={isMgmt ? 5 : 3} />
                         </table>
                     </div>
                 </section>

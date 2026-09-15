@@ -27,8 +27,14 @@ trait BuildsQuotationReview
         ];
     }
 
-    /** @return array<string, mixed> */
-    private function quotationDetail(Quotation $quotation): array
+    /**
+     * @param  bool  $includeCost  Harga beli (cost_price) & margin cuma untuk Manager —
+     *                             Project Manager mereview kelayakan teknis/pengiriman,
+     *                             bukan margin harga, jadi datanya tidak perlu sampai
+     *                             ke payload halaman PM sama sekali (bukan cuma disembunyikan di UI).
+     * @return array<string, mixed>
+     */
+    private function quotationDetail(Quotation $quotation, bool $includeCost = false): array
     {
         $quotation->loadMissing([
             'contact:id,name,company_name,email,phone',
@@ -48,8 +54,22 @@ trait BuildsQuotationReview
             'sales' => $quotation->sales?->name,
             'valid_until' => $quotation->valid_until,
             'notes' => $quotation->notes,
-            'lines' => $quotation->lines,
-            'totals' => DocumentTotals::of($quotation->lines),
+            'lines' => $quotation->lines->map(fn ($line) => [
+                'id' => $line->id,
+                'item_name' => $line->item_name,
+                'category' => $line->category,
+                'description' => $line->description,
+                'qty' => $line->qty,
+                'unit' => $line->unit,
+                'selling_price' => $line->selling_price,
+                'subtotal' => $line->subtotal,
+                'cost_price' => $includeCost ? $line->cost_price : null,
+            ]),
+            'totals' => $includeCost ? DocumentTotals::of($quotation->lines) : [
+                ...DocumentTotals::of($quotation->lines),
+                'margin_amount' => null,
+                'margin_percent' => null,
+            ],
             'pm_review_status' => $quotation->pm_review_status,
             'pm_reviewed_by' => $quotation->pmReviewedBy?->name,
             'pm_reviewed_at' => $quotation->pm_reviewed_at,

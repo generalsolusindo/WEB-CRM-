@@ -1,7 +1,6 @@
 import { Head, router } from '@inertiajs/react';
-import { FiFileText } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, PillTabs, DataTable, StatusBadge, EmptyState, Pagination, Button, DateRangeFilter } from '../../../Components/ui';
+import { PageHeader, PillTabs, DataTable, StatusBadge, EmptyState, Pagination, DateRangeFilter } from '../../../Components/ui';
 
 export default function Index({ quotations, filters, statusOptions }) {
     function query(overrides) {
@@ -51,16 +50,6 @@ export default function Index({ quotations, filters, statusOptions }) {
         { key: 'sales', label: 'Sales', render: (q) => q.sales || '—' },
         { key: 'status', label: 'Status', render: (q) => <StatusBadge status={q.status} label={statusOptions.find((s) => s.value === q.status)?.label} /> },
         { key: 'created_at', label: 'Tanggal', render: (q) => q.created_at?.slice(0, 10) },
-        {
-            key: 'pdf',
-            label: '',
-            align: 'right',
-            render: (q) => (
-                <Button href={`/sales/quotations/${q.id}/print`} external variant="outline" icon={FiFileText} className="text-xs">
-                    Lihat PDF
-                </Button>
-            ),
-        },
     ];
 
     return (
@@ -78,6 +67,7 @@ export default function Index({ quotations, filters, statusOptions }) {
                     columns={columns}
                     rows={quotations.data}
                     rowKey="id"
+                    rowHref={(q) => `/management/quotations/${q.id}`}
                     empty={<EmptyState title="Belum ada quotation." />}
                     footer={<Pagination links={quotations.links} />}
                 />
