@@ -312,14 +312,73 @@ class SowTest extends TestCase
         $this->assertDatabaseMissing('attachments', ['id' => $image->id]);
     }
 
-    public function test_cannot_edit_sow_once_pending_hr_review(): void
+    public function test_editing_sow_after_it_was_sent_resets_review_and_signatures_to_draft(): void
     {
-        [$project, $ops, , $technician] = $this->projectWithVendor();
+        [$project, $ops, $vendor, $technician] = $this->projectWithVendor();
+        $hr = User::factory()->create(['role' => 'hr', 'is_active' => true]);
+        $vendorUser = User::factory()->create(['role' => 'vendor', 'vendor_id' => $vendor->id, 'is_active' => true]);
 
         $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow", [
             'number' => 'SOW-001', 'project_name' => 'Jasa X', 'technician_id' => $technician->id,
         ]);
         $this->actingAs($ops)->post("/operational/projects/{$project->id}/sow/submit");
+        $sow = Sow::where('project_id', $project->id)->firstOrFail();
+
+        $hrReviewer = User::factory()->create(['role' => 'hr', 'is_active' => true]);
+        $this->actingAs($hrReviewer)->post("/hr/sows/{$sow->id}/review", ['approved' => true]);
+        $this->actingAs($technician)->post("/technician/sows/{$sow->id}/sign", ['signature' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=']);
+        $sow->refresh();
+        $this->assertSame('pending_vendor_signature', $sow->status);
+
+        // Boleh diedit meski sudah lewat dari Draft — sekarang tidak lagi forbidden.
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow", [
+            'number' => 'SOW-002', 'project_name' => 'Jasa Y (revisi)', 'technician_id' => $technician->id,
+        ])->assertRedirect();
+
+        $sow->refresh();
+        $this->assertSame('draft', $sow->status);
+        $this->assertSame('Jasa Y (revisi)', $sow->project_name);
+        $this->assertNull($sow->submitted_at);
+        $this->assertNull($sow->technician_signature);
+        $this->assertNull($sow->technician_signed_at);
+        $this->assertNull($sow->vendor_signature);
+        $this->assertNull($sow->hr_content_reviewed_by);
+
+        // Sub-bab ruang lingkup juga kembali bisa diubah.
+        $section = $sow->scopeSections()->firstOrFail();
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow/scope-sections/{$section->id}", [
+            'title' => 'Ubah', 'content' => 'x',
+        ])->assertRedirect();
+        $this->assertSame('Ubah', $section->fresh()->title);
+
+        // Pihak yang sebelumnya sudah terlibat (teknisi, karena statusnya sudah lewat
+        // pending_technician_signature) diberi tahu bahwa SOW direset.
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $technician->id, 'type' => 'sow.reset_for_edit', 'related_id' => $sow->id,
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $hr->id, 'type' => 'sow.reset_for_edit', 'related_id' => $sow->id,
+        ]);
+        // PIC Vendor belum sempat melihat SOW ini (masih pending_technician_signature saat
+        // teknisi baru saja tanda tangan dan lompat ke pending_vendor_signature — vendor
+        // sudah boleh lihat begitu status itu tercapai), jadi ikut diberi tahu.
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $vendorUser->id, 'type' => 'sow.reset_for_edit', 'related_id' => $sow->id,
+        ]);
+
+        // Bisa dikirim ulang ke HR dari awal.
+        $this->actingAs($ops)->post("/operational/projects/{$project->id}/sow/submit")->assertRedirect();
+        $this->assertSame('pending_hr_review', $sow->fresh()->status);
+    }
+
+    public function test_cannot_edit_sow_once_completed(): void
+    {
+        [$project, $ops, $vendor, $technician] = $this->projectWithVendor();
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow", [
+            'number' => 'SOW-001', 'project_name' => 'Jasa X', 'technician_id' => $technician->id,
+        ]);
+        $sow = Sow::where('project_id', $project->id)->firstOrFail();
+        $sow->update(['status' => 'completed']);
 
         $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow", [
             'number' => 'SOW-002', 'project_name' => 'Jasa Y', 'technician_id' => $technician->id,
@@ -327,20 +386,6 @@ class SowTest extends TestCase
 
         // Tapi tetap bisa dilihat (read-only).
         $this->actingAs($ops)->get("/operational/projects/{$project->id}/sow")->assertOk();
-
-        // Sub-bab ruang lingkup juga tidak bisa diubah lagi — halaman edit tetap
-        // harus menyembunyikan tombol ini, tapi backend tetap jadi garis pertahanan.
-        $sow = Sow::where('project_id', $project->id)->firstOrFail();
-        $section = $sow->scopeSections()->firstOrFail();
-
-        $this->actingAs($ops)->post("/operational/projects/{$project->id}/sow/scope-sections", [
-            'title' => 'Baru', 'content' => 'x',
-        ])->assertForbidden();
-        $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow/scope-sections/{$section->id}", [
-            'title' => 'Ubah', 'content' => 'x',
-        ])->assertForbidden();
-        $this->actingAs($ops)->delete("/operational/projects/{$project->id}/sow/scope-sections/{$section->id}")
-            ->assertForbidden();
     }
 
     public function test_technician_options_are_scoped_to_the_projects_vendor(): void

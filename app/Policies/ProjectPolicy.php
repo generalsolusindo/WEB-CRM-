@@ -199,7 +199,14 @@ class ProjectPolicy
         return $this->isOperational($user) && $project->vendor_id !== null;
     }
 
-    /** Buat/edit SOW — hanya Operational, project harus sudah ditandai pakai vendor, dan SOW belum dikirim ke HR (atau sedang dikembalikan). */
+    /**
+     * Buat/edit SOW — Operational, project harus sudah ditandai pakai vendor.
+     * Boleh diedit kapan saja selama belum Completed — termasuk setelah dikirim
+     * dan/atau sudah ada tanda tangan yang masuk, supaya kesalahan isi masih bisa
+     * diperbaiki. Mengedit di luar status Draft/RejectedByHr me-reset seluruh
+     * proses review & tanda tangan (lihat SaveSowDraft) karena tanda tangan yang
+     * sudah dikumpulkan hanya sah untuk isi SOW yang mereka tanda tangani.
+     */
     public function manageSow(User $user, Project $project): bool
     {
         if (! $this->isOperational($user) || $project->vendor_id === null) {
@@ -208,7 +215,7 @@ class ProjectPolicy
 
         $sow = $project->sow;
 
-        return $sow === null || in_array($sow->status, [SowStatus::Draft->value, SowStatus::RejectedByHr->value], true);
+        return $sow === null || $sow->status !== SowStatus::Completed->value;
     }
 
     private function isOperational(User $user): bool

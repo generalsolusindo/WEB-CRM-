@@ -49,6 +49,14 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
 
     function submit(e) {
         e.preventDefault();
+        if (!isDraftLike) {
+            const ok = confirm(
+                'SOW ini sudah berjalan di proses review/tanda tangan. Menyimpan perubahan akan MERESET seluruh ' +
+                'review & tanda tangan yang sudah dikumpulkan (HR, Teknisi, PIC Vendor, dst) — statusnya kembali ke ' +
+                'Draft dan harus dikirim ulang dari awal. Lanjutkan?'
+            );
+            if (!ok) return;
+        }
         form.put(`/operational/projects/${project.id}/sow`, { preserveScroll: true });
     }
 
@@ -87,6 +95,15 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
                     <div className="rounded-xl border border-danger/30 bg-danger/5 p-4 text-sm text-danger">
                         SOW ini dikembalikan oleh HR{sow.hr_content_reviewed_by ? ` (${sow.hr_content_reviewed_by})` : ''} — silakan perbaiki lalu kirim ulang.
                         {sow.hr_content_review_notes && <div className="mt-1 font-medium">Catatan: {sow.hr_content_review_notes}</div>}
+                    </div>
+                )}
+
+                {canEdit && !isDraftLike && sow.status !== 'completed' && (
+                    <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning">
+                        <strong>Perhatian:</strong> SOW ini sudah dikirim dan sedang berjalan di proses review/tanda tangan
+                        ({sow.status_label}). Anda tetap bisa mengubah isinya di bawah, tapi menyimpan perubahan akan
+                        <strong> mereset seluruh review &amp; tanda tangan yang sudah dikumpulkan</strong> ke Draft — semua
+                        pihak yang sudah terlibat akan diberi tahu, dan SOW harus dikirim ulang dari awal.
                     </div>
                 )}
 
@@ -230,7 +247,7 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
                         <TextArea value={form.data.closing} onChange={(v) => form.setData('closing', v)} error={form.errors.closing} />
                     </Section>
 
-                    {canEdit && isDraftLike && (
+                    {canEdit && (
                         <div className="flex flex-wrap justify-end gap-2">
                             {sow.id && (
                                 <a href={`/operational/projects/${project.id}/sow/print`} target="_blank" rel="noreferrer" className="btn btn-outline">
@@ -238,16 +255,16 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
                                 </a>
                             )}
                             <button disabled={form.processing} className="btn btn-outline">
-                                {form.processing ? 'Menyimpan…' : 'Simpan Draft'}
+                                {form.processing ? 'Menyimpan…' : isDraftLike ? 'Simpan Draft' : 'Simpan Perubahan (Reset Proses)'}
                             </button>
-                            {sow.id && (
+                            {sow.id && isDraftLike && (
                                 <button type="button" onClick={submitToHr} className="btn btn-primary">
                                     Kirim ke HR
                                 </button>
                             )}
                         </div>
                     )}
-                    {!isDraftLike && sow.id && (
+                    {!canEdit && sow.id && (
                         <div className="flex justify-end">
                             <a href={`/operational/projects/${project.id}/sow/print`} target="_blank" rel="noreferrer" className="btn btn-outline">
                                 Lihat / Cetak PDF
