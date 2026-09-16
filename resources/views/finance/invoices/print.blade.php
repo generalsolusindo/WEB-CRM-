@@ -65,7 +65,7 @@
         td, th { vertical-align: top; }
 
         .top td { border: 0; padding: 0; }
-        .brand-logo { height: 58px; margin-bottom: 4px; }
+        .brand-logo { height: 82px; margin-bottom: 4px; }
         .brand-name { font-size: 20px; font-weight: 700; color: #001B3A; letter-spacing: .5px; }
         .brand-sub { font-size: 10px; font-style: italic; color: #374151; margin: 2px 0 6px; }
         .muted { color: #6B7280; }
