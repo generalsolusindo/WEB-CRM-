@@ -131,4 +131,62 @@ class ContactManagementTest extends TestCase
 
         $this->assertDatabaseHas('contacts', ['id' => $contact->id]);
     }
+
+    public function test_merging_moves_leads_quotations_and_sales_orders_then_deletes_duplicate(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $keep = Contact::create(['name' => 'Dian Herbayu', 'phone' => '0896', 'created_by' => $sales->id]);
+        $duplicate = Contact::create(['name' => 'Dian H.', 'email' => 'dian@dup.test', 'created_by' => $sales->id]);
+
+        $lead = Lead::create([
+            'contact_id' => $duplicate->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'negotiation',
+        ]);
+        $quotation = \App\Models\Quotation::create([
+            'number' => 'QUO-TEST-0001', 'procurement_request_id' => \App\Models\ProcurementRequest::create([
+                'lead_id' => $lead->id, 'status' => 'ready',
+            ])->id,
+            'lead_id' => $lead->id, 'contact_id' => $duplicate->id, 'sales_id' => $sales->id,
+            'status' => 'draft', 'revision_number' => 1,
+        ]);
+
+        $this->actingAs($sales)->post("/sales/contacts/{$keep->id}/merge", [
+            'duplicate_contact_id' => $duplicate->id,
+        ])->assertRedirect(route('sales.contacts.show', $keep));
+
+        $this->assertSame($keep->id, $lead->fresh()->contact_id);
+        $this->assertSame($keep->id, $quotation->fresh()->contact_id);
+        $this->assertDatabaseMissing('contacts', ['id' => $duplicate->id]);
+        // Field yang kosong di $keep (email) ikut terisi dari duplikatnya.
+        $this->assertSame('dian@dup.test', $keep->fresh()->email);
+        // Field yang sudah terisi di $keep (phone) tidak ditimpa.
+        $this->assertSame('0896', $keep->fresh()->phone);
+    }
+
+    public function test_cannot_merge_another_sales_contact(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $other = User::factory()->create(['role' => 'sales']);
+        $keep = Contact::create(['name' => 'Milik Saya', 'created_by' => $sales->id]);
+        $notMine = Contact::create(['name' => 'Milik Orang Lain', 'created_by' => $other->id]);
+
+        $this->actingAs($sales)->post("/sales/contacts/{$keep->id}/merge", [
+            'duplicate_contact_id' => $notMine->id,
+        ])->assertForbidden();
+
+        $this->assertDatabaseHas('contacts', ['id' => $notMine->id]);
+    }
+
+    public function test_cannot_merge_contact_with_itself(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Solo', 'created_by' => $sales->id]);
+
+        // Ditolak lewat authorize() policy (403) sebelum sempat divalidasi — keduanya
+        // sama-sama efektif mencegah merge, tapi authorize() jalan lebih dulu.
+        $this->actingAs($sales)->post("/sales/contacts/{$contact->id}/merge", [
+            'duplicate_contact_id' => $contact->id,
+        ])->assertForbidden();
+
+        $this->assertDatabaseHas('contacts', ['id' => $contact->id]);
+    }
 }

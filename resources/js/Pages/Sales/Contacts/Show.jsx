@@ -1,15 +1,32 @@
+import { useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { FiUserPlus, FiEdit2, FiTrash2, FiMessageCircle } from 'react-icons/fi';
+import { FiUserPlus, FiEdit2, FiTrash2, FiMessageCircle, FiGitMerge } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, Card, CardHeader, Button, Info, InfoGrid, StatusBadge, EmptyState } from '../../../Components/ui';
+import { PageHeader, Card, CardHeader, Button, Info, InfoGrid, StatusBadge, EmptyState, Modal, Select } from '../../../Components/ui';
 import { contactWhatsappLink } from '../../../Utils/whatsapp';
 
-export default function Show({ contact, leads, npwpDocumentUrl = null }) {
+export default function Show({ contact, leads, npwpDocumentUrl = null, otherContacts = [] }) {
     const salesName = usePage().props.auth?.user?.name;
     const waLink = contactWhatsappLink(contact, salesName);
+    const [mergeOpen, setMergeOpen] = useState(false);
+    const [duplicateId, setDuplicateId] = useState('');
+    const [merging, setMerging] = useState(false);
 
     function destroy() {
         if (confirm('Hapus contact ini?')) router.delete(`/sales/contacts/${contact.id}`);
+    }
+
+    function submitMerge() {
+        if (!duplicateId) return;
+        const duplicate = otherContacts.find((c) => String(c.id) === String(duplicateId));
+        if (!confirm(`Gabungkan "${duplicate?.name}" ke "${contact.name}"? Semua lead, quotation, dan dokumen milik "${duplicate?.name}" akan dipindah ke sini, lalu "${duplicate?.name}" akan dihapus. Tindakan ini tidak bisa dibatalkan.`)) {
+            return;
+        }
+        setMerging(true);
+        router.post(`/sales/contacts/${contact.id}/merge`, { duplicate_contact_id: duplicateId }, {
+            onFinish: () => setMerging(false),
+            onSuccess: () => setMergeOpen(false),
+        });
     }
 
     return (
@@ -34,10 +51,36 @@ export default function Show({ contact, leads, npwpDocumentUrl = null }) {
                             )}
                             <Button href={`/sales/leads/create?contact_id=${contact.id}`} icon={FiUserPlus}>Buat Lead</Button>
                             <Button href={`/sales/contacts/${contact.id}/edit`} variant="outline" icon={FiEdit2}>Edit</Button>
+                            {otherContacts.length > 0 && (
+                                <Button onClick={() => setMergeOpen(true)} variant="outline" icon={FiGitMerge}>Gabungkan Duplikat</Button>
+                            )}
                             <Button onClick={destroy} variant="ghost" icon={FiTrash2} className="text-danger hover:bg-danger-soft hover:text-danger">Hapus</Button>
                         </>
                     }
                 />
+
+                <Modal open={mergeOpen} onClose={() => setMergeOpen(false)} title="Gabungkan Contact Duplikat" size="sm"
+                    footer={(
+                        <>
+                            <Button variant="outline" onClick={() => setMergeOpen(false)}>Batal</Button>
+                            <Button onClick={submitMerge} disabled={!duplicateId || merging} className="bg-danger hover:bg-danger">
+                                {merging ? 'Menggabungkan…' : 'Gabungkan & Hapus Duplikat'}
+                            </Button>
+                        </>
+                    )}
+                >
+                    <p className="mb-3 text-sm text-text-muted">
+                        Pilih contact lain yang ternyata duplikat dari <strong className="text-text">{contact.name}</strong> ini.
+                        Semua lead, quotation, sales order, dan dokumen milik duplikat itu akan dipindah ke sini, lalu
+                        contact duplikatnya akan dihapus permanen.
+                    </p>
+                    <Select value={duplicateId} onChange={(e) => setDuplicateId(e.target.value)}>
+                        <option value="">— pilih contact duplikat —</option>
+                        {otherContacts.map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}{c.company_name ? ` · ${c.company_name}` : ''}</option>
+                        ))}
+                    </Select>
+                </Modal>
 
                 <Card>
                     <InfoGrid>

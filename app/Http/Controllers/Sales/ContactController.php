@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Sales;
 
+use App\Actions\Sales\MergeContacts;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Sales\MergeContactRequest;
 use App\Http\Requests\Sales\StoreContactRequest;
 use App\Http\Requests\Sales\UpdateContactRequest;
 use App\Models\Contact;
@@ -77,10 +79,17 @@ class ContactController extends Controller
 
         $contact->whatsapp_number = $contact->whatsappNumber();
 
+        $otherContacts = Contact::query()
+            ->where('created_by', request()->user()->id)
+            ->where('id', '!=', $contact->id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'company_name']);
+
         return Inertia::render('Sales/Contacts/Show', [
             'contact' => $contact,
             'leads' => $leads,
             'npwpDocumentUrl' => $this->npwpDocumentUrl($contact),
+            'otherContacts' => $otherContacts,
         ]);
     }
 
@@ -136,5 +145,20 @@ class ContactController extends Controller
 
         return redirect()->route('sales.contacts.index')
             ->with('success', 'Contact berhasil dihapus.');
+    }
+
+    /**
+     * Gabungkan contact duplikat: {contact} adalah yang DIPERTAHANKAN, duplicate_contact_id
+     * adalah duplikatnya — seluruh lead/quotation/sales order/dokumen milik duplikat
+     * dipindah ke {contact}, lalu duplikatnya dihapus.
+     */
+    public function merge(MergeContactRequest $request, Contact $contact, MergeContacts $action): RedirectResponse
+    {
+        $duplicate = Contact::findOrFail($request->validated('duplicate_contact_id'));
+
+        $action->handle($contact, $duplicate);
+
+        return redirect()->route('sales.contacts.show', $contact)
+            ->with('success', "Contact \"{$duplicate->name}\" berhasil digabungkan ke sini.");
     }
 }

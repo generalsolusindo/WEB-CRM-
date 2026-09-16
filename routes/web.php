@@ -346,6 +346,7 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('sales')->name('sales.')->middleware('role:sales')->group(function () {
         Route::resource('contacts', ContactController::class);
+        Route::post('contacts/{contact}/merge', [ContactController::class, 'merge'])->name('contacts.merge');
         Route::post('leads/{lead}/convert', [LeadController::class, 'convert'])->name('leads.convert');
         Route::post('leads/{lead}/submit-procurement', SubmitProcurementRequestController::class)
             ->name('leads.submit-procurement');

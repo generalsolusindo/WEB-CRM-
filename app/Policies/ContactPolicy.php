@@ -32,6 +32,14 @@ class ContactPolicy
         return $this->owns($user, $contact);
     }
 
+    /** Gabungkan dua contact duplikat — keduanya harus milik Sales yang sama. */
+    public function merge(User $user, Contact $keep, Contact $duplicate): bool
+    {
+        return $this->owns($user, $keep)
+            && $this->owns($user, $duplicate)
+            && $keep->id !== $duplicate->id;
+    }
+
     private function owns(User $user, Contact $contact): bool
     {
         return $user->role === 'sales'
