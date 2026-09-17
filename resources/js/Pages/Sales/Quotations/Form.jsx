@@ -10,7 +10,7 @@ function money(v) {
 function suggestedPrice(cost) { return (Number(cost) * 1.3).toFixed(2); }
 function r2(n) { return Math.round(n * 100) / 100; }
 
-function initialLine(line, taxes) {
+function initialLine(line, taxes, editing) {
     const dp = line.discount_percent != null ? Number(line.discount_percent) : null;
     const da = line.discount_amount != null ? Number(line.discount_amount) : 0;
     const taxId = line.tax_id ?? line.tax?.id ?? '';
@@ -20,7 +20,13 @@ function initialLine(line, taxes) {
     else if (rate != null && rate > 0) taxMode = 'custom';
     return {
         _key: `src-${line.id}`,
-        procurement_request_line_id: line.procurement_request_line_id ?? line.id,
+        // Saat membuat quotation baru, `line` adalah baris Procurement Request itu sendiri
+        // (tidak punya kolom procurement_request_line_id sendiri) -> id-nya dipakai sebagai
+        // acuan. Saat edit quotation, `line` adalah QuotationLine yang SUDAH punya kolom
+        // procurement_request_line_id sendiri (bisa null untuk item manual) — di sini nilai
+        // itu harus dipakai apa adanya, TIDAK boleh fallback ke line.id (itu id baris quotation
+        // sendiri, bukan id baris procurement, dan akan ditolak backend sebagai "tidak valid").
+        procurement_request_line_id: editing ? (line.procurement_request_line_id ?? null) : (line.procurement_request_line_id ?? line.id),
         item_name: line.item_name ?? '',
         description: line.description ?? '',
         qty: String(line.qty ?? ''),
@@ -69,7 +75,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
         notes: quotation?.notes ?? '',
         terms: quotation?.terms ?? defaultTerms,
         agreed_dpp: quotation?.agreed_dpp != null ? String(Number(quotation.agreed_dpp)) : '',
-        lines: sourceLines.map((l) => initialLine(l, taxes)),
+        lines: sourceLines.map((l) => initialLine(l, taxes, editing)),
     });
 
     const groupRank = (i) => (data.lines[i].category === 'material' ? 0 : 1);
