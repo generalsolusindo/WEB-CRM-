@@ -28,6 +28,7 @@ class Quotation extends Model
         'parent_quotation_id',
         'is_addendum',
         'valid_until',
+        'quoted_at',
         'notes',
         'terms',
         'whatsapp_sent_at',
@@ -49,6 +50,7 @@ class Quotation extends Model
         return [
             'agreed_dpp' => 'decimal:2',
             'valid_until' => 'date',
+            'quoted_at' => 'date',
             'pm_reviewed_at' => 'datetime',
             'manager_reviewed_at' => 'datetime',
             'is_addendum' => 'boolean',

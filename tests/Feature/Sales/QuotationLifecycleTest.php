@@ -169,6 +169,33 @@ class QuotationLifecycleTest extends TestCase
         $this->assertSame(now()->addDays(10)->toDateString(), $quotation->fresh()->valid_until->toDateString());
     }
 
+    /**
+     * "Date" di cetakan quotation (quoted_at) harus ikut terhitung ulang saat diedit — beda
+     * dengan created_at (tetap tanggal dibuat pertama kali) dan updated_at (ikut berubah oleh
+     * aksi lain seperti review PM/Manager, jadi tidak bisa dipakai untuk ini).
+     */
+    public function test_editing_recalculates_quoted_at_and_reflects_on_print(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $quotation->update(['quoted_at' => now()->subDays(20)->toDateString()]);
+        $line = $quotation->lines()->firstOrFail();
+
+        $this->actingAs($sales)
+            ->put("/sales/quotations/{$quotation->id}", [
+                'lines' => [
+                    ['procurement_request_line_id' => $line->procurement_request_line_id, 'selling_price' => 1500000],
+                ],
+            ])
+            ->assertRedirect();
+
+        $fresh = $quotation->fresh();
+        $this->assertSame(now()->toDateString(), $fresh->quoted_at->toDateString());
+
+        $this->actingAs($sales)->get("/sales/quotations/{$quotation->id}/print")
+            ->assertOk()
+            ->assertSee(now()->format('d/m/Y'));
+    }
+
     /** Unit lama di luar daftar baku (mis. dari data lawas) tidak boleh menghalangi edit lain. */
     public function test_editing_with_legacy_unit_value_still_succeeds(): void
     {

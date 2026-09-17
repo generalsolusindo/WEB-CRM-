@@ -60,6 +60,7 @@ class CreateQuotation
                 'parent_quotation_id' => null,
                 'is_addendum' => $request->is_addendum,
                 'valid_until' => now()->addDays(10)->toDateString(),
+                'quoted_at' => now()->toDateString(),
                 'notes' => $data['notes'] ?? null,
                 'terms' => ($data['terms'] ?? '') !== '' ? $data['terms'] : QuotationDefaults::terms(),
                 'agreed_dpp' => isset($data['agreed_dpp']) && $data['agreed_dpp'] !== null && $data['agreed_dpp'] !== ''

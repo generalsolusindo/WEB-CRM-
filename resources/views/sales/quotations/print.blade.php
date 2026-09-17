@@ -140,7 +140,7 @@
                 </td>
                 <td class="meta">
                     <table>
-                        <tr><td class="k">Date :</td><td>{{ $quotation->created_at?->format('d/m/Y') }}</td></tr>
+                        <tr><td class="k">Date :</td><td>{{ ($quotation->quoted_at ?? $quotation->created_at)?->format('d/m/Y') }}</td></tr>
                         <tr><td class="k">Quotation # :</td><td>{{ $number }}</td></tr>
                         <tr><td class="k">Customer ID :</td><td>&nbsp;</td></tr>
                     </table>
