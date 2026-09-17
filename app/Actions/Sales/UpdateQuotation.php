@@ -31,6 +31,9 @@ class UpdateQuotation
                 // Angka berubah -> kembali ke Draft supaya wajib direview & dikirim ulang
                 // ke customer, apa pun status sebelumnya (Sent/Rejected).
                 'status' => QuotationStatus::Draft->value,
+                // Dianggap penawaran baru sejak hari ini -> masa berlaku dihitung ulang,
+                // sama seperti saat quotation pertama kali dibuat (bukan sisa masa berlaku lama).
+                'valid_until' => now()->addDays(10)->toDateString(),
                 'notes' => $data['notes'] ?? null,
                 'terms' => $data['terms'] ?? null,
                 'agreed_dpp' => isset($data['agreed_dpp']) && $data['agreed_dpp'] !== null && $data['agreed_dpp'] !== ''

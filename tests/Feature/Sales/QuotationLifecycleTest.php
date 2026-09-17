@@ -147,6 +147,28 @@ class QuotationLifecycleTest extends TestCase
         $this->assertSame('50.00', $quotation->lines()->first()->markup_percent);
     }
 
+    /**
+     * Quotation yang diedit dianggap penawaran baru sejak hari itu — "Berlaku Sampai"
+     * harus ikut dihitung ulang dari hari edit, bukan tetap memakai tanggal lama yang
+     * dihitung dari saat quotation pertama kali dibuat.
+     */
+    public function test_editing_recalculates_valid_until_from_today(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $quotation->update(['valid_until' => now()->subDays(20)->toDateString()]);
+        $line = $quotation->lines()->firstOrFail();
+
+        $this->actingAs($sales)
+            ->put("/sales/quotations/{$quotation->id}", [
+                'lines' => [
+                    ['procurement_request_line_id' => $line->procurement_request_line_id, 'selling_price' => 1500000],
+                ],
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(now()->addDays(10)->toDateString(), $quotation->fresh()->valid_until->toDateString());
+    }
+
     /** Unit lama di luar daftar baku (mis. dari data lawas) tidak boleh menghalangi edit lain. */
     public function test_editing_with_legacy_unit_value_still_succeeds(): void
     {
