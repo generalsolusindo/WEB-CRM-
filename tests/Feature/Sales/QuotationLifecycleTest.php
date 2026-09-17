@@ -201,14 +201,14 @@ class QuotationLifecycleTest extends TestCase
     {
         [$sales, $quotation] = $this->draftQuotation();
         $line = $quotation->lines()->firstOrFail();
-        $line->update(['unit' => 'pcs']); // nilai lama, di luar Requirement::UNITS
+        $line->update(['unit' => 'Unit']); // nilai lama, di luar Requirement::UNITS (huruf besar, bukan format baku)
 
         $this->actingAs($sales)
             ->put("/sales/quotations/{$quotation->id}", [
                 'lines' => [
                     [
                         'procurement_request_line_id' => $line->procurement_request_line_id,
-                        'unit' => 'pcs',
+                        'unit' => 'Unit',
                         'selling_price' => 1450000,
                     ],
                 ],
@@ -216,7 +216,7 @@ class QuotationLifecycleTest extends TestCase
             ->assertRedirect();
 
         $fresh = $quotation->lines()->firstOrFail();
-        $this->assertSame('pcs', $fresh->unit);
+        $this->assertSame('Unit', $fresh->unit);
         $this->assertSame('1450000.00', $fresh->selling_price);
     }
 

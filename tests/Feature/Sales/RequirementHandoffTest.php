@@ -209,7 +209,7 @@ class RequirementHandoffTest extends TestCase
 
         $this->actingAs($sales)->post("/sales/leads/{$lead->id}/requirements", [
             ...$this->requirementData(),
-            'unit' => 'pcs', // bebas teks lama — sudah tidak diterima
+            'unit' => 'kardus', // bebas teks lama — sudah tidak diterima
         ])->assertSessionHasErrors('unit');
 
         foreach (Requirement::UNITS as $unit) {
