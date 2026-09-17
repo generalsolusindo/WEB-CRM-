@@ -741,6 +741,8 @@ function ManagementOverview({ data, menuBadges = {} }) {
                 )}
             </section>
 
+            <RevenueSection data={data.revenue} />
+
             <StatSection title="Sales" href="/management/opportunities">
                 <StatGrid items={data.sales.leads_by_stage} hrefFor={(item) => `/management/opportunities?stage=${item.value}`} />
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -772,6 +774,43 @@ function ManagementOverview({ data, menuBadges = {} }) {
                 <StatGrid items={data.survey.by_status} hrefFor={(item) => `/management/surveys?status=${item.value}`} />
             </StatSection>
         </div>
+    );
+}
+
+/** Ringkasan pendapatan & profit bulan berjalan — angka finansial yang paling ingin
+ * langsung dilihat Manager begitu buka Dashboard, dihitung dari project yang Won
+ * (rumus sama persis dengan laporan "Profit Project"). Diletakkan paling atas,
+ * sebelum ringkasan operasional lain, karena ini yang paling sering dicari duluan. */
+function RevenueSection({ data }) {
+    const isProfitNegative = Number(data.profit_this_month) < 0;
+
+    return (
+        <Link href={data.href} className="block">
+            <div className="card p-5 transition hover:shadow-md">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-bold tracking-tight text-text">Pendapatan &amp; Profit — {data.month_label}</h3>
+                    <span className="flex items-center gap-1 text-xs font-semibold text-primary">
+                        Lihat rincian per project <FiArrowRight className="h-3 w-3" />
+                    </span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl bg-bg px-4 py-3">
+                        <div className="text-2xl font-bold tracking-tight text-text">{money(data.revenue_this_month)}</div>
+                        <div className="mt-0.5 text-xs text-text-muted">Pendapatan (Harga Jual, project Won)</div>
+                    </div>
+                    <div className="rounded-xl bg-bg px-4 py-3">
+                        <div className={`text-2xl font-bold tracking-tight ${isProfitNegative ? 'text-danger' : 'text-success'}`}>{money(data.profit_this_month)}</div>
+                        <div className="mt-0.5 text-xs text-text-muted">
+                            Profit {data.margin_percent != null ? `(${data.margin_percent}% dari HPP)` : ''}
+                        </div>
+                    </div>
+                    <div className="rounded-xl bg-bg px-4 py-3">
+                        <div className="text-2xl font-bold tracking-tight text-text">{data.won_count_this_month}</div>
+                        <div className="mt-0.5 text-xs text-text-muted">Project Won bulan ini</div>
+                    </div>
+                </div>
+            </div>
+        </Link>
     );
 }
 

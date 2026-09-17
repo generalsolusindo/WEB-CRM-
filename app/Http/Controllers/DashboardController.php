@@ -20,6 +20,7 @@ use App\Models\ProjectTask;
 use App\Models\Quotation;
 use App\Models\SalesOrder;
 use App\Models\Survey;
+use App\Services\Management\ProjectProfitCalculator;
 use App\Services\Sales\DocumentTotals;
 use App\Services\Sales\SalesOrderSettlement;
 use Illuminate\Http\Request;
@@ -155,6 +156,19 @@ class DashboardController extends Controller
 
         $bastPending = Bast::query()->where('status', 'submitted')->count();
 
+        $monthStart = now()->startOfMonth()->toDateString();
+        $monthEnd = now()->endOfMonth()->toDateString();
+        $wonThisMonth = Project::query()
+            ->whereHas('salesOrder', fn ($q) => $q->where('status', 'won'))
+            ->whereDate('created_at', '>=', $monthStart)
+            ->whereDate('created_at', '<=', $monthEnd)
+            ->with(ProjectProfitCalculator::eagerLoads())
+            ->get()
+            ->map(fn (Project $project) => ProjectProfitCalculator::rowFor($project));
+        $revenueThisMonth = round((float) $wonThisMonth->sum('harga_jual'), 2);
+        $profitThisMonth = round((float) $wonThisMonth->sum('profit'), 2);
+        $hppThisMonth = round((float) $wonThisMonth->sum('hpp'), 2);
+
         $surveyCounts = $countByStatus(Survey::class);
         $surveysByStatus = collect(SurveyStatus::options())
             ->filter(fn ($o) => ! in_array($o['value'], ['closed', 'cancelled'], true))
@@ -165,6 +179,14 @@ class DashboardController extends Controller
             ])->values();
 
         return [
+            'revenue' => [
+                'month_label' => now()->translatedFormat('F Y'),
+                'revenue_this_month' => $revenueThisMonth,
+                'profit_this_month' => $profitThisMonth,
+                'margin_percent' => $hppThisMonth > 0 ? round($profitThisMonth / $hppThisMonth * 100, 2) : null,
+                'won_count_this_month' => $wonThisMonth->count(),
+                'href' => "/management/project-profit?scope=won&from={$monthStart}&to={$monthEnd}",
+            ],
             'sales' => [
                 'leads_by_stage' => $leadsByStage,
                 'open_quotations' => $openQuotations->count(),
