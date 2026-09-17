@@ -33,9 +33,9 @@ export default function Index({ payments }) {
 
     return (
         <AppLayout>
-            <Head title="Pembayaran" />
+            <Head title="Pembayaran Invoice" />
             <div className="mx-auto max-w-6xl space-y-5">
-                <PageHeader title="Pembayaran" subtitle="Riwayat seluruh pembayaran. Pencatatan dilakukan dari halaman Invoice." />
+                <PageHeader title="Pembayaran Invoice" subtitle="Riwayat pembayaran yang diterima dari customer. Pencatatan dilakukan dari halaman Invoice." />
 
                 <DataTable
                     columns={columns}

@@ -12,7 +12,6 @@ import {
     FiTool,
     FiCreditCard,
     FiUserCheck,
-    FiDatabase,
     FiEdit3,
     FiCheckCircle,
     FiPercent,
@@ -60,7 +59,7 @@ const menuConfig = {
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
         { label: 'Invoice', href: '/finance/invoices', icon: FiFileText },
         { label: 'Survey', href: '/finance/surveys', icon: FiClipboard },
-        { label: 'Pembayaran', href: '/finance/payments', icon: FiCreditCard },
+        { label: 'Pembayaran Invoice', href: '/finance/payments', icon: FiCreditCard },
         { label: 'Pembayaran Vendor', href: '/finance/procurement-payments', icon: FiTruck },
     ],
     management: [
@@ -87,8 +86,7 @@ const menuConfig = {
     administrator: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
         { label: 'Manajemen User', href: '/admin/users', icon: FiUserCheck },
-        { label: 'Master Data', href: '#', icon: FiDatabase },
-        { label: 'Master Data · Pajak', href: '/admin/taxes', icon: FiPercent },
+        { label: 'Master Pajak', href: '/admin/taxes', icon: FiPercent },
         { label: 'Tanda Tangan', href: '/admin/signature', icon: FiEdit3 },
     ],
     hr: [

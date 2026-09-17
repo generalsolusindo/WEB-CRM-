@@ -121,9 +121,15 @@ class InvoiceUpdateTest extends TestCase
         $this->assertSame('draft', $invoice->fresh()->status);
     }
 
-    public function test_cannot_edit_invoice_with_recorded_payment(): void
+    /**
+     * Rincian baris & nominal tetap terkunci begitu ada pembayaran tercatat — supaya tidak
+     * mismatch dengan uang yang sudah masuk. Tapi jatuh tempo & catatan (tidak memengaruhi
+     * nominal) tetap boleh dikoreksi kapan saja, termasuk setelah dibayar.
+     */
+    public function test_lines_locked_but_due_date_and_notes_still_editable_after_payment(): void
     {
         $invoice = $this->draftInvoice();
+        $originalAmount = $invoice->amount;
         $finance = $this->finance();
         $this->actingAs($finance)->post("/finance/invoices/{$invoice->id}/payments", [
             'amount_paid' => (float) $invoice->amount + (float) $invoice->tax_amount,
@@ -133,10 +139,34 @@ class InvoiceUpdateTest extends TestCase
         $lines = $invoice->lines->sortBy('id')->values();
         $this->actingAs($finance)
             ->put("/finance/invoices/{$invoice->id}", [
+                'due_date' => '2026-12-01',
+                'notes' => 'Perpanjang jatuh tempo administratif',
                 'lines' => [
                     ['sales_order_line_id' => $lines[0]->sales_order_line_id, 'item_name' => 'Ganti nama', 'category' => 'material', 'qty' => 1, 'unit_price' => 1000000, 'discount_amount' => 0, 'tax_rate' => 0],
                 ],
             ])
+            ->assertRedirect();
+
+        $fresh = $invoice->fresh()->load('lines');
+        $this->assertSame('2026-12-01', $fresh->due_date->toDateString());
+        $this->assertSame('Perpanjang jatuh tempo administratif', $fresh->notes);
+        // Rincian baris & nominal tidak ikut berubah walau dikirim di payload yang sama.
+        $this->assertSame($originalAmount, $fresh->amount);
+        $this->assertSame($lines[0]->item_name, $fresh->lines->sortBy('id')->first()->item_name);
+    }
+
+    public function test_non_finance_cannot_edit_invoice_meta_either(): void
+    {
+        $invoice = $this->draftInvoice();
+        $finance = $this->finance();
+        $this->actingAs($finance)->post("/finance/invoices/{$invoice->id}/payments", [
+            'amount_paid' => (float) $invoice->amount + (float) $invoice->tax_amount,
+            'paid_at' => now()->toDateTimeString(),
+        ]);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $this->actingAs($sales)
+            ->put("/finance/invoices/{$invoice->id}", ['due_date' => '2026-12-01'])
             ->assertForbidden();
     }
 

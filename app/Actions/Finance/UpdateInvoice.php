@@ -9,18 +9,24 @@ use Illuminate\Validation\ValidationException;
 
 class UpdateInvoice
 {
-    /** @param array<int, array<string, mixed>> $lines */
+    /**
+     * @param  array<int, array<string, mixed>>  $lines  Diabaikan (rincian baris tidak disentuh)
+     *                                                    kalau invoice sudah ada pembayaran tercatat —
+     *                                                    hanya jatuh tempo & catatan yang tetap tersimpan.
+     */
     public function handle(Invoice $invoice, ?string $dueDate, ?string $notes, array $lines): Invoice
     {
         return DB::transaction(function () use ($invoice, $dueDate, $notes, $lines) {
             $locked = Invoice::query()->whereKey($invoice->id)->lockForUpdate()->firstOrFail();
 
-            if ($locked->payments()->exists()) {
-                throw ValidationException::withMessages(['invoice' => 'Invoice yang sudah ada pembayarannya tidak dapat diubah.']);
-            }
-
             if ($locked->status === InvoiceStatus::Cancelled->value) {
                 throw ValidationException::withMessages(['invoice' => 'Invoice yang dibatalkan tidak dapat diubah.']);
+            }
+
+            if ($locked->payments()->exists()) {
+                $locked->update(['due_date' => $dueDate, 'notes' => $notes]);
+
+                return $locked->refresh();
             }
 
             $locked->lines()->delete();

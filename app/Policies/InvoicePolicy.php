@@ -43,6 +43,19 @@ class InvoicePolicy
             && ! $invoice->payments()->exists();
     }
 
+    /**
+     * Ubah jatuh tempo & catatan saja — boleh kapan saja selama belum Cancelled, TERMASUK
+     * setelah ada pembayaran tercatat. Dua field ini tidak memengaruhi nominal/pajak yang
+     * sudah dibayar, jadi aman diedit; beda dengan update() yang mengunci rincian baris &
+     * nominal begitu uang sudah masuk supaya tidak mismatch dengan pembayaran yang tercatat.
+     */
+    public function updateMeta(User $user, Invoice $invoice): bool
+    {
+        return $this->isFinance($user)
+            && ! $invoice->isSurvey()
+            && $invoice->status !== InvoiceStatus::Cancelled->value;
+    }
+
     public function send(User $user, Invoice $invoice): bool
     {
         return $this->isFinance($user)

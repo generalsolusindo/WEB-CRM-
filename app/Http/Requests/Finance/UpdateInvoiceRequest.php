@@ -8,17 +8,28 @@ use Illuminate\Validation\Rule;
 
 class UpdateInvoiceRequest extends FormRequest
 {
+    /** updateMeta = jatuh tempo & catatan selalu boleh; update = rincian baris juga ikut (terkunci kalau sudah ada pembayaran). */
     public function authorize(): bool
     {
-        return $this->user()?->can('update', $this->route('invoice')) ?? false;
+        return $this->user()?->can('updateMeta', $this->route('invoice')) ?? false;
     }
 
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        return [
+        $linesEditable = $this->user()?->can('update', $this->route('invoice')) ?? false;
+
+        $rules = [
             'due_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
+        ];
+
+        if (! $linesEditable) {
+            return $rules;
+        }
+
+        return [
+            ...$rules,
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.sales_order_line_id' => ['nullable', 'integer', 'exists:sales_order_lines,id'],
             'lines.*.item_name' => ['required', 'string', 'max:255'],

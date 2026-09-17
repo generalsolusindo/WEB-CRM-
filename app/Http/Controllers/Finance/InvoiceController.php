@@ -149,12 +149,13 @@ class InvoiceController extends Controller
 
     public function edit(Invoice $invoice): Response
     {
-        Gate::authorize('update', $invoice);
+        Gate::authorize('updateMeta', $invoice);
 
         $invoice->load(['lines.tax:id,name,rate', 'salesOrder:id,number,contact_id', 'salesOrder.contact:id,name,company_name']);
 
         return Inertia::render('Finance/Invoices/Edit', [
             'invoice' => $invoice,
+            'linesEditable' => request()->user()->can('update', $invoice),
         ]);
     }
 
@@ -164,7 +165,7 @@ class InvoiceController extends Controller
             $invoice,
             $request->validated('due_date'),
             $request->validated('notes'),
-            $request->validated('lines'),
+            $request->validated('lines') ?? [],
         );
 
         return redirect()->route('finance.invoices.show', $invoice)
@@ -248,7 +249,7 @@ class InvoiceController extends Controller
                     && $invoice->lines->contains('category', 'service'),
             ],
             'permissions' => [
-                'update' => request()->user()->can('update', $invoice),
+                'update' => request()->user()->can('updateMeta', $invoice),
                 'send' => request()->user()->can('send', $invoice),
                 'sendWhatsapp' => request()->user()->can('sendWhatsapp', $invoice),
                 'updateNumber' => request()->user()->can('updateNumber', $invoice),

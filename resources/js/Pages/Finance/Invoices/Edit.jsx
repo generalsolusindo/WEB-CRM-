@@ -11,19 +11,21 @@ function Alert({ text }) {
     return <div className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">{text}</div>;
 }
 
-export default function Edit({ invoice }) {
+export default function Edit({ invoice, linesEditable }) {
     const { data, setData, put, processing, errors } = useForm({
         due_date: invoice.due_date ?? '',
         notes: invoice.notes ?? '',
-        lines: invoice.lines.map((l) => ({
-            sales_order_line_id: l.sales_order_line_id,
-            item_name: l.item_name,
-            category: l.category,
-            qty: l.qty,
-            unit_price: l.unit_price,
-            discount_amount: l.discount_amount,
-            tax_rate: l.tax_rate,
-        })),
+        ...(linesEditable ? {
+            lines: invoice.lines.map((l) => ({
+                sales_order_line_id: l.sales_order_line_id,
+                item_name: l.item_name,
+                category: l.category,
+                qty: l.qty,
+                unit_price: l.unit_price,
+                discount_amount: l.discount_amount,
+                tax_rate: l.tax_rate,
+            })),
+        } : {}),
     });
 
     function submit(e) {
@@ -45,7 +47,8 @@ export default function Edit({ invoice }) {
         }]);
     }
 
-    const computed = data.lines.map((l) => {
+    const sourceLines = linesEditable ? data.lines : invoice.lines;
+    const computed = sourceLines.map((l) => {
         const qty = Number(l.qty) || 0;
         const unitPrice = Number(l.unit_price) || 0;
         const discount = Number(l.discount_amount) || 0;
@@ -65,17 +68,23 @@ export default function Edit({ invoice }) {
     return (
         <AppLayout>
             <Head title={`Edit ${invoice.number}`} />
-            <div className="mx-auto max-w-4xl space-y-5">
+            <div className="mx-auto max-w-5xl space-y-5">
                 <PageHeader
                     title={`Edit Invoice — ${invoice.number}`}
                     subtitle={`${invoice.sales_order?.number ?? ''} · ${invoice.sales_order?.contact?.name ?? '—'}`}
                     back={{ href: `/finance/invoices/${invoice.id}`, label: 'Kembali ke Invoice' }}
                 />
 
-                <div className="rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm font-medium text-warning">
-                    Menyimpan perubahan akan mengembalikan status invoice ke Draft — perlu dikirim ulang ke customer. Phase invoice ({invoice.invoice_phase}) tidak bisa diubah di sini.
-                </div>
-                {invoice.whatsapp_sent_at && (
+                {linesEditable ? (
+                    <div className="rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm font-medium text-warning">
+                        Menyimpan perubahan akan mengembalikan status invoice ke Draft — perlu dikirim ulang ke customer. Phase invoice ({invoice.invoice_phase}) tidak bisa diubah di sini.
+                    </div>
+                ) : (
+                    <div className="rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm font-medium text-text-muted">
+                        Invoice ini sudah ada pembayaran tercatat, jadi rincian baris & nominal terkunci supaya tidak mismatch dengan uang yang sudah masuk. Anda tetap bisa mengubah jatuh tempo dan catatan.
+                    </div>
+                )}
+                {linesEditable && invoice.whatsapp_sent_at && (
                     <div className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">
                         Invoice ini sudah pernah dikirim via WhatsApp ({new Date(invoice.whatsapp_sent_at).toLocaleString('id-ID')}) dengan total tagihan yang lama tertulis di teks pesan. Setelah menyimpan perubahan ini, <strong>kirim ulang via WhatsApp</strong> supaya customer tidak pegang total yang sudah tidak sesuai.
                     </div>
@@ -97,7 +106,7 @@ export default function Edit({ invoice }) {
                     <Card padded={false}>
                         <CardHeader title="Rincian Baris" />
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
+                            <table className="w-full min-w-[820px] text-left text-sm">
                                 <thead>
                                     <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
                                         <th className="px-4 py-3">Item</th>
@@ -111,10 +120,10 @@ export default function Edit({ invoice }) {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
-                                    {computed.map((l, i) => (
+                                    {computed.map((l, i) => linesEditable ? (
                                         <tr key={i}>
                                             <td className="px-4 py-2">
-                                                <input value={l.item_name} onChange={(e) => updateLine(i, 'item_name', e.target.value)} className="w-full rounded-lg border border-border px-2 py-1.5 outline-none focus:border-navy" />
+                                                <input value={l.item_name} onChange={(e) => updateLine(i, 'item_name', e.target.value)} className="w-full min-w-[160px] rounded-lg border border-border px-2 py-1.5 outline-none focus:border-navy" />
                                                 {errors[`lines.${i}.item_name`] && <span className="text-xs text-danger">{errors[`lines.${i}.item_name`]}</span>}
                                             </td>
                                             <td className="px-4 py-2">
@@ -143,26 +152,41 @@ export default function Edit({ invoice }) {
                                                 )}
                                             </td>
                                         </tr>
+                                    ) : (
+                                        <tr key={i} className="text-text-muted">
+                                            <td className="px-4 py-2 text-text">{l.item_name}</td>
+                                            <td className="px-4 py-2 capitalize">{l.category}</td>
+                                            <td className="px-4 py-2 tabular-nums">{Number(l.qty).toFixed(2)}</td>
+                                            <td className="px-4 py-2 text-right tabular-nums">{money(l.unit_price)}</td>
+                                            <td className="px-4 py-2 text-right tabular-nums">{money(l.discount_amount)}</td>
+                                            <td className="px-4 py-2 tabular-nums">{Number(l.tax_rate).toFixed(2)}</td>
+                                            <td className="px-4 py-2 text-right font-medium tabular-nums text-text">{money(l.subtotal)}</td>
+                                            <td className="px-4 py-2"></td>
+                                        </tr>
                                     ))}
                                 </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td colSpan="8" className="px-4 py-2">
-                                            <button type="button" onClick={addLine} className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-text-muted hover:text-text">+ Tambah Item</button>
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                                <tfoot className="border-t border-border bg-surface-2 text-text">
-                                    <tr><td colSpan="6" className="px-4 py-2 text-right text-text-muted">Subtotal Bruto</td><td colSpan="2" className="px-4 py-2 text-right font-medium tabular-nums">{money(grossTotal)}</td></tr>
-                                    <tr><td colSpan="6" className="px-4 py-2 text-right text-text-muted">Total Diskon</td><td colSpan="2" className="px-4 py-2 text-right font-medium tabular-nums text-danger">{discountTotal > 0 ? `− ${money(discountTotal)}` : money(0)}</td></tr>
-                                    <tr><td colSpan="6" className="px-4 py-2 text-right text-text-muted">DPP</td><td colSpan="2" className="px-4 py-2 text-right font-medium tabular-nums">{money(subtotalTotal)}</td></tr>
-                                    <tr><td colSpan="6" className="px-4 py-2 text-right text-text-muted">Total PPN</td><td colSpan="2" className="px-4 py-2 text-right font-medium tabular-nums">{money(taxTotal)}</td></tr>
-                                    <tr><td colSpan="6" className="px-4 py-4 text-right font-semibold">Total Tagihan</td><td colSpan="2" className="px-4 py-4 text-right text-lg font-bold tabular-nums">{money(grandTotal)}</td></tr>
-                                    {invoice.pph23_enabled && (
-                                        <tr><td colSpan="6" className="px-4 py-2 text-right text-xs text-text-muted">PPh 23 ({Number(invoice.pph23_rate)}%) — dihitung ulang otomatis dari baris jasa</td><td colSpan="2" className="px-4 py-2 text-right text-xs font-medium tabular-nums text-warning">− {money(pph23Preview)}</td></tr>
-                                    )}
-                                </tfoot>
+                                {linesEditable && (
+                                    <tfoot>
+                                        <tr>
+                                            <td colSpan="8" className="px-4 py-2">
+                                                <button type="button" onClick={addLine} className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-text-muted hover:text-text">+ Tambah Item</button>
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                )}
                             </table>
+                        </div>
+                        {/* Ringkasan total di luar tabel supaya selalu terlihat penuh, tidak ikut
+                            ter-scroll bersama tabel rincian baris yang lebar di layar sempit. */}
+                        <div className="space-y-1.5 border-t border-border bg-surface-2 px-4 py-4 text-sm text-text">
+                            <div className="flex items-center justify-between text-text-muted"><span>Subtotal Bruto</span><span className="font-medium tabular-nums text-text">{money(grossTotal)}</span></div>
+                            <div className="flex items-center justify-between text-text-muted"><span>Total Diskon</span><span className="font-medium tabular-nums text-danger">{discountTotal > 0 ? `− ${money(discountTotal)}` : money(0)}</span></div>
+                            <div className="flex items-center justify-between text-text-muted"><span>DPP</span><span className="font-medium tabular-nums text-text">{money(subtotalTotal)}</span></div>
+                            <div className="flex items-center justify-between text-text-muted"><span>Total PPN</span><span className="font-medium tabular-nums text-text">{money(taxTotal)}</span></div>
+                            <div className="flex items-center justify-between border-t border-border pt-2 text-base font-semibold text-text"><span>Total Tagihan</span><span className="text-lg font-bold tabular-nums">{money(grandTotal)}</span></div>
+                            {invoice.pph23_enabled && (
+                                <div className="flex items-center justify-between text-xs text-text-muted"><span>PPh 23 ({Number(invoice.pph23_rate)}%) — dihitung ulang otomatis dari baris jasa</span><span className="font-medium tabular-nums text-warning">− {money(pph23Preview)}</span></div>
+                            )}
                         </div>
                     </Card>
 
@@ -170,7 +194,7 @@ export default function Edit({ invoice }) {
                         cancelHref={`/finance/invoices/${invoice.id}`}
                         submitLabel="Simpan Perubahan"
                         processing={processing}
-                        disabled={data.lines.length === 0}
+                        disabled={linesEditable && data.lines.length === 0}
                     />
                 </form>
             </div>
