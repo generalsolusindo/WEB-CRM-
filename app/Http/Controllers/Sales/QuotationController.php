@@ -172,7 +172,6 @@ class QuotationController extends Controller
             ->stream($this->pdfFilename($quotation));
     }
 
-    /** Unduhan publik lewat tautan bertanda tangan (dipakai di pesan WhatsApp ke customer). */
     public function downloadPdf(Quotation $quotation): \Illuminate\Http\Response
     {
         return Pdf::loadView('sales.quotations.print', $this->printData($quotation, forPdf: true))
