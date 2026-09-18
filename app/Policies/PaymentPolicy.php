@@ -4,10 +4,19 @@ namespace App\Policies;
 
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
+use App\Models\Payment;
 use App\Models\User;
 
 class PaymentPolicy
 {
+    public function cancel(User $user, Payment $payment): bool
+    {
+        return $this->isFinance($user)
+            && ! $payment->trashed()
+            && ! $payment->invoice->isSurvey()
+            && $payment->invoice->status !== InvoiceStatus::Cancelled->value;
+    }
+
     public function create(User $user, Invoice $invoice): bool
     {
         return $this->isFinance($user)

@@ -2,18 +2,30 @@
 
 namespace App\Http\Controllers\Finance;
 
+use App\Actions\Finance\CancelPayment;
 use App\Actions\Finance\RecordPayment;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Finance\StorePaymentRequest;
 use App\Models\Invoice;
 use App\Models\Payment;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class PaymentController extends Controller
 {
+    public function cancel(Request $request, Invoice $invoice, Payment $payment, CancelPayment $action): RedirectResponse
+    {
+        abort_unless($payment->invoice_id === $invoice->id, 404);
+        Gate::authorize('cancel', $payment);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:2000']]);
+        $action->handle($invoice, $payment, $request->user(), $data['reason']);
+
+        return back()->with('success', 'Pembayaran dibatalkan. Total dan status invoice sudah dihitung ulang.');
+    }
+
     public function index(): Response
     {
         Gate::authorize('viewAny', Invoice::class);

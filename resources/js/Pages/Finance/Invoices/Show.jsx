@@ -1,15 +1,34 @@
 import { Head, router, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import { FiFileText, FiSend, FiXCircle, FiHash, FiEdit2 } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { Totals } from '../../Sales/Quotations/Show';
 import { pickFile } from '../../../utils/fileValidation';
-import { PageHeader, Card, CardHeader, Button, Field, Input, Info, InfoGrid, StatusBadge, CurrencyInput } from '../../../Components/ui';
+import { PageHeader, Card, CardHeader, Button, Field, Input, Info, InfoGrid, StatusBadge, CurrencyInput, Modal } from '../../../Components/ui';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
 }
 
-export default function Show({ invoice, payments, totals, totalPaid, customerHasWhatsapp = false, pph23 = null, settlement = null, permissions }) {
+export default function Show({ invoice, payments, cancelledPayments = [], totals, totalPaid, customerHasWhatsapp = false, pph23 = null, settlement = null, permissions }) {
+    const [cancelTarget, setCancelTarget] = useState(null);
+    const cancelForm = useForm({ reason: '' });
+    function closeCancel() {
+        if (cancelForm.processing) return;
+        setCancelTarget(null);
+        cancelForm.reset();
+        cancelForm.clearErrors();
+    }
+    function cancelPayment(e) {
+        e.preventDefault();
+        cancelForm.post(`/finance/invoices/${invoice.id}/payments/${cancelTarget.id}/cancel`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setCancelTarget(null);
+                cancelForm.reset();
+            },
+        });
+    }
     const grandTotal = totals.grand_total;
     const payable = pph23 && pph23.amount > 0 ? pph23.payable : grandTotal;
 
@@ -222,9 +241,27 @@ export default function Show({ invoice, payments, totals, totalPaid, customerHas
                                     {p.proofs.length === 0
                                         ? <span className="badge badge-warning">Bukti belum ada</span>
                                         : <span className="flex gap-2">{p.proofs.map((proof, i) => <a key={proof.id} href={proof.url} target="_blank" rel="noreferrer" className="rounded-lg border border-primary/30 px-3 py-1 text-xs font-semibold text-primary">Bukti {p.proofs.length > 1 ? i + 1 : ''}</a>)}</span>}
+                                    {p.can_cancel && (
+                                        <button type="button" onClick={() => { cancelForm.clearErrors(); setCancelTarget(p); }} className="text-xs font-semibold text-danger hover:underline">
+                                            Batalkan pembayaran
+                                        </button>
+                                    )}
                                 </div>
                             ))}
                         </div>
+                    )}
+
+                    {cancelledPayments.length > 0 && (
+                        <details className="mt-4 rounded-xl border border-border p-3 text-sm text-text-muted">
+                            <summary className="cursor-pointer font-medium">Riwayat pembatalan ({cancelledPayments.length}) — tidak dihitung dalam total</summary>
+                            {cancelledPayments.map((p) => (
+                                <div key={p.id} className="mt-3 border-t border-border pt-3">
+                                    <p className="font-medium">{money(p.amount_paid)} · Dibatalkan</p>
+                                    <p>{p.cancelled_at} · {p.cancelled_by ?? 'Finance'}</p>
+                                    <p className="break-words">Alasan: {p.reason}</p>
+                                </div>
+                            ))}
+                        </details>
                     )}
 
                     {permissions.recordPayment && (
@@ -251,6 +288,19 @@ export default function Show({ invoice, payments, totals, totalPaid, customerHas
                     )}
                 </Card>
             </div>
+            <Modal open={cancelTarget !== null} onClose={closeCancel} title="Batalkan pencatatan pembayaran">
+                <form onSubmit={cancelPayment} className="space-y-4">
+                    <p className="text-sm">Batalkan pembayaran <strong>{money(cancelTarget?.amount_paid)}</strong> pada invoice {invoice.number}? Pembayaran lain tetap tercatat. Total dan status invoice akan dihitung ulang.</p>
+                    <p className="text-sm text-text-muted">Ini koreksi pencatatan, bukan pengembalian uang. Project yang sudah dibuat tetap ada dan akan diberi pemberitahuan jika pembayaran awal menjadi belum lunas.</p>
+                    <Field label="Alasan pembatalan" required error={cancelForm.errors.reason}>
+                        <Input autoFocus required maxLength={2000} value={cancelForm.data.reason} onChange={(e) => cancelForm.setData('reason', e.target.value)} placeholder="Contoh: salah input pelunasan, customer baru membayar DP" />
+                    </Field>
+                    <div className="flex justify-end gap-3">
+                        <button type="button" disabled={cancelForm.processing} onClick={closeCancel}>Kembali</button>
+                        <Button type="submit" variant="danger" loading={cancelForm.processing}>Batalkan pembayaran ini</Button>
+                    </div>
+                </form>
+            </Modal>
         </AppLayout>
     );
 }

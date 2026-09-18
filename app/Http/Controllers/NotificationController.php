@@ -25,6 +25,9 @@ class NotificationController extends Controller
             'sales_order.created' => "/finance/sales-orders/{$notification->related_id}/invoices/create",
             'invoice.upfront_paid',
             'project_procurement.ready' => "/operational/projects/{$notification->related_id}",
+            'invoice.payment_cancelled' => request()->user()->role === 'management'
+                ? "/management/projects/{$notification->related_id}"
+                : "/operational/projects/{$notification->related_id}",
             'project_procurement.requested' => '/procurement/project-procurements',
             'procurement_request.ready',
             'procurement_request.rejected' => $this->leadUrlForProcurementRequest($notification->related_id),

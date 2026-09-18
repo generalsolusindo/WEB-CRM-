@@ -220,6 +220,7 @@ Route::middleware('auth')->group(function () {
         Route::post('surveys/{survey}/clear', [FinanceSurveyController::class, 'clear'])->name('surveys.clear');
         Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
         Route::post('invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
+        Route::post('invoices/{invoice}/payments/{payment}/cancel', [PaymentController::class, 'cancel'])->name('invoices.payments.cancel');
         Route::get('procurement-payments', [FinanceProcurementPaymentController::class, 'index'])->name('procurement-payments.index');
         Route::get('procurement-payments/{procurementPayment}', [FinanceProcurementPaymentController::class, 'show'])->name('procurement-payments.show');
         Route::post('procurement-payments/{procurementPayment}/pay', [FinanceProcurementPaymentController::class, 'pay'])->name('procurement-payments.pay');

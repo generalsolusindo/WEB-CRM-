@@ -98,6 +98,7 @@ class RecordPayment
 
     private function notifyOperational(Invoice $invoice, \App\Models\Project $project): void
     {
+        $this->notify->resolve('invoice.payment_cancelled', $project);
         $invoice->loadMissing('salesOrder.contact');
         $salesOrder = $invoice->salesOrder;
         $customer = $salesOrder->contact?->name ?? 'customer';
@@ -110,4 +111,3 @@ class RecordPayment
         );
     }
 }
-

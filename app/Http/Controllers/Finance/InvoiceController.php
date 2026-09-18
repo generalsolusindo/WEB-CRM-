@@ -209,6 +209,7 @@ class InvoiceController extends Controller
             'amount_paid' => $payment->amount_paid,
             'paid_at' => $payment->paid_at,
             'notes' => $payment->notes,
+            'can_cancel' => request()->user()->can('cancel', $payment),
             'proofs' => $payment->attachments
                 ->where('category', 'payment_proof')
                 ->map(fn ($a) => ['id' => $a->id, 'url' => Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay())])
@@ -218,6 +219,14 @@ class InvoiceController extends Controller
         return Inertia::render('Finance/Invoices/Show', [
             'invoice' => $invoice->makeHidden('payments'),
             'payments' => $payments,
+            'cancelledPayments' => $invoice->payments()->onlyTrashed()->with('canceller:id,name')
+                ->latest('deleted_at')->get()->map(fn ($payment) => [
+                    'id' => $payment->id,
+                    'amount_paid' => $payment->amount_paid,
+                    'cancelled_at' => $payment->deleted_at->format('d/m/Y H:i'),
+                    'cancelled_by' => $payment->canceller?->name,
+                    'reason' => $payment->cancellation_reason,
+                ]),
             'totals' => [
                 ...\App\Services\Sales\DocumentTotals::of($invoice->lines),
                 'grand_total' => $invoice->grandTotal(),
