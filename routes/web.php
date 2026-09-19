@@ -1,11 +1,13 @@
 <?php
 
+use App\Http\Controllers\Admin\SignatureController;
 use App\Http\Controllers\Admin\TaxController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Finance\InvoiceController;
-use App\Http\Controllers\Finance\ProcurementPaymentController as FinanceProcurementPaymentController;
 use App\Http\Controllers\Finance\PaymentController;
+use App\Http\Controllers\Finance\ProcurementPaymentController as FinanceProcurementPaymentController;
 use App\Http\Controllers\Finance\SurveyController as FinanceSurveyController;
 use App\Http\Controllers\Hr\SowController as HrSowController;
 use App\Http\Controllers\Management\OpportunityController as ManagementOpportunityController;
@@ -14,12 +16,8 @@ use App\Http\Controllers\Management\ProjectManagerAccountController;
 use App\Http\Controllers\Management\ProjectProfitController;
 use App\Http\Controllers\Management\QuotationController as ManagementQuotationController;
 use App\Http\Controllers\Management\SowController as ManagementSowController;
+use App\Http\Controllers\Management\SurveyController;
 use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\ProjectManager\OpportunityController as ProjectManagerOpportunityController;
-use App\Http\Controllers\ProjectManager\ProjectController as ProjectManagerProjectController;
-use App\Http\Controllers\ProjectManager\ProcurementPaymentController as ProjectManagerProcurementPaymentController;
-use App\Http\Controllers\ProjectManager\QuotationController as ProjectManagerQuotationController;
-use App\Http\Controllers\ProjectManager\SowController as ProjectManagerSowController;
 use App\Http\Controllers\Operational\ActualProcurementController;
 use App\Http\Controllers\Operational\BastDraftController;
 use App\Http\Controllers\Operational\BastVerificationController;
@@ -35,27 +33,32 @@ use App\Http\Controllers\Procurement\ProjectProcurementController;
 use App\Http\Controllers\Procurement\SurveyController as ProcurementSurveyController;
 use App\Http\Controllers\Procurement\TechnicianAccountController;
 use App\Http\Controllers\Procurement\VendorAccountController;
-use App\Http\Controllers\Technician\BastController as TechnicianBastController;
-use App\Http\Controllers\Technician\DeliveryNoteController as TechnicianDeliveryNoteController;
-use App\Http\Controllers\Technician\SowController as TechnicianSowController;
-use App\Http\Controllers\Technician\SurveyController as TechnicianSurveyController;
-use App\Http\Controllers\Technician\TaskController as TechnicianTaskController;
 use App\Http\Controllers\Procurement\VendorController;
 use App\Http\Controllers\Procurement\VendorProductController;
-use App\Http\Controllers\Vendor\SowController as VendorSowController;
-use App\Http\Controllers\Warehouse\WarehouseItemController;
+use App\Http\Controllers\ProjectManager\OpportunityController as ProjectManagerOpportunityController;
+use App\Http\Controllers\ProjectManager\ProcurementPaymentController as ProjectManagerProcurementPaymentController;
+use App\Http\Controllers\ProjectManager\ProjectController as ProjectManagerProjectController;
+use App\Http\Controllers\ProjectManager\QuotationController as ProjectManagerQuotationController;
+use App\Http\Controllers\ProjectManager\SowController as ProjectManagerSowController;
 use App\Http\Controllers\Sales\ContactController;
 use App\Http\Controllers\Sales\LeadController;
 use App\Http\Controllers\Sales\LeadReportController;
+use App\Http\Controllers\Sales\LeadSurveyController;
 use App\Http\Controllers\Sales\MeetingController;
 use App\Http\Controllers\Sales\QuotationConfirmationController;
 use App\Http\Controllers\Sales\QuotationController;
 use App\Http\Controllers\Sales\QuotationRevisionController;
 use App\Http\Controllers\Sales\RequirementController;
-use App\Http\Controllers\Sales\LeadSurveyController;
 use App\Http\Controllers\Sales\SalesOrderController;
 use App\Http\Controllers\Sales\SubmitAddendumController;
 use App\Http\Controllers\Sales\SubmitProcurementRequestController;
+use App\Http\Controllers\Technician\BastController as TechnicianBastController;
+use App\Http\Controllers\Technician\DeliveryNoteController as TechnicianDeliveryNoteController;
+use App\Http\Controllers\Technician\SowController as TechnicianSowController;
+use App\Http\Controllers\Technician\SurveyController as TechnicianSurveyController;
+use App\Http\Controllers\Technician\TaskController as TechnicianTaskController;
+use App\Http\Controllers\Vendor\SowController as VendorSowController;
+use App\Http\Controllers\Warehouse\WarehouseItemController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -77,11 +80,11 @@ Route::middleware('auth')->group(function () {
         ->name('notifications.read');
 
     Route::prefix('admin')->name('admin.')->middleware('role:administrator')->group(function () {
-        Route::resource('users', \App\Http\Controllers\Admin\UserController::class)
+        Route::resource('users', UserController::class)
             ->except(['show', 'destroy']);
         Route::resource('taxes', TaxController::class)->except('show');
-        Route::get('signature', [\App\Http\Controllers\Admin\SignatureController::class, 'edit'])->name('signature.edit');
-        Route::post('signature', [\App\Http\Controllers\Admin\SignatureController::class, 'update'])->name('signature.update');
+        Route::get('signature', [SignatureController::class, 'edit'])->name('signature.edit');
+        Route::post('signature', [SignatureController::class, 'update'])->name('signature.update');
     });
 
     Route::prefix('management')->name('management.')->middleware('role:management')->group(function () {
@@ -112,11 +115,11 @@ Route::middleware('auth')->group(function () {
         Route::get('sows', [ManagementSowController::class, 'index'])->name('sows.index');
         Route::get('sows/{sow}', [ManagementSowController::class, 'show'])->name('sows.show');
         Route::post('sows/{sow}/sign', [ManagementSowController::class, 'sign'])->name('sows.sign');
-        Route::get('procurement-requests', [\App\Http\Controllers\Management\ProcurementRequestController::class, 'index'])
+        Route::get('procurement-requests', [App\Http\Controllers\Management\ProcurementRequestController::class, 'index'])
             ->name('procurement-requests.index');
-        Route::get('invoices', [\App\Http\Controllers\Management\InvoiceController::class, 'index'])
+        Route::get('invoices', [App\Http\Controllers\Management\InvoiceController::class, 'index'])
             ->name('invoices.index');
-        Route::get('surveys', [\App\Http\Controllers\Management\SurveyController::class, 'index'])
+        Route::get('surveys', [SurveyController::class, 'index'])
             ->name('surveys.index');
         Route::get('project-profit', [ProjectProfitController::class, 'index'])
             ->name('project-profit.index');
@@ -349,6 +352,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('contacts', ContactController::class);
         Route::post('contacts/{contact}/merge', [ContactController::class, 'merge'])->name('contacts.merge');
         Route::post('leads/{lead}/convert', [LeadController::class, 'convert'])->name('leads.convert');
+        Route::post('leads/{lead}/mark-lost', [LeadController::class, 'markLost'])->name('leads.mark-lost');
+        Route::patch('leads/{lead}/temperature', [LeadController::class, 'updateTemperature'])->name('leads.temperature.update');
         Route::post('leads/{lead}/submit-procurement', SubmitProcurementRequestController::class)
             ->name('leads.submit-procurement');
         Route::post('leads/{lead}/submit-addendum', SubmitAddendumController::class)
@@ -399,7 +404,6 @@ Route::middleware('auth')->group(function () {
         Route::resource('leads', LeadController::class);
     });
 
-   
     Route::prefix('sales')->name('sales.')->middleware('role:sales,management,project_manager')->group(function () {
         Route::get('quotations/{quotation}/print', [QuotationController::class, 'print'])
             ->name('quotations.print');

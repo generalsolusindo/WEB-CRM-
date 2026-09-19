@@ -35,6 +35,19 @@ class LeadPolicy
             && ! $lead->procurementRequests()->exists();
     }
 
+    /** Temperatur prospek tetap boleh dinilai Sales meski proses transaksi sudah berjalan. */
+    public function updateTemperature(User $user, Lead $lead): bool
+    {
+        return $this->owns($user, $lead);
+    }
+
+    public function markLost(User $user, Lead $lead): bool
+    {
+        return $this->owns($user, $lead)
+            && ! in_array($lead->stage, ['won', 'lost'], true)
+            && ! $lead->quotations()->whereHas('salesOrder')->exists();
+    }
+
     /**
      * Bisa dihapus di tahap apa pun — Requirement, Procurement Request, dan Quotation
      * di bawahnya ikut terhapus sekaligus (cascade) — SELAMA belum ada data transaksi

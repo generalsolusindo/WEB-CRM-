@@ -2,11 +2,11 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, Field, Input, Select, Textarea, FormActions } from '../../../Components/ui';
 
-export default function Form({ lead = null, contacts, stageOptions, sourceOptions = [], selectedContactId = null }) {
+export default function Form({ lead = null, contacts, stageOptions, sourceOptions = [], temperatureOptions = [], selectedContactId = null }) {
     const editing = Boolean(lead);
     const { data, setData, post, put, processing, errors } = useForm({
         contact_id: lead?.contact_id ?? selectedContactId ?? '',
-        stage: lead?.stage ?? 'new', source: lead?.source ?? '', notes: lead?.notes ?? '',
+        stage: lead?.stage ?? 'new', temperature: lead?.temperature ?? 'cold', source: lead?.source ?? '', notes: lead?.notes ?? '',
         pic_name: lead?.pic_name ?? '', pic_position: lead?.pic_position ?? '', pic_phone: lead?.pic_phone ?? '',
     });
 
@@ -43,6 +43,12 @@ export default function Form({ lead = null, contacts, stageOptions, sourceOption
                         <Field label="Stage" required error={errors.stage}>
                             <Select value={data.stage} onChange={(e) => setData('stage', e.target.value)}>
                                 {stageOptions.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                            </Select>
+                        </Field>
+
+                        <Field label="Status Lead" required error={errors.temperature}>
+                            <Select value={data.temperature} onChange={(e) => setData('temperature', e.target.value)}>
+                                {temperatureOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                             </Select>
                         </Field>
 

@@ -5,15 +5,22 @@ namespace App\Http\Controllers\Sales;
 use App\Actions\Sales\DeleteLead;
 use App\Enums\LeadSource;
 use App\Enums\LeadStage;
+use App\Enums\LeadTemperature;
 use App\Enums\LeadType;
+use App\Enums\SurveyDeliveryMode;
+use App\Enums\SurveyStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Sales\StoreLeadRequest;
 use App\Http\Requests\Sales\UpdateLeadRequest;
 use App\Models\Contact;
 use App\Models\Lead;
+use App\Models\Meeting;
+use App\Models\Requirement;
+use App\Models\Survey;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -60,6 +67,7 @@ class LeadController extends Controller
             ],
             'stageOptions' => LeadStage::options(),
             'sourceOptions' => LeadSource::options(),
+            'temperatureOptions' => LeadTemperature::options(),
         ]);
     }
 
@@ -71,6 +79,7 @@ class LeadController extends Controller
             'contacts' => $this->contactOptions($request),
             'stageOptions' => $this->stageOptions([LeadStage::New]),
             'sourceOptions' => LeadSource::options(),
+            'temperatureOptions' => LeadTemperature::options(),
             'selectedContactId' => $request->integer('contact_id') ?: null,
         ]);
     }
@@ -118,10 +127,10 @@ class LeadController extends Controller
                 'code' => $survey->code,
                 'site_region' => $survey->site_region,
                 'site_address' => $survey->site_address,
-                'delivery_mode' => \App\Enums\SurveyDeliveryMode::from($survey->delivery_mode)->label(),
+                'delivery_mode' => SurveyDeliveryMode::from($survey->delivery_mode)->label(),
                 'billable' => $survey->billable,
                 'status' => $survey->status,
-                'status_label' => \App\Enums\SurveyStatus::from($survey->status)->label(),
+                'status_label' => SurveyStatus::from($survey->status)->label(),
                 'cost' => (float) $survey->cost,
                 'surveyor' => $survey->leaderUser()?->name ?? $survey->surveyors->pluck('name')->join(', ') ?: null,
                 'vendor' => $survey->vendor?->name,
@@ -141,7 +150,7 @@ class LeadController extends Controller
                     'attachments' => $report->attachments->map(fn ($a) => [
                         'id' => $a->id,
                         'name' => basename($a->file_path),
-                        'url' => \Illuminate\Support\Facades\Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay()),
+                        'url' => Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay()),
                     ]),
                 ] : null,
                 'created_at' => $survey->created_at,
@@ -182,6 +191,7 @@ class LeadController extends Controller
             'lead' => $lead,
             'stageOptions' => LeadStage::options(),
             'sourceOptions' => LeadSource::options(),
+            'temperatureOptions' => LeadTemperature::options(),
             'procurementRequest' => $procurementData,
             'requirementsEditable' => $lead->type === LeadType::Opportunity->value
                 && (! $lead->requirementsLocked() || $hasActiveSalesOrder),
@@ -190,15 +200,16 @@ class LeadController extends Controller
                 && request()->user()->can('submitAddendum', $lead),
             'hasActiveSalesOrderForAddendum' => $hasActiveSalesOrder,
             'canDelete' => request()->user()->can('delete', $lead),
+            'canMarkLost' => request()->user()->can('markLost', $lead),
             'convertBlockReason' => $lead->type === LeadType::Lead->value
                 ? $this->convertBlocker($lead)
                 : null,
             'meetings' => $lead->meetings,
-            'meetingsEditable' => request()->user()->can('create', [\App\Models\Meeting::class, $lead]),
+            'meetingsEditable' => request()->user()->can('create', [Meeting::class, $lead]),
             'surveys' => $surveys,
-            'surveyRequestable' => request()->user()->can('create', [\App\Models\Survey::class, $lead]),
-            'surveyDeliveryOptions' => \App\Enums\SurveyDeliveryMode::options(),
-            'unitOptions' => \App\Models\Requirement::UNITS,
+            'surveyRequestable' => request()->user()->can('create', [Survey::class, $lead]),
+            'surveyDeliveryOptions' => SurveyDeliveryMode::options(),
+            'unitOptions' => Requirement::UNITS,
         ]);
     }
 
@@ -215,6 +226,7 @@ class LeadController extends Controller
                     : [LeadStage::New, LeadStage::Qualified],
             ),
             'sourceOptions' => LeadSource::options(),
+            'temperatureOptions' => LeadTemperature::options(),
         ]);
     }
 
@@ -224,6 +236,28 @@ class LeadController extends Controller
 
         return redirect()->route('sales.leads.show', $lead)
             ->with('success', 'Lead berhasil diperbarui.');
+    }
+
+    public function updateTemperature(Request $request, Lead $lead): RedirectResponse
+    {
+        Gate::authorize('updateTemperature', $lead);
+
+        $data = $request->validate([
+            'temperature' => ['required', Rule::enum(LeadTemperature::class)],
+        ]);
+
+        $lead->update($data);
+
+        return back()->with('success', 'Status lead berhasil diperbarui.');
+    }
+
+    public function markLost(Lead $lead): RedirectResponse
+    {
+        Gate::authorize('markLost', $lead);
+
+        $lead->update(['stage' => LeadStage::Lost->value]);
+
+        return back()->with('success', 'Lead ditandai gagal dan pipeline telah diperbarui.');
     }
 
     public function destroy(Lead $lead, DeleteLead $action): RedirectResponse

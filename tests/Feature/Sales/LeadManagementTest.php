@@ -6,7 +6,6 @@ use App\Models\Contact;
 use App\Models\Lead;
 use App\Models\Notification;
 use App\Models\ProcurementRequest;
-use App\Models\Project;
 use App\Models\Quotation;
 use App\Models\SalesOrder;
 use App\Models\Survey;
@@ -113,6 +112,66 @@ class LeadManagementTest extends TestCase
 
         $this->actingAs($sales)->get("/sales/leads/{$lead->id}")->assertForbidden();
         $this->actingAs($sales)->post("/sales/leads/{$lead->id}/convert")->assertForbidden();
+    }
+
+    public function test_sales_can_update_temperature_for_owned_lead_only(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $otherSales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
+        $lead = Lead::create([
+            'contact_id' => $contact->id,
+            'sales_id' => $sales->id,
+            'type' => 'opportunity',
+            'stage' => 'quotation',
+        ]);
+
+        $this->actingAs($sales)
+            ->patch("/sales/leads/{$lead->id}/temperature", ['temperature' => 'hot'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('hot', $lead->fresh()->temperature);
+
+        $this->actingAs($otherSales)
+            ->patch("/sales/leads/{$lead->id}/temperature", ['temperature' => 'warm'])
+            ->assertForbidden();
+
+        $this->assertSame('hot', $lead->fresh()->temperature);
+    }
+
+    public function test_lead_temperature_rejects_unknown_value(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
+        $lead = Lead::create([
+            'contact_id' => $contact->id,
+            'sales_id' => $sales->id,
+            'type' => 'lead',
+            'stage' => 'new',
+        ]);
+
+        $this->actingAs($sales)
+            ->patch("/sales/leads/{$lead->id}/temperature", ['temperature' => 'very_hot'])
+            ->assertSessionHasErrors('temperature');
+
+        $this->assertSame('cold', $lead->fresh()->temperature);
+    }
+
+    public function test_owner_can_mark_unconverted_pipeline_as_lost(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
+        $lead = Lead::create([
+            'contact_id' => $contact->id,
+            'sales_id' => $sales->id,
+            'type' => 'opportunity',
+            'stage' => 'quotation',
+        ]);
+
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/mark-lost")
+            ->assertSessionHas('success');
+
+        $this->assertSame('lost', $lead->fresh()->stage);
     }
 
     public function test_owner_can_convert_new_lead_with_reachable_contact_in_one_step(): void

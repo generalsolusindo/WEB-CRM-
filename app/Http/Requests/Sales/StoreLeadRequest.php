@@ -4,6 +4,7 @@ namespace App\Http\Requests\Sales;
 
 use App\Enums\LeadSource;
 use App\Enums\LeadStage;
+use App\Enums\LeadTemperature;
 use App\Models\Contact;
 use App\Models\Lead;
 use Illuminate\Foundation\Http\FormRequest;
@@ -28,6 +29,7 @@ class StoreLeadRequest extends FormRequest
                 ),
             ],
             'stage' => ['required', Rule::in([LeadStage::New->value])],
+            'temperature' => ['sometimes', Rule::enum(LeadTemperature::class)],
             'source' => ['nullable', Rule::enum(LeadSource::class)],
             'notes' => ['nullable', 'string'],
             'pic_name' => ['nullable', 'string', 'max:255'],

@@ -23,6 +23,7 @@ class Lead extends Model
         'sales_id',
         'type',
         'stage',
+        'temperature',
         'source',
         'notes',
         'pic_name',

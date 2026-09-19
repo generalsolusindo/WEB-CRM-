@@ -8,16 +8,28 @@ function money(value) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(value || 0));
 }
 
-export default function Index({ quotations, filters, statusOptions }) {
+export default function Index({ quotations, filters, statusOptions, temperatureOptions = [] }) {
     const [form, setForm] = useState(filters);
+    const [updatingLeadId, setUpdatingLeadId] = useState(null);
 
     function submit(e) {
         e?.preventDefault();
         router.get('/sales/quotations', form, { preserveState: true, replace: true });
     }
     function reset() {
-        setForm({ search: '', status: '' });
+        setForm({ search: '', status: '', temperature: '' });
         router.get('/sales/quotations');
+    }
+
+    function updateTemperature(event, quotation) {
+        event.stopPropagation();
+        const temperature = event.target.value;
+        setUpdatingLeadId(quotation.lead.id);
+        router.patch(`/sales/leads/${quotation.lead.id}/temperature`, { temperature }, {
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => setUpdatingLeadId(null),
+        });
     }
 
     const columns = [
@@ -40,6 +52,29 @@ export default function Index({ quotations, filters, statusOptions }) {
             ),
         },
         { key: 'status', label: 'Status', render: (q) => <StatusBadge status={q.status} /> },
+        {
+            key: 'lead_temperature', label: 'Status Lead',
+            render: (q) => (
+                <select
+                    value={q.lead.temperature}
+                    onClick={(event) => event.stopPropagation()}
+                    onChange={(event) => updateTemperature(event, q)}
+                    disabled={updatingLeadId === q.lead.id}
+                    aria-label={`Status lead ${q.contact.name}`}
+                    className={`min-w-24 rounded-full border px-3 py-1.5 text-xs font-semibold outline-none transition focus:ring-2 focus:ring-primary/20 ${temperatureClass(q.lead.temperature)}`}
+                >
+                    {temperatureOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+            ),
+        },
+        {
+            key: 'pipeline_stage', label: 'Pipeline Stage',
+            render: (q) => (
+                <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${pipelineClass(q.lead.pipeline_stage)}`}>
+                    {q.lead.pipeline_stage_label}
+                </span>
+            ),
+        },
         { key: 'valid_until', label: 'Valid Until', render: (q) => <span className="text-text-muted">{q.valid_until || '—'}</span> },
         { key: 'total', label: 'Total', align: 'right', render: (q) => <span className="font-semibold tabular-nums text-text">{money(q.total_amount)}</span> },
     ];
@@ -57,6 +92,10 @@ export default function Index({ quotations, filters, statusOptions }) {
                             <option value="">Semua status</option>
                             {statusOptions.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </FilterSelect>
+                        <FilterSelect value={form.temperature} onChange={(v) => setForm({ ...form, temperature: v })} className="min-w-36">
+                            <option value="">Semua status lead</option>
+                            {temperatureOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                        </FilterSelect>
                         <Button type="submit">Filter</Button>
                         <Button type="button" variant="outline" onClick={reset}>Reset</Button>
                     </Toolbar>
@@ -72,4 +111,17 @@ export default function Index({ quotations, filters, statusOptions }) {
             </div>
         </AppLayout>
     );
+}
+
+function temperatureClass(value) {
+    if (value === 'hot') return 'border-danger/25 bg-danger-soft text-danger';
+    if (value === 'warm') return 'border-warning/25 bg-warning-soft text-warning';
+    return 'border-info/25 bg-info-soft text-info';
+}
+
+function pipelineClass(value) {
+    if (value === 'failed') return 'bg-danger-soft text-danger';
+    if (value === 'executed') return 'bg-success-soft text-success';
+    if (value === 'deal') return 'bg-primary-soft text-primary-strong';
+    return 'bg-warning-soft text-warning';
 }

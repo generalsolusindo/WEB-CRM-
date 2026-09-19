@@ -5,12 +5,14 @@ namespace Tests\Feature\Sales;
 use App\Models\Contact;
 use App\Models\Invoice;
 use App\Models\Lead;
+use App\Models\Notification;
 use App\Models\Payment;
 use App\Models\ProcurementRequest;
 use App\Models\Quotation;
 use App\Models\SalesOrder;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class QuotationLifecycleTest extends TestCase
@@ -54,6 +56,19 @@ class QuotationLifecycleTest extends TestCase
 
         $res = $this->actingAs($quotation->sales)->get("/sales/quotations/{$quotation->id}/print");
         $res->assertOk()->assertSee('Price Include Tax')->assertSee('Warranty Services 1 Month');
+    }
+
+    public function test_quotation_list_exposes_manual_temperature_and_automatic_pipeline_stage(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $quotation->lead->update(['temperature' => 'warm']);
+
+        $this->actingAs($sales)->get('/sales/quotations')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('quotations.data.0.lead.temperature', 'warm')
+                ->where('quotations.data.0.lead.pipeline_stage', 'negotiation')
+                ->where('quotations.data.0.lead.pipeline_stage_label', 'Negosiasi'));
     }
 
     public function test_sales_can_customize_terms_on_create_and_edit(): void
@@ -502,13 +517,13 @@ class QuotationLifecycleTest extends TestCase
 
         // Draft quotation cannot be confirmed.
         $this->actingAs($sales)
-            ->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload("mixed"))
+            ->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload('mixed'))
             ->assertForbidden();
 
         $quotation->update(['status' => 'sent']);
 
         $this->actingAs($sales)
-            ->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload("material_only"))
+            ->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload('material_only'))
             ->assertRedirect();
 
         $salesOrder = SalesOrder::with('lines')->firstOrFail();
@@ -521,7 +536,7 @@ class QuotationLifecycleTest extends TestCase
 
         // Cannot confirm twice.
         $this->actingAs($sales)
-            ->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload("material_only"))
+            ->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload('material_only'))
             ->assertForbidden();
 
         $this->assertDatabaseCount('sales_orders', 1);
@@ -533,7 +548,7 @@ class QuotationLifecycleTest extends TestCase
         $quotation->update(['status' => 'sent']);
 
         $this->actingAs($sales)
-            ->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload("service_only"))
+            ->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload('service_only'))
             ->assertRedirect();
 
         $this->assertSame('dp_50', SalesOrder::firstOrFail()->payment_rule);
@@ -723,7 +738,7 @@ class QuotationLifecycleTest extends TestCase
 
     public function test_deleting_confirmed_quotation_also_removes_sales_order_attachments_and_notifications(): void
     {
-        \Illuminate\Support\Facades\Storage::fake('local');
+        Storage::fake('local');
         [$sales, $salesOrder] = $this->confirmedSalesOrder('material_only');
         $quotation = $salesOrder->quotation;
 
@@ -732,10 +747,10 @@ class QuotationLifecycleTest extends TestCase
             'file_path' => 'sales-orders/signed-quotation.pdf',
             'uploaded_by' => $sales->id,
         ]);
-        \Illuminate\Support\Facades\Storage::disk('local')->put('sales-orders/signed-quotation.pdf', 'dummy');
+        Storage::disk('local')->put('sales-orders/signed-quotation.pdf', 'dummy');
 
         $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
-        \App\Models\Notification::create([
+        Notification::create([
             'user_id' => $finance->id,
             'type' => 'sales_order.created',
             'message' => 'Sales Order siap dibuatkan invoice.',
@@ -747,7 +762,7 @@ class QuotationLifecycleTest extends TestCase
         $this->actingAs($sales)->delete("/sales/quotations/{$quotation->id}")->assertRedirect();
 
         $this->assertDatabaseMissing('attachments', ['attachable_type' => $salesOrder->getMorphClass(), 'attachable_id' => $salesOrder->id]);
-        \Illuminate\Support\Facades\Storage::disk('local')->assertMissing('sales-orders/signed-quotation.pdf');
+        Storage::disk('local')->assertMissing('sales-orders/signed-quotation.pdf');
         $this->assertDatabaseMissing('notifications', ['related_type' => $salesOrder->getMorphClass(), 'related_id' => $salesOrder->id]);
     }
 

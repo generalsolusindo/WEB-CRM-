@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Sales;
 
 use App\Actions\Sales\CreateQuotation;
 use App\Actions\Sales\UpdateQuotation;
+use App\Enums\LeadStage;
+use App\Enums\LeadTemperature;
 use App\Enums\QuotationStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Sales\SaveQuotationRequest;
@@ -11,17 +13,24 @@ use App\Http\Requests\Sales\UpdateQuotationNumberRequest;
 use App\Http\Requests\Sales\UpdateQuotationRequest;
 use App\Models\Notification;
 use App\Models\ProcurementRequest;
+use App\Models\Project;
 use App\Models\Quotation;
+use App\Models\Requirement;
+use App\Models\SalesOrder;
 use App\Models\Tax;
+use App\Services\Sales\DocumentTotals;
 use App\Services\Whatsapp\WhatsappGateway;
+use App\Support\QuotationDefaults;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -34,12 +43,13 @@ class QuotationController extends Controller
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', Rule::enum(QuotationStatus::class)],
+            'temperature' => ['nullable', Rule::enum(LeadTemperature::class)],
         ]);
         $search = trim((string) ($filters['search'] ?? ''));
 
         $quotations = Quotation::query()
             ->where('sales_id', $request->user()->id)
-            ->with(['contact:id,name,company_name', 'lead:id,type,stage'])
+            ->with(['contact:id,name,company_name', 'lead:id,type,stage,temperature'])
             ->withSum('lines as total_amount', 'subtotal')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
@@ -50,14 +60,49 @@ class QuotationController extends Controller
                 });
             })
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->when($filters['temperature'] ?? null, fn ($query, $temperature) => $query
+                ->whereHas('lead', fn ($lead) => $lead->where('temperature', $temperature)))
             ->latest()
             ->paginate(10)
             ->withQueryString();
 
+        $leadIds = $quotations->getCollection()->pluck('lead_id')->unique()->values();
+        $dealLeadIds = SalesOrder::query()
+            ->whereHas('quotation', fn ($query) => $query->whereIn('lead_id', $leadIds))
+            ->with('quotation:id,lead_id')
+            ->get()
+            ->pluck('quotation.lead_id')
+            ->unique()
+            ->flip();
+        $executedLeadIds = Project::query()
+            ->whereHas('salesOrder.quotation', fn ($query) => $query->whereIn('lead_id', $leadIds))
+            ->with('salesOrder.quotation:id,lead_id')
+            ->get()
+            ->pluck('salesOrder.quotation.lead_id')
+            ->unique()
+            ->flip();
+
+        $quotations->getCollection()->each(function (Quotation $quotation) use ($dealLeadIds, $executedLeadIds) {
+            $pipeline = match (true) {
+                $quotation->lead->stage === LeadStage::Lost->value => ['value' => 'failed', 'label' => 'Gagal'],
+                $executedLeadIds->has($quotation->lead_id) => ['value' => 'executed', 'label' => 'Sudah Eksekusi'],
+                $dealLeadIds->has($quotation->lead_id) => ['value' => 'deal', 'label' => 'Deal'],
+                default => ['value' => 'negotiation', 'label' => 'Negosiasi'],
+            };
+
+            $quotation->lead->setAttribute('pipeline_stage', $pipeline['value']);
+            $quotation->lead->setAttribute('pipeline_stage_label', $pipeline['label']);
+        });
+
         return Inertia::render('Sales/Quotations/Index', [
             'quotations' => $quotations,
-            'filters' => ['search' => $search, 'status' => $filters['status'] ?? ''],
+            'filters' => [
+                'search' => $search,
+                'status' => $filters['status'] ?? '',
+                'temperature' => $filters['temperature'] ?? '',
+            ],
             'statusOptions' => QuotationStatus::options(),
+            'temperatureOptions' => LeadTemperature::options(),
         ]);
     }
 
@@ -79,8 +124,8 @@ class QuotationController extends Controller
         return Inertia::render('Sales/Quotations/Form', [
             'procurementRequest' => $procurementRequest,
             'taxes' => $this->activeTaxes(),
-            'defaultTerms' => \App\Support\QuotationDefaults::terms(),
-            'unitOptions' => \App\Models\Requirement::UNITS,
+            'defaultTerms' => QuotationDefaults::terms(),
+            'unitOptions' => Requirement::UNITS,
         ]);
     }
 
@@ -121,7 +166,7 @@ class QuotationController extends Controller
         return Inertia::render('Sales/Quotations/Show', [
             'quotation' => $quotation,
             'history' => $history,
-            'totals' => \App\Services\Sales\DocumentTotals::of($quotation->lines),
+            'totals' => DocumentTotals::of($quotation->lines),
             'customerHasWhatsapp' => $quotation->contact?->whatsappNumber() !== null,
             'permissions' => [
                 'update' => request()->user()->can('update', $quotation),
@@ -147,17 +192,17 @@ class QuotationController extends Controller
         return Inertia::render('Sales/Quotations/Form', [
             'quotation' => $quotation,
             'taxes' => $this->activeTaxes(),
-            'unitOptions' => \App\Models\Requirement::UNITS,
+            'unitOptions' => Requirement::UNITS,
         ]);
     }
 
-    /** @return \Illuminate\Support\Collection<int, Tax> */
+    /** @return Collection<int, Tax> */
     private function activeTaxes()
     {
         return Tax::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'rate']);
     }
 
-    public function print(Quotation $quotation): \Illuminate\View\View
+    public function print(Quotation $quotation): View
     {
         Gate::authorize('view', $quotation);
 
@@ -229,7 +274,7 @@ class QuotationController extends Controller
 
         return [
             'quotation' => $quotation,
-            'totals' => \App\Services\Sales\DocumentTotals::of($quotation->lines),
+            'totals' => DocumentTotals::of($quotation->lines),
             'forPdf' => $forPdf,
         ];
     }
