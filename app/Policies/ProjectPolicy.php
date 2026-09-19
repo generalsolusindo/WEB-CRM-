@@ -218,6 +218,18 @@ class ProjectPolicy
         return $sow === null || $sow->status !== SowStatus::Completed->value;
     }
 
+    /** Perubahan langsung yang tidak melewati Simpan Draft hanya aman sebelum proses review dimulai. */
+    public function manageSowAssets(User $user, Project $project): bool
+    {
+        if (! $this->manageSow($user, $project)) {
+            return false;
+        }
+
+        $status = $project->sow?->status;
+
+        return $status === null || in_array($status, [SowStatus::Draft->value, SowStatus::RejectedByHr->value], true);
+    }
+
     private function isOperational(User $user): bool
     {
         return $user->role === 'operational' && $user->is_active;

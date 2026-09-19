@@ -332,6 +332,28 @@ class SowTest extends TestCase
             ->assertSee('Deskripsi metode khusus.');
     }
 
+    public function test_legacy_draft_update_does_not_erase_custom_sections_when_field_is_omitted(): void
+    {
+        [$project, $ops] = $this->projectWithVendor();
+
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow", [
+            'project_name' => 'Jasa X',
+            'custom_sections' => [[
+                'title' => 'Metode Pelaksanaan',
+                'content' => 'Isi metode.',
+                'after' => 'responsibilities',
+                'active' => true,
+            ]],
+        ]);
+
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow", [
+            'project_name' => 'Jasa X Revisi',
+        ])->assertSessionDoesntHaveErrors();
+
+        $sow = Sow::where('project_id', $project->id)->firstOrFail();
+        $this->assertSame('Metode Pelaksanaan', $sow->custom_sections[0]['title']);
+    }
+
     public function test_operational_uploads_and_deletes_scope_section_image(): void
     {
         Storage::fake('local');
@@ -413,6 +435,29 @@ class SowTest extends TestCase
         // Bisa dikirim ulang ke HR dari awal.
         $this->actingAs($ops)->post("/operational/projects/{$project->id}/sow/submit")->assertRedirect();
         $this->assertSame('pending_hr_review', $sow->fresh()->status);
+    }
+
+    public function test_direct_scope_and_image_changes_are_blocked_while_signatures_are_in_progress(): void
+    {
+        Storage::fake('local');
+        [$project, $ops, , $technician] = $this->projectWithVendor();
+        User::factory()->create(['role' => 'hr', 'is_active' => true]);
+
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow", [
+            'number' => 'SOW-001', 'project_name' => 'Jasa X', 'technician_id' => $technician->id,
+        ]);
+        $this->actingAs($ops)->post("/operational/projects/{$project->id}/sow/submit");
+        $section = $project->sow->scopeSections()->firstOrFail();
+
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow/scope-sections/{$section->id}", [
+            'title' => 'Perubahan diam-diam', 'content' => 'Tidak boleh tersimpan',
+        ])->assertForbidden();
+        $this->actingAs($ops)->post("/operational/projects/{$project->id}/sow/images", [
+            'images' => [UploadedFile::fake()->image('late.jpg')],
+        ])->assertForbidden();
+
+        $this->assertNotSame('Perubahan diam-diam', $section->fresh()->title);
+        $this->assertSame(0, $project->sow->attachments()->count());
     }
 
     public function test_cannot_edit_sow_once_completed(): void

@@ -8,7 +8,7 @@ class SaveSowScopeSectionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('manageSow', $this->route('project')) ?? false;
+        return $this->user()?->can('manageSowAssets', $this->route('project')) ?? false;
     }
 
     /** @return array<string, mixed> */

@@ -22,9 +22,12 @@ class SaveSowDraft
     {
         return DB::transaction(function () use ($project, $user, $data) {
             $scopeSections = $data['scope_sections'] ?? null;
+            $hasCustomSections = array_key_exists('custom_sections', $data);
             $customSections = $data['custom_sections'] ?? [];
-            unset($data['scope_sections']);
-            $data['custom_sections'] = array_values($customSections);
+            unset($data['scope_sections'], $data['custom_sections']);
+            if ($hasCustomSections) {
+                $data['custom_sections'] = array_values($customSections);
+            }
             $sow = Sow::query()->where('project_id', $project->id)->lockForUpdate()->first();
             $isFirstSave = $sow === null;
             if ($isFirstSave && $scopeSections === []) {

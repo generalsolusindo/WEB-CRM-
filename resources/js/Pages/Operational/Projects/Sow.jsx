@@ -206,7 +206,7 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
                     <Section title="2. Latar Belakang" active={isSectionActive('background')} onActiveChange={(v) => setSectionActive('background', v)} canEdit={canEdit}>
                         <TextArea value={form.data.background} onChange={(v) => form.setData('background', v)} error={form.errors.background} placeholder="Narasi latar belakang pekerjaan..." />
                         <div className="mt-3">
-                            {canEdit && (
+                            {canEdit && isDraftLike && (
                                 <label className="block text-sm font-medium text-text">Gambar/Diagram Pendukung
                                     <input ref={fileInput} type="file" accept="image/*" multiple onChange={uploadImages} className="mt-1 block text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" disabled={!sow.id} />
                                 </label>
@@ -217,7 +217,7 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
                                     {sow.images.map((img) => (
                                         <div key={img.id} className="group relative">
                                             <a href={img.url} target="_blank" rel="noreferrer"><img src={img.url} className="h-24 w-full rounded-lg border border-border object-cover" /></a>
-                                            {canEdit && (
+                                            {canEdit && isDraftLike && (
                                                 <button type="button" onClick={() => deleteImage(img.id)} className="absolute right-1 top-1 rounded-full bg-danger px-2 py-0.5 text-xs text-white opacity-0 group-hover:opacity-100">✕</button>
                                             )}
                                         </div>
@@ -230,7 +230,7 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
 
                     <Section title="3. Ruang Lingkup Pekerjaan" active={isSectionActive('scope')} onActiveChange={(v) => setSectionActive('scope', v)} canEdit={canEdit}>
                         {sow.id ? (
-                            <ScopeSections project={project} sections={form.data.scope_sections} canEdit={canEdit} onChange={(sections) => form.setData('scope_sections', sections)} />
+                            <ScopeSections project={project} sections={form.data.scope_sections} canEdit={canEdit} canEditImages={isDraftLike} onChange={(sections) => form.setData('scope_sections', sections)} />
                         ) : (
                             <p className="text-sm text-warning">Simpan draft dulu (Informasi Umum + Latar Belakang) sebelum menambah sub-bab ruang lingkup.</p>
                         )}
@@ -400,7 +400,7 @@ function TextArea({ value, onChange, error, placeholder }) {
     );
 }
 
-function ScopeSections({ project, sections, canEdit, onChange }) {
+function ScopeSections({ project, sections, canEdit, canEditImages, onChange }) {
     function addSection() {
         onChange([...sections, { id: null, title: 'Sub Bab Baru', content: '', images: [] }]);
     }
@@ -435,6 +435,7 @@ function ScopeSections({ project, sections, canEdit, onChange }) {
                     isFirst={i === 0}
                     isLast={i === sections.length - 1}
                     canEdit={canEdit}
+                    canEditImages={canEditImages}
                     onChange={(patch) => updateSection(i, patch)}
                     onRemove={() => removeSection(i)}
                     onMove={(direction) => moveSection(i, direction)}
@@ -450,7 +451,7 @@ function ScopeSections({ project, sections, canEdit, onChange }) {
     );
 }
 
-function ScopeSectionCard({ project, section, letter, isFirst, isLast, canEdit, onChange, onRemove, onMove }) {
+function ScopeSectionCard({ project, section, letter, isFirst, isLast, canEdit, canEditImages, onChange, onRemove, onMove }) {
     const fileRef = useRef(null);
 
     function uploadImages(e) {
@@ -502,19 +503,19 @@ function ScopeSectionCard({ project, section, letter, isFirst, isLast, canEdit, 
             <div className="mt-3">
                 <TextArea value={section.content} onChange={(content) => onChange({ content })} placeholder="Isi sub-bab ini..." />
             </div>
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            {canEditImages && <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <label className="text-sm font-medium text-text">
                     Gambar pendukung
                     <input ref={fileRef} type="file" accept="image/*" multiple onChange={uploadImages} disabled={!section.id} className="mt-1 block text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong disabled:opacity-50" />
                 </label>
                 {!section.id && <span className="text-xs text-warning">Simpan Draft dahulu sebelum menambah gambar.</span>}
-            </div>
+            </div>}
             {section.images?.length > 0 && (
                 <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">
                     {section.images.map((img) => (
                         <div key={img.id} className="group relative">
                             <a href={img.url} target="_blank" rel="noreferrer"><img src={img.url} className="h-24 w-full rounded-lg border border-border object-cover" /></a>
-                            <button type="button" onClick={() => deleteImage(img.id)} className="absolute right-1 top-1 rounded-full bg-danger px-2 py-0.5 text-xs text-white opacity-0 group-hover:opacity-100">✕</button>
+                            {canEditImages && <button type="button" onClick={() => deleteImage(img.id)} className="absolute right-1 top-1 rounded-full bg-danger px-2 py-0.5 text-xs text-white opacity-0 group-hover:opacity-100">✕</button>}
                         </div>
                     ))}
                 </div>

@@ -182,7 +182,7 @@ class SowController extends Controller
 
     public function destroyImage(Project $project, Attachment $image): RedirectResponse
     {
-        Gate::authorize('manageSow', $project);
+        Gate::authorize('manageSowAssets', $project);
         abort_unless($image->attachable_type === \App\Models\Sow::class && $image->attachable_id === $project->sow?->id, 404);
 
         Storage::disk('local')->delete($image->file_path);
@@ -212,7 +212,7 @@ class SowController extends Controller
 
     public function destroyScopeSection(Project $project, SowScopeSection $scopeSection, DeleteSowScopeSection $action): RedirectResponse
     {
-        Gate::authorize('manageSow', $project);
+        Gate::authorize('manageSowAssets', $project);
         abort_unless($scopeSection->sow_id === $project->sow?->id, 404);
 
         $action->handle($scopeSection);
@@ -222,7 +222,7 @@ class SowController extends Controller
 
     public function moveScopeSection(Project $project, SowScopeSection $scopeSection, MoveSowScopeSection $action): RedirectResponse
     {
-        Gate::authorize('manageSow', $project);
+        Gate::authorize('manageSowAssets', $project);
         abort_unless($scopeSection->sow_id === $project->sow?->id, 404);
         $direction = request()->input('direction') === 'up' ? 'up' : 'down';
 
@@ -248,7 +248,7 @@ class SowController extends Controller
 
     public function destroyScopeImage(Project $project, SowScopeSection $scopeSection, Attachment $image): RedirectResponse
     {
-        Gate::authorize('manageSow', $project);
+        Gate::authorize('manageSowAssets', $project);
         abort_unless($scopeSection->sow_id === $project->sow?->id, 404);
         abort_unless($image->attachable_type === SowScopeSection::class && $image->attachable_id === $scopeSection->id, 404);
 
