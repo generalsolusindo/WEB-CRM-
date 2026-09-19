@@ -11,6 +11,7 @@ use App\Services\DocumentNumber;
 use App\Services\Notifications\Notify;
 use App\Support\SowDefaults;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class SaveSowDraft
 {
@@ -20,8 +21,15 @@ class SaveSowDraft
     public function handle(Project $project, User $user, array $data): Sow
     {
         return DB::transaction(function () use ($project, $user, $data) {
+            $scopeSections = $data['scope_sections'] ?? null;
+            $customSections = $data['custom_sections'] ?? [];
+            unset($data['scope_sections']);
+            $data['custom_sections'] = array_values($customSections);
             $sow = Sow::query()->where('project_id', $project->id)->lockForUpdate()->first();
             $isFirstSave = $sow === null;
+            if ($isFirstSave && $scopeSections === []) {
+                $scopeSections = null;
+            }
 
             // SOW sudah dikirim (atau lebih jauh) tapi isinya diedit lagi — tanda tangan
             // yang sudah dikumpulkan tidak lagi sah untuk isi yang baru, jadi seluruh
@@ -79,6 +87,34 @@ class SaveSowDraft
                     'title' => 'Pengadaan Material',
                     'content' => SowDefaults::materialScopeContent($project->loadMissing('actualProcurements')),
                 ]);
+            }
+
+            if ($scopeSections !== null) {
+                $keptIds = [];
+
+                foreach (array_values($scopeSections) as $position => $sectionData) {
+                    $section = ! empty($sectionData['id'])
+                        ? $saved->scopeSections()->whereKey($sectionData['id'])->first()
+                        : null;
+
+                    $values = [
+                        'position' => $position + 1,
+                        'title' => $sectionData['title'],
+                        'content' => $sectionData['content'] ?? null,
+                    ];
+
+                    $section ? $section->update($values) : $section = $saved->scopeSections()->create($values);
+                    $keptIds[] = $section->id;
+                }
+
+                $removed = $saved->scopeSections()->whereNotIn('id', $keptIds)->with('attachments')->get();
+                foreach ($removed as $section) {
+                    foreach ($section->attachments as $attachment) {
+                        Storage::disk('local')->delete($attachment->file_path);
+                        $attachment->delete();
+                    }
+                    $section->delete();
+                }
             }
 
             if ($wasSentBefore) {

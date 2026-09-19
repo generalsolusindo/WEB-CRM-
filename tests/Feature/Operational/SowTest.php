@@ -288,6 +288,50 @@ class SowTest extends TestCase
         $this->assertDatabaseMissing('sow_scope_sections', ['id' => $section->id]);
     }
 
+    public function test_scope_sections_are_saved_together_with_the_main_draft(): void
+    {
+        [$project, $ops] = $this->projectWithVendor();
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow", ['project_name' => 'Jasa X']);
+        $sow = Sow::where('project_id', $project->id)->firstOrFail();
+        $existing = $sow->scopeSections()->firstOrFail();
+
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow", [
+            'project_name' => 'Jasa X',
+            'scope_sections' => [
+                ['id' => $existing->id, 'title' => 'Material Revisi', 'content' => 'Isi revisi'],
+                ['title' => 'Instalasi', 'content' => 'Isi instalasi'],
+            ],
+        ])->assertSessionDoesntHaveErrors()->assertRedirect();
+
+        $this->assertSame(['Material Revisi', 'Instalasi'], $sow->scopeSections()->pluck('title')->all());
+    }
+
+    public function test_section_visibility_and_custom_sections_are_saved_and_rendered_in_print(): void
+    {
+        [$project, $ops] = $this->projectWithVendor();
+
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow", [
+            'project_name' => 'Jasa X',
+            'section_visibility' => ['responsibilities' => false],
+            'custom_sections' => [[
+                'title' => 'Metode Pelaksanaan',
+                'content' => 'Deskripsi metode khusus.',
+                'after' => 'responsibilities',
+                'active' => true,
+            ]],
+        ])->assertSessionDoesntHaveErrors()->assertRedirect();
+
+        $sow = Sow::where('project_id', $project->id)->firstOrFail();
+        $this->assertFalse($sow->section_visibility['responsibilities']);
+        $this->assertSame('Metode Pelaksanaan', $sow->custom_sections[0]['title']);
+
+        $this->actingAs($ops)->get("/operational/projects/{$project->id}/sow/print")
+            ->assertOk()
+            ->assertDontSee('TANGGUNG JAWAB')
+            ->assertSee('METODE PELAKSANAAN')
+            ->assertSee('Deskripsi metode khusus.');
+    }
+
     public function test_operational_uploads_and_deletes_scope_section_image(): void
     {
         Storage::fake('local');

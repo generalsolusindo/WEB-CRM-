@@ -38,6 +38,14 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
         technician_team_note: sow.technician_team_note ?? '',
         client_pic_name: sow.client_pic_name ?? '',
         client_pic_phone: sow.client_pic_phone ?? '',
+        section_visibility: sow.section_visibility ?? {},
+        custom_sections: sow.custom_sections ?? [],
+        scope_sections: (sow.scope_sections ?? []).map((section) => ({
+            id: section.id,
+            title: section.title,
+            content: section.content ?? '',
+            images: section.images ?? [],
+        })),
     });
     const imageForm = useForm({ images: [] });
 
@@ -80,6 +88,50 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
     }
 
     const isDraftLike = !sow.status || sow.status === 'draft' || sow.status === 'rejected_by_hr';
+
+    function isSectionActive(key) {
+        return form.data.section_visibility[key] !== false;
+    }
+
+    function setSectionActive(key, active) {
+        form.setData('section_visibility', { ...form.data.section_visibility, [key]: active });
+    }
+
+    function addCustomSection(after) {
+        form.setData('custom_sections', [
+            ...form.data.custom_sections,
+            { title: 'Bagian Baru', content: '', after, active: true },
+        ]);
+    }
+
+    function updateCustomSection(index, patch) {
+        form.setData('custom_sections', form.data.custom_sections.map((section, i) => i === index ? { ...section, ...patch } : section));
+    }
+
+    function removeCustomSection(index) {
+        form.setData('custom_sections', form.data.custom_sections.filter((_, i) => i !== index));
+    }
+
+    function customSectionsAfter(after) {
+        return (
+            <div className="space-y-3">
+                {form.data.custom_sections.map((section, index) => section.after === after && (
+                    <CustomSection
+                        key={index}
+                        section={section}
+                        canEdit={canEdit}
+                        onChange={(patch) => updateCustomSection(index, patch)}
+                        onRemove={() => removeCustomSection(index)}
+                    />
+                ))}
+                {canEdit && (
+                    <button type="button" onClick={() => addCustomSection(after)} className="btn btn-outline">
+                        + Tambah Card di Bawah Bagian Ini
+                    </button>
+                )}
+            </div>
+        );
+    }
 
     return (
         <AppLayout>
@@ -139,7 +191,7 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
                 )}
 
                 <form onSubmit={submit} className="space-y-6">
-                    <Section title="1. Informasi Umum">
+                    <Section title="1. Informasi Umum" active={isSectionActive('general')} onActiveChange={(v) => setSectionActive('general', v)} canEdit={canEdit}>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <Field label="Nomor SOW *" value={form.data.number} onChange={(v) => form.setData('number', v)} error={form.errors.number} placeholder="Terisi otomatis setelah disimpan" />
                             <Field label="Nama Proyek *" value={form.data.project_name} onChange={(v) => form.setData('project_name', v)} error={form.errors.project_name} />
@@ -149,8 +201,9 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
                             <div className="block text-sm font-medium text-text">Vendor/Implementor<div className="mt-1 rounded-lg border border-border bg-bg px-3 py-2 text-text-muted">CV. General Solusindo</div></div>
                         </div>
                     </Section>
+                    {customSectionsAfter('general')}
 
-                    <Section title="2. Latar Belakang">
+                    <Section title="2. Latar Belakang" active={isSectionActive('background')} onActiveChange={(v) => setSectionActive('background', v)} canEdit={canEdit}>
                         <TextArea value={form.data.background} onChange={(v) => form.setData('background', v)} error={form.errors.background} placeholder="Narasi latar belakang pekerjaan..." />
                         <div className="mt-3">
                             {canEdit && (
@@ -173,20 +226,23 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
                             )}
                         </div>
                     </Section>
+                    {customSectionsAfter('background')}
 
-                    <Section title="3. Ruang Lingkup Pekerjaan">
+                    <Section title="3. Ruang Lingkup Pekerjaan" active={isSectionActive('scope')} onActiveChange={(v) => setSectionActive('scope', v)} canEdit={canEdit}>
                         {sow.id ? (
-                            <ScopeSections project={project} sections={sow.scope_sections || []} canEdit={canEdit} />
+                            <ScopeSections project={project} sections={form.data.scope_sections} canEdit={canEdit} onChange={(sections) => form.setData('scope_sections', sections)} />
                         ) : (
                             <p className="text-sm text-warning">Simpan draft dulu (Informasi Umum + Latar Belakang) sebelum menambah sub-bab ruang lingkup.</p>
                         )}
                     </Section>
+                    {customSectionsAfter('scope')}
 
-                    <Section title="4. Tanggung Jawab">
+                    <Section title="4. Tanggung Jawab" active={isSectionActive('responsibilities')} onActiveChange={(v) => setSectionActive('responsibilities', v)} canEdit={canEdit}>
                         <TextArea value={form.data.responsibilities} onChange={(v) => form.setData('responsibilities', v)} error={form.errors.responsibilities} placeholder="Tanggung jawab Vendor vs Client..." />
                     </Section>
+                    {customSectionsAfter('responsibilities')}
 
-                    <Section title="5. Waktu Pelaksanaan & Jadwal">
+                    <Section title="5. Waktu Pelaksanaan & Jadwal" active={isSectionActive('schedule')} onActiveChange={(v) => setSectionActive('schedule', v)} canEdit={canEdit}>
                         <div className="grid gap-4 sm:grid-cols-3">
                             <Field label="Estimasi Durasi Pekerjaan" value={form.data.schedule_duration} onChange={(v) => form.setData('schedule_duration', v)} error={form.errors.schedule_duration} placeholder="Mis. 3 – 5 hari" />
                             <label className="block text-sm font-medium text-text">Waktu Mulai
@@ -199,28 +255,34 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
                             </label>
                         </div>
                     </Section>
+                    {customSectionsAfter('schedule')}
 
-                    <Section title="6. Keselamatan Kerja (K3)">
+                    <Section title="6. Keselamatan Kerja (K3)" active={isSectionActive('safety')} onActiveChange={(v) => setSectionActive('safety', v)} canEdit={canEdit}>
                         <TextArea value={form.data.safety} onChange={(v) => form.setData('safety', v)} error={form.errors.safety} />
                     </Section>
+                    {customSectionsAfter('safety')}
 
-                    <Section title="7. Pembayaran">
+                    <Section title="7. Pembayaran" active={isSectionActive('payment')} onActiveChange={(v) => setSectionActive('payment', v)} canEdit={canEdit}>
                         <TextArea value={form.data.payment_terms} onChange={(v) => form.setData('payment_terms', v)} error={form.errors.payment_terms} />
                     </Section>
+                    {customSectionsAfter('payment')}
 
-                    <Section title="8. Output Pekerjaan">
+                    <Section title="8. Output Pekerjaan" active={isSectionActive('output')} onActiveChange={(v) => setSectionActive('output', v)} canEdit={canEdit}>
                         <TextArea value={form.data.output} onChange={(v) => form.setData('output', v)} error={form.errors.output} />
                     </Section>
+                    {customSectionsAfter('output')}
 
-                    <Section title="9. Garansi Layanan Teknisi">
+                    <Section title="9. Garansi Layanan Teknisi" active={isSectionActive('warranty')} onActiveChange={(v) => setSectionActive('warranty', v)} canEdit={canEdit}>
                         <TextArea value={form.data.warranty} onChange={(v) => form.setData('warranty', v)} error={form.errors.warranty} />
                     </Section>
+                    {customSectionsAfter('warranty')}
 
-                    <Section title="10. Catatan">
+                    <Section title="10. Catatan" active={isSectionActive('notes')} onActiveChange={(v) => setSectionActive('notes', v)} canEdit={canEdit}>
                         <TextArea value={form.data.notes} onChange={(v) => form.setData('notes', v)} error={form.errors.notes} />
                     </Section>
+                    {customSectionsAfter('notes')}
 
-                    <Section title="11. PIC & Kontak">
+                    <Section title="11. PIC & Kontak" active={isSectionActive('contacts')} onActiveChange={(v) => setSectionActive('contacts', v)} canEdit={canEdit}>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="block text-sm font-medium text-text">PIC Vendor
                                 <div className="mt-1 rounded-lg border border-border bg-bg px-3 py-2 text-text-muted">
@@ -242,10 +304,12 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
                             <Field label="Telepon PIC Client" value={form.data.client_pic_phone} onChange={(v) => form.setData('client_pic_phone', v)} error={form.errors.client_pic_phone} />
                         </div>
                     </Section>
+                    {customSectionsAfter('contacts')}
 
-                    <Section title="12. Penutup">
+                    <Section title="12. Penutup" active={isSectionActive('closing')} onActiveChange={(v) => setSectionActive('closing', v)} canEdit={canEdit}>
                         <TextArea value={form.data.closing} onChange={(v) => form.setData('closing', v)} error={form.errors.closing} />
                     </Section>
+                    {customSectionsAfter('closing')}
 
                     {canEdit && (
                         <div className="flex flex-wrap justify-end gap-2">
@@ -277,11 +341,42 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
     );
 }
 
-function Section({ title, children }) {
+function Section({ title, children, active = true, onActiveChange, canEdit = false }) {
     return (
-        <section className="card p-6">
-            <h2 className="mb-3 font-semibold text-text">{title}</h2>
-            {children}
+        <section className={`card p-4 sm:p-6 ${active ? '' : 'opacity-60'}`}>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="font-semibold text-text">{title}</h2>
+                {onActiveChange && (
+                    <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-text-muted">
+                        <input type="checkbox" checked={active} onChange={(e) => onActiveChange(e.target.checked)} disabled={!canEdit} className="h-5 w-5 accent-primary" />
+                        Aktif di PDF
+                    </label>
+                )}
+            </div>
+            <div className={active ? '' : 'pointer-events-none'}>{children}</div>
+        </section>
+    );
+}
+
+function CustomSection({ section, canEdit, onChange, onRemove }) {
+    return (
+        <section className={`card border-l-4 border-l-primary p-4 sm:p-6 ${section.active !== false ? '' : 'opacity-60'}`}>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold uppercase tracking-wide text-primary">Card Tambahan</span>
+                <div className="flex items-center gap-3">
+                    <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-text-muted">
+                        <input type="checkbox" checked={section.active !== false} onChange={(e) => onChange({ active: e.target.checked })} disabled={!canEdit} className="h-5 w-5 accent-primary" />
+                        Aktif di PDF
+                    </label>
+                    {canEdit && <button type="button" onClick={onRemove} className="text-sm font-semibold text-danger">Hapus</button>}
+                </div>
+            </div>
+            <div className={section.active === false ? 'pointer-events-none' : 'space-y-3'}>
+                <Field label="Judul Card" value={section.title} onChange={(title) => onChange({ title })} />
+                <label className="block text-sm font-medium text-text">Deskripsi
+                    <TextArea value={section.content} onChange={(content) => onChange({ content })} placeholder="Isi deskripsi bagian tambahan..." />
+                </label>
+            </div>
         </section>
     );
 }
@@ -305,58 +400,63 @@ function TextArea({ value, onChange, error, placeholder }) {
     );
 }
 
-function ScopeSections({ project, sections, canEdit }) {
-    const [adding, setAdding] = useState(false);
-
+function ScopeSections({ project, sections, canEdit, onChange }) {
     function addSection() {
-        setAdding(true);
-        router.post(`/operational/projects/${project.id}/sow/scope-sections`, {
-            title: 'Sub Bab Baru',
-            content: '',
-        }, { preserveScroll: true, onFinish: () => setAdding(false) });
+        onChange([...sections, { id: null, title: 'Sub Bab Baru', content: '', images: [] }]);
+    }
+
+    function updateSection(index, patch) {
+        onChange(sections.map((section, i) => i === index ? { ...section, ...patch } : section));
+    }
+
+    function removeSection(index) {
+        if (confirm(`Hapus sub-bab "${sections[index].title}"? Perubahan diterapkan saat Simpan Draft.`)) {
+            onChange(sections.filter((_, i) => i !== index));
+        }
+    }
+
+    function moveSection(index, direction) {
+        const target = direction === 'up' ? index - 1 : index + 1;
+        if (target < 0 || target >= sections.length) return;
+        const reordered = [...sections];
+        [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+        onChange(reordered);
     }
 
     return (
         <div className="space-y-4">
             {sections.length === 0 && <p className="text-sm text-text-muted">Belum ada sub-bab.</p>}
             {sections.map((s, i) => (
-                <ScopeSectionCard key={s.id} project={project} section={s} letter={String.fromCharCode(65 + i)} isFirst={i === 0} isLast={i === sections.length - 1} canEdit={canEdit} />
+                <ScopeSectionCard
+                    key={s.id ?? `new-${i}`}
+                    project={project}
+                    section={s}
+                    letter={String.fromCharCode(65 + i)}
+                    isFirst={i === 0}
+                    isLast={i === sections.length - 1}
+                    canEdit={canEdit}
+                    onChange={(patch) => updateSection(i, patch)}
+                    onRemove={() => removeSection(i)}
+                    onMove={(direction) => moveSection(i, direction)}
+                />
             ))}
             {canEdit && (
-                <button type="button" onClick={addSection} disabled={adding} className="btn btn-outline">
-                    {adding ? 'Menambah…' : '+ Tambah Sub Bab'}
+                <button type="button" onClick={addSection} className="btn btn-outline">
+                    + Tambah Sub Bab
                 </button>
             )}
+            {canEdit && <p className="text-xs text-text-muted">Perubahan judul, isi, urutan, penambahan, dan penghapusan sub-bab disimpan bersama tombol Simpan Draft.</p>}
         </div>
     );
 }
 
-function ScopeSectionCard({ project, section, letter, isFirst, isLast, canEdit }) {
-    const [title, setTitle] = useState(section.title);
-    const [content, setContent] = useState(section.content || '');
-    const [saving, setSaving] = useState(false);
+function ScopeSectionCard({ project, section, letter, isFirst, isLast, canEdit, onChange, onRemove, onMove }) {
     const fileRef = useRef(null);
-
-    function save() {
-        setSaving(true);
-        router.put(`/operational/projects/${project.id}/sow/scope-sections/${section.id}`, { title, content }, {
-            preserveScroll: true, onFinish: () => setSaving(false),
-        });
-    }
-
-    function remove() {
-        if (confirm(`Hapus sub-bab "${section.title}"?`)) {
-            router.delete(`/operational/projects/${project.id}/sow/scope-sections/${section.id}`, { preserveScroll: true });
-        }
-    }
-
-    function move(direction) {
-        router.post(`/operational/projects/${project.id}/sow/scope-sections/${section.id}/move`, { direction }, { preserveScroll: true });
-    }
 
     function uploadImages(e) {
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
+        if (!section.id) return;
         router.post(`/operational/projects/${project.id}/sow/scope-sections/${section.id}/images`, { images: files }, {
             preserveScroll: true,
             forceFormData: true,
@@ -391,25 +491,23 @@ function ScopeSectionCard({ project, section, letter, isFirst, isLast, canEdit }
             <div className="flex items-start justify-between gap-2">
                 <label className="block flex-1 text-sm font-medium text-text">
                     {letter}. Judul Sub Bab
-                    <input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 w-full rounded-lg border border-border px-3 py-2 outline-none focus:border-navy" />
+                    <input value={section.title} onChange={(e) => onChange({ title: e.target.value })} className="mt-1 w-full rounded-lg border border-border px-3 py-2 outline-none focus:border-navy" />
                 </label>
                 <div className="flex shrink-0 gap-1 pt-6">
-                    <button type="button" onClick={() => move('up')} disabled={isFirst} className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold text-text-muted disabled:opacity-30" title="Pindah naik">↑</button>
-                    <button type="button" onClick={() => move('down')} disabled={isLast} className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold text-text-muted disabled:opacity-30" title="Pindah turun">↓</button>
-                    <button type="button" onClick={remove} className="rounded-lg border border-danger/30 px-2 py-1.5 text-xs font-semibold text-danger" title="Hapus sub-bab">Hapus</button>
+                    <button type="button" onClick={() => onMove('up')} disabled={isFirst} className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold text-text-muted disabled:opacity-30" title="Pindah naik">↑</button>
+                    <button type="button" onClick={() => onMove('down')} disabled={isLast} className="rounded-lg border border-border px-2 py-1.5 text-xs font-semibold text-text-muted disabled:opacity-30" title="Pindah turun">↓</button>
+                    <button type="button" onClick={onRemove} className="rounded-lg border border-danger/30 px-2 py-1.5 text-xs font-semibold text-danger" title="Hapus sub-bab">Hapus</button>
                 </div>
             </div>
             <div className="mt-3">
-                <TextArea value={content} onChange={setContent} placeholder="Isi sub-bab ini..." />
+                <TextArea value={section.content} onChange={(content) => onChange({ content })} placeholder="Isi sub-bab ini..." />
             </div>
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <label className="text-sm font-medium text-text">
                     Gambar pendukung
-                    <input ref={fileRef} type="file" accept="image/*" multiple onChange={uploadImages} className="mt-1 block text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" />
+                    <input ref={fileRef} type="file" accept="image/*" multiple onChange={uploadImages} disabled={!section.id} className="mt-1 block text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong disabled:opacity-50" />
                 </label>
-                <button type="button" onClick={save} disabled={saving} className="btn btn-primary">
-                    {saving ? 'Menyimpan…' : 'Simpan Sub Bab'}
-                </button>
+                {!section.id && <span className="text-xs text-warning">Simpan Draft dahulu sebelum menambah gambar.</span>}
             </div>
             {section.images?.length > 0 && (
                 <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4">

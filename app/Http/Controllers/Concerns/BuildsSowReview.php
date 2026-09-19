@@ -70,6 +70,8 @@ trait BuildsSowReview
             'warranty' => $sow->warranty,
             'notes' => $sow->notes,
             'closing' => $sow->closing,
+            'section_visibility' => $sow->section_visibility ?? [],
+            'custom_sections' => $sow->custom_sections ?? [],
             'technician' => $sow->technician ? ['id' => $sow->technician->id, 'name' => $sow->technician->name, 'phone' => $sow->technician->phone] : null,
             'technician_team_note' => $sow->technician_team_note,
             'client_pic_name' => $sow->client_pic_name,

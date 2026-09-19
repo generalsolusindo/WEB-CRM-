@@ -34,6 +34,8 @@ class Sow extends Model
         'warranty',
         'notes',
         'closing',
+        'section_visibility',
+        'custom_sections',
         'technician_id',
         'technician_team_note',
         'client_pic_name',
@@ -64,6 +66,8 @@ class Sow extends Model
     protected function casts(): array
     {
         return [
+            'section_visibility' => 'array',
+            'custom_sections' => 'array',
             'schedule_start_date' => 'date:Y-m-d',
             'schedule_end_date' => 'date:Y-m-d',
             'submitted_at' => 'datetime',

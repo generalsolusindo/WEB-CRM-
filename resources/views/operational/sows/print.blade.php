@@ -2,6 +2,12 @@
     $forPdf = $forPdf ?? false;
     $dots = fn (?string $v, int $min = 20) => $v !== null && $v !== '' ? $v : str_repeat('.', $min);
     $vendor = $project->vendor;
+    $visibility = $sow->section_visibility ?? [];
+    $isActive = fn (string $key) => ($visibility[$key] ?? true) === true;
+    $customSections = collect($sow->custom_sections ?? [])->filter(fn ($section) => ($section['active'] ?? true) === true);
+    $customAfter = fn (string $key) => $customSections->where('after', $key);
+    $sectionNumber = 0;
+    $nextNumber = function () use (&$sectionNumber) { return ++$sectionNumber; };
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -36,7 +42,8 @@
     <div class="sheet">
         <h1>SCOPE OF WORK (SOW)</h1>
 
-        <h2>1. INFORMASI UMUM</h2>
+        @if($isActive('general'))
+        <h2>{{ $nextNumber() }}. INFORMASI UMUM</h2>
         <table class="meta">
             <tr><td class="label">Nama Proyek</td><td>: {{ $dots($sow->project_name) }}</td></tr>
             <tr><td class="label">Nomor</td><td>: {{ $dots($sow->number) }}</td></tr>
@@ -45,8 +52,11 @@
             <tr><td class="label">Vendor/Implementor</td><td>: CV. General Solusindo</td></tr>
             <tr><td class="label">Tanggal Pelaksanaan</td><td>: {{ $dots($sow->execution_date) }}</td></tr>
         </table>
+        @endif
+        @include('operational.sows._custom-sections', ['after' => 'general'])
 
-        <h2>2. LATAR BELAKANG</h2>
+        @if($isActive('background'))
+        <h2>{{ $nextNumber() }}. LATAR BELAKANG</h2>
         <p class="body-text">{{ $sow->background ?: '.................................................' }}</p>
         @if($imageUrls->isNotEmpty())
             <div style="margin-top:8px;">
@@ -55,8 +65,11 @@
                 @endforeach
             </div>
         @endif
+        @endif
+        @include('operational.sows._custom-sections', ['after' => 'background'])
 
-        <h2>3. RUANG LINGKUP PEKERJAAN</h2>
+        @if($isActive('scope'))
+        <h2>{{ $nextNumber() }}. RUANG LINGKUP PEKERJAAN</h2>
         @if($sow->scopeSections->isEmpty())
             <p class="body-text">.................................................</p>
         @else
@@ -68,33 +81,57 @@
                 @endforeach
             @endforeach
         @endif
+        @endif
+        @include('operational.sows._custom-sections', ['after' => 'scope'])
 
-        <h2>4. TANGGUNG JAWAB</h2>
+        @if($isActive('responsibilities'))
+        <h2>{{ $nextNumber() }}. TANGGUNG JAWAB</h2>
         <p class="body-text">{{ $dots($sow->responsibilities, 40) }}</p>
+        @endif
+        @include('operational.sows._custom-sections', ['after' => 'responsibilities'])
 
-        <h2>5. WAKTU PELAKSANAAN & JADWAL</h2>
+        @if($isActive('schedule'))
+        <h2>{{ $nextNumber() }}. WAKTU PELAKSANAAN & JADWAL</h2>
         <table class="meta">
             <tr><td class="label">Estimasi Durasi Pekerjaan</td><td>: {{ $dots($sow->schedule_duration, 20) }}</td></tr>
             <tr><td class="label">Waktu Mulai</td><td>: {{ $sow->schedule_start_date?->locale('id')->translatedFormat('d F Y') ?: str_repeat('.', 20) }}</td></tr>
             <tr><td class="label">Target Selesai</td><td>: {{ $sow->schedule_end_date?->locale('id')->translatedFormat('d F Y') ?: str_repeat('.', 20) }}</td></tr>
         </table>
+        @endif
+        @include('operational.sows._custom-sections', ['after' => 'schedule'])
 
-        <h2>6. KESELAMATAN KERJA (K3)</h2>
+        @if($isActive('safety'))
+        <h2>{{ $nextNumber() }}. KESELAMATAN KERJA (K3)</h2>
         <p class="body-text">{{ $dots($sow->safety, 40) }}</p>
+        @endif
+        @include('operational.sows._custom-sections', ['after' => 'safety'])
 
-        <h2>7. PEMBAYARAN</h2>
+        @if($isActive('payment'))
+        <h2>{{ $nextNumber() }}. PEMBAYARAN</h2>
         <p class="body-text">{{ $dots($sow->payment_terms, 40) }}</p>
+        @endif
+        @include('operational.sows._custom-sections', ['after' => 'payment'])
 
-        <h2>8. OUTPUT PEKERJAAN</h2>
+        @if($isActive('output'))
+        <h2>{{ $nextNumber() }}. OUTPUT PEKERJAAN</h2>
         <p class="body-text">{{ $dots($sow->output, 40) }}</p>
+        @endif
+        @include('operational.sows._custom-sections', ['after' => 'output'])
 
-        <h2>9. GARANSI LAYANAN TEKNISI</h2>
+        @if($isActive('warranty'))
+        <h2>{{ $nextNumber() }}. GARANSI LAYANAN TEKNISI</h2>
         <p class="body-text">{{ $dots($sow->warranty, 40) }}</p>
+        @endif
+        @include('operational.sows._custom-sections', ['after' => 'warranty'])
 
-        <h2>10. CATATAN</h2>
+        @if($isActive('notes'))
+        <h2>{{ $nextNumber() }}. CATATAN</h2>
         <p class="body-text">{{ $dots($sow->notes, 40) }}</p>
+        @endif
+        @include('operational.sows._custom-sections', ['after' => 'notes'])
 
-        <h2>11. PIC & KONTAK</h2>
+        @if($isActive('contacts'))
+        <h2>{{ $nextNumber() }}. PIC & KONTAK</h2>
         <table class="meta">
             <tr><td class="label">PIC Vendor</td><td>: {{ $dots($vendor?->contact_person, 30) }} ({{ $dots($vendor?->phone, 15) }})</td></tr>
             <tr><td class="label">Team Teknisi Site</td><td>: {{ $dots($sow->technician?->name, 30) }} ({{ $dots($sow->technician?->phone, 15) }})</td></tr>
@@ -103,9 +140,14 @@
             @endif
             <tr><td class="label">PIC Client</td><td>: {{ $dots($sow->client_pic_name, 30) }} ({{ $dots($sow->client_pic_phone, 15) }})</td></tr>
         </table>
+        @endif
+        @include('operational.sows._custom-sections', ['after' => 'contacts'])
 
-        <h2>12. PENUTUP</h2>
+        @if($isActive('closing'))
+        <h2>{{ $nextNumber() }}. PENUTUP</h2>
         <p class="body-text">{{ $dots($sow->closing, 40) }}</p>
+        @endif
+        @include('operational.sows._custom-sections', ['after' => 'closing'])
 
         <p style="margin-top:20px; font-weight:700;">PENUGASAN</p>
         <p>Disetujui oleh:</p>
