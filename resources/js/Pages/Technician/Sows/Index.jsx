@@ -12,7 +12,7 @@ export default function Index({ sows }) {
     return (
         <AppLayout>
             <Head title="SOW Saya" />
-            <div className="mx-auto max-w-4xl space-y-5">
+            <div className="mx-auto min-w-0 break-words max-w-4xl space-y-5">
                 <PageHeader title="SOW Saya" subtitle="Scope of Work yang ditugaskan kepada Anda — tanda tangani sebelum berangkat ke lapangan." />
                 <DataTable
                     columns={columns}

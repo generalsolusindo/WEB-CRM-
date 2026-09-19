@@ -8,12 +8,16 @@ export default function SignaturePad({ onChange }) {
 
     function pos(e) {
         const rect = canvasRef.current.getBoundingClientRect();
-        const point = e.touches ? e.touches[0] : e;
-        return { x: point.clientX - rect.left, y: point.clientY - rect.top };
+        return {
+            x: (e.clientX - rect.left) * canvasRef.current.width / rect.width,
+            y: (e.clientY - rect.top) * canvasRef.current.height / rect.height,
+        };
     }
 
     function start(e) {
+        if (!e.isPrimary || e.button !== 0) return;
         e.preventDefault();
+        canvasRef.current.setPointerCapture(e.pointerId);
         drawing.current = true;
         const ctx = canvasRef.current.getContext('2d');
         const { x, y } = pos(e);
@@ -55,17 +59,16 @@ export default function SignaturePad({ onChange }) {
                 width={400}
                 height={160}
                 className="w-full touch-none rounded-lg border border-border bg-white"
-                onMouseDown={start}
-                onMouseMove={move}
-                onMouseUp={end}
-                onMouseLeave={end}
-                onTouchStart={start}
-                onTouchMove={move}
-                onTouchEnd={end}
+                aria-label="Area tanda tangan"
+                onPointerDown={start}
+                onPointerMove={move}
+                onPointerUp={end}
+                onPointerCancel={end}
+                onLostPointerCapture={end}
             />
-            <div className="mt-2 flex items-center justify-between">
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs text-text-muted">{isEmpty ? 'Tanda tangan di area di atas' : 'Tanda tangan tersimpan'}</span>
-                <button type="button" onClick={clear} className="text-xs font-semibold text-info">Hapus & Ulangi</button>
+                <button type="button" onClick={clear} className="min-h-11 text-xs font-semibold text-info">Hapus & Ulangi</button>
             </div>
         </div>
     );

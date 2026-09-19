@@ -669,8 +669,8 @@ function GenericDashboard({ auth, menuBadges = {} }) {
 
     return (
         <div className="mx-auto max-w-6xl space-y-6">
-            <section className="flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-navy via-navy to-primary p-7 text-white shadow-md">
-                <div>
+            <section className="flex flex-wrap items-center justify-between gap-4 overflow-hidden rounded-3xl bg-gradient-to-br from-navy via-navy to-primary p-4 sm:p-7 text-white shadow-md">
+                <div className="min-w-0 break-words">
                     <p className="text-sm font-medium text-white/65">Ringkasan hari ini</p>
                     <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
                         {withCount.length === 0

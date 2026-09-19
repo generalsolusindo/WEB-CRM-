@@ -15,7 +15,7 @@ export default function Submit({ project }) {
     return (
         <AppLayout>
             <Head title="Submit BAST" />
-            <div className="mx-auto max-w-2xl space-y-5">
+            <div className="mx-auto min-w-0 break-words max-w-2xl space-y-5">
                 <PageHeader
                     title={`Submit BAST — ${project.number}`}
                     subtitle={project.sales_order}
@@ -28,8 +28,8 @@ export default function Submit({ project }) {
                     <h2 className="mb-2 text-sm font-semibold text-text">Status Task</h2>
                     <ul className="space-y-1 text-sm">
                         {project.tasks.map((t) => (
-                            <li key={t.id} className="flex justify-between">
-                                <span className="text-text">{t.title}</span>
+                            <li key={t.id} className="flex flex-wrap justify-between gap-x-4 gap-y-1">
+                                <span className="min-w-0 break-words text-text">{t.title}</span>
                                 <span className={t.status === 'done' ? 'text-success' : 'text-warning'}>{t.status}</span>
                             </li>
                         ))}
@@ -37,7 +37,7 @@ export default function Submit({ project }) {
                     {!allDone && <p className="mt-2 text-xs text-danger">Semua task harus Selesai sebelum BAST dikirim.</p>}
                 </section>
 
-                <form onSubmit={submit} className="space-y-4 card p-6">
+                <form onSubmit={submit} className="space-y-4 card p-4 sm:p-6">
                     <label className="block text-sm font-medium text-text">Catatan
                         <textarea rows="3" value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} className="input" />
                     </label>

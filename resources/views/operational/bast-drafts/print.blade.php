@@ -4,6 +4,14 @@
     $monthNames = [1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April', 5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus', 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'];
     $date = $draft->event_date;
     $dots = fn (?string $v, int $min = 20) => $v !== null && $v !== '' ? $v : str_repeat('.', $min);
+    $hasPurchaseOrder = filled($salesOrder->po_number);
+    $referenceLabel = $hasPurchaseOrder ? 'Purchase Order (PO)' : 'Quotation';
+    $referenceNumber = $hasPurchaseOrder
+        ? $salesOrder->po_number
+        : ($salesOrder->quotation?->number ?: 'QT-'.str_pad((string) ($salesOrder->quotation_id ?? 0), 6, '0', STR_PAD_LEFT).' / R'.($salesOrder->quotation?->revision_number ?? 1));
+    $referenceDate = $hasPurchaseOrder
+        ? $salesOrder->po_date
+        : ($salesOrder->quotation?->quoted_at ?? $salesOrder->quotation?->created_at);
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -75,10 +83,10 @@
         </p>
 
         <ol>
-            <li>Bahwa, sebelumnya Pihak Pertama dan Pihak Kedua telah mengadakan suatu kerja sama kontrak kerja berdasarkan Purchase Order (PO) Nomor : {{ $dots($salesOrder->po_number, 20) }} tanggal {{ $salesOrder->po_date ? $salesOrder->po_date->format('d-m-Y') : '...............' }}, tentang Pekerjaan {{ $dots($draft->job_title, 30) }}</li>
+            <li>Bahwa, sebelumnya Pihak Pertama dan Pihak Kedua telah mengadakan suatu kerja sama kontrak kerja berdasarkan {{ $referenceLabel }} Nomor : {{ $dots($referenceNumber, 20) }} tanggal {{ $referenceDate ? $referenceDate->format('d-m-Y') : '...............' }}, tentang Pekerjaan {{ $dots($draft->job_title, 30) }}</li>
             <li>Bahwa, Pihak Kedua telah melaksanakan {{ $dots($draft->work_description, 40) }}</li>
-            <li>Bahwa, Perjanjian tersebut telah mewajibkan Pihak Kedua untuk menyerahkan pekerjaan kepada Pihak Kesatu, sesuai dengan Purchase Order.</li>
-            <li>Bahwa, untuk melaksanakan serah terima Pekerjaan berdasarkan Purchase Order sebagaimana dimaksud angka 2 diatas, maka Pihak Kedua dengan ini menyerahkan Pekerjaan kepada Pihak Pertama sebagaimana Pihak Pertama dengan ini menerima Pekerjaan tersebut dari Pihak Kedua.</li>
+            <li>Bahwa, Perjanjian tersebut telah mewajibkan Pihak Kedua untuk menyerahkan pekerjaan kepada Pihak Kesatu, sesuai dengan {{ $referenceLabel }}.</li>
+            <li>Bahwa, untuk melaksanakan serah terima Pekerjaan berdasarkan {{ $referenceLabel }} sebagaimana dimaksud angka 2 diatas, maka Pihak Kedua dengan ini menyerahkan Pekerjaan kepada Pihak Pertama sebagaimana Pihak Pertama dengan ini menerima Pekerjaan tersebut dari Pihak Kedua.</li>
             <li>Bahwa, dengan telah dilakukannya serah terima Pekerjaan berdasarkan Berita Acara ini, maka dengan demikian kewajiban Pihak Kedua untuk menyerahkan Pekerjaan kepada Pihak Pertama dan hak Pihak Pertama untuk menerima Pekerjaan tersebut dari Pihak Kedua berdasarkan Perjanjian telah dilaksanakan.</li>
             <li>Bahwa, dengan telah dilakukannya serah terima BAST dari Pihak Kedua kepada Pihak Kesatu maka Pihak Kesatu berkewajiban untuk membayarkan sisa tagihan kepada Pihak Kedua.</li>
             <li>Bahwa, Berita Acara ini merupakan bagian dari pelaksanaan Perjanjian dan sekaligus sebagai Tanda Terima dokumen diantara Para Pihak, sehingga oleh karenanya merupakan satu kesatuan dan bagian yang tidak terpisahkan dari Perjanjian.</li>

@@ -21,7 +21,7 @@ class BastDraftController extends Controller
         $project->load([
             'salesOrder:id,number,po_number,po_date,contact_id,quotation_id',
             'salesOrder.contact:id,name,company_name,address',
-            'salesOrder.quotation:id,lead_id',
+            'salesOrder.quotation:id,number,revision_number,quoted_at,created_at,lead_id',
             'salesOrder.quotation.lead:id,pic_name,pic_position',
             'leader.technician:id,name',
             'bastDraft',
@@ -75,7 +75,11 @@ class BastDraftController extends Controller
     {
         Gate::authorize('manageBastDraft', $project);
 
-        $project->load(['salesOrder:id,number,po_number,po_date', 'bastDraft']);
+        $project->load([
+            'salesOrder:id,number,po_number,po_date,quotation_id',
+            'salesOrder.quotation:id,number,revision_number,quoted_at,created_at',
+            'bastDraft',
+        ]);
         abort_unless($project->bastDraft, 404);
 
         return view('operational.bast-drafts.print', [

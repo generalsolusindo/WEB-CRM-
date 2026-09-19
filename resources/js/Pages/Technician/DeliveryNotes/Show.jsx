@@ -12,7 +12,7 @@ export default function Show({ deliveryNote: dn, canReceive }) {
     return (
         <AppLayout>
             <Head title={dn.number} />
-            <div className="mx-auto max-w-2xl space-y-5">
+            <div className="mx-auto min-w-0 break-words max-w-2xl space-y-5">
                 <PageHeader
                     title={(
                         <span className="flex flex-wrap items-center gap-3">
@@ -24,14 +24,14 @@ export default function Show({ deliveryNote: dn, canReceive }) {
                     back={{ href: '/technician/tasks', label: 'Tugas Saya' }}
                 />
 
-                <section className="card p-6">
+                <section className="card p-4 sm:p-6">
                     <div className="text-[11px] font-bold uppercase tracking-wider text-text-faint">Alamat Pengiriman</div>
                     <div className="mt-1 whitespace-pre-line text-sm text-text">{dn.delivery_address}</div>
                 </section>
 
                 <section className="card overflow-hidden p-0">
                     <div className="border-b border-border p-5"><h2 className="font-semibold text-text">Barang Dikirim</h2></div>
-                    <table className="w-full text-left text-sm">
+                    <table className="w-full table-fixed text-left text-sm">
                         <thead className="bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint"><tr><th className="px-4 py-3">Item</th><th className="px-4 py-3 text-right">Qty Dikirim</th></tr></thead>
                         <tbody className="divide-y divide-border">
                             {dn.lines.map((l, i) => (

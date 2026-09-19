@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { FiLogOut } from 'react-icons/fi';
+import { FiLogOut, FiX } from 'react-icons/fi';
 import { getMenuForUser } from '../config/menuConfig';
 
 const ROLE_LABEL = {
@@ -19,7 +19,7 @@ function isActive(href, url) {
     return false;
 }
 
-export default function Sidebar() {
+export default function Sidebar({ onNavigate, onClose }) {
     const { auth } = usePage().props;
     const url = usePage().url;
     const items = getMenuForUser(auth);
@@ -28,7 +28,8 @@ export default function Sidebar() {
     const initial = user?.name?.charAt(0)?.toUpperCase() ?? '?';
 
     return (
-        <aside className="flex w-[248px] shrink-0 flex-col rounded-2xl border border-border bg-surface shadow-sm">
+        <aside className="relative flex h-full min-h-0 w-full shrink-0 flex-col rounded-2xl border border-border bg-surface shadow-sm">
+            {onClose && <button type="button" onClick={onClose} aria-label="Tutup menu" className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-lg text-text-muted hover:bg-bg"><FiX className="h-5 w-5" /></button>}
             {/* Brand */}
             <div className="flex flex-col items-center px-5 pb-4 pt-6 text-center">
                 <img src="/images/logo-gs.png" alt="General Solusindo" className="h-12 w-auto" />
@@ -36,7 +37,7 @@ export default function Sidebar() {
             </div>
 
             {/* Nav */}
-            <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
+            <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
                 {items.map((item, i) => {
                     const Icon = item.icon;
                     const disabled = item.href === '#';
@@ -56,6 +57,8 @@ export default function Sidebar() {
                         <Link
                             key={i}
                             href={item.href}
+                            onClick={onNavigate}
+                            aria-current={active ? 'page' : undefined}
                             className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                                 active
                                     ? 'bg-navy text-white shadow-sm'

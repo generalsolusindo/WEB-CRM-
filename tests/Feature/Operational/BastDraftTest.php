@@ -119,6 +119,34 @@ class BastDraftTest extends TestCase
         $this->assertDatabaseHas('bast_drafts', ['project_id' => $project->id, 'job_title' => 'Sudah Direvisi']);
     }
 
+    public function test_bast_print_uses_quotation_when_sales_order_has_no_po(): void
+    {
+        [$project, $ops] = $this->projectWithLead();
+        $leader = User::factory()->create(['role' => 'technician', 'is_active' => true]);
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/technicians", [
+            'technician_ids' => [$leader->id],
+            'leader_id' => $leader->id,
+        ]);
+
+        $project->salesOrder->quotation()->update([
+            'number' => 'QT-2026-001',
+            'quoted_at' => '2026-09-19',
+        ]);
+        $project->salesOrder->update(['po_number' => null, 'po_date' => null]);
+
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/bast-draft", [
+            'job_title' => 'Instalasi Router',
+        ]);
+
+        $this->actingAs($ops)->get("/operational/projects/{$project->id}/bast-draft/print")
+            ->assertOk()
+            ->assertSee('berdasarkan')
+            ->assertSee('Quotation')
+            ->assertSee('QT-2026-001')
+            ->assertSee('19-09-2026')
+            ->assertDontSee('Purchase Order (PO)');
+    }
+
     public function test_bast_number_is_auto_generated_when_left_blank_on_first_save(): void
     {
         [$project, $ops] = $this->projectWithLead();

@@ -15,7 +15,7 @@ export default function Index({ project, deliveryNotes }) {
     return (
         <AppLayout>
             <Head title={`Delivery Note — ${project.number}`} />
-            <div className="mx-auto max-w-2xl space-y-5">
+            <div className="mx-auto min-w-0 break-words max-w-2xl space-y-5">
                 <PageHeader
                     title="Delivery Note"
                     subtitle={`${project.number} · ${project.customer}`}

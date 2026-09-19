@@ -399,8 +399,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('leads', LeadController::class);
     });
 
-    // Lihat PDF quotation (bukan cuma buat/kelola) — Management & Project Manager
-    // juga boleh (dipakai di layar verifikasi/tracking mereka), buat tracking read-only.
+   
     Route::prefix('sales')->name('sales.')->middleware('role:sales,management,project_manager')->group(function () {
         Route::get('quotations/{quotation}/print', [QuotationController::class, 'print'])
             ->name('quotations.print');

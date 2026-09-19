@@ -19,7 +19,7 @@ export default function Show({ sow, canSign, signUrl, roleLabel, backHref, autoS
     return (
         <AppLayout>
             <Head title={sow.number || `SOW #${sow.id}`} />
-            <div className="mx-auto max-w-3xl space-y-5">
+            <div className="mx-auto min-w-0 break-words max-w-3xl space-y-5">
                 <PageHeader
                     title={<span className="flex flex-wrap items-center gap-3">{sow.number} — {sow.project_name} <span className="badge badge-primary">{sow.status_label}</span></span>}
                     subtitle={sow.company || sow.customer}
@@ -82,7 +82,7 @@ export default function Show({ sow, canSign, signUrl, roleLabel, backHref, autoS
                 </Section>
 
                 {canSign ? (
-                    <div className="space-y-3 rounded-xl border-2 border-navy/40 bg-navy/5 p-6 shadow-sm">
+                    <div className="space-y-3 rounded-xl border-2 border-navy/40 bg-navy/5 p-4 sm:p-6 shadow-sm">
                         <h2 className="font-semibold text-text">Perlu Tanda Tangan Anda — {roleLabel}</h2>
                         {autoSign ? (
                             <>
@@ -118,7 +118,7 @@ export default function Show({ sow, canSign, signUrl, roleLabel, backHref, autoS
 
 function Section({ title, children }) {
     return (
-        <section className="space-y-2 card p-6">
+        <section className="space-y-2 card p-4 sm:p-6">
             <h2 className="font-semibold text-text">{title}</h2>
             {children}
         </section>
@@ -139,7 +139,7 @@ function SignaturePreview({ label, name, image, at }) {
             <div className="text-[11px] font-bold uppercase tracking-wider text-text-faint">{label}</div>
             {image ? (
                 <>
-                    <img src={image} className="mt-1 h-16 border-b border-border object-contain" />
+                    <img src={image} className="mt-1 h-16 max-w-full border-b border-border object-contain" />
                     <div className="text-xs text-text-muted">{name} · {at ? new Date(at).toLocaleString('id-ID') : ''}</div>
                 </>
             ) : <div className="mt-1 text-sm text-text-muted">Belum tanda tangan</div>}

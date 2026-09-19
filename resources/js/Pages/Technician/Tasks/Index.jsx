@@ -12,7 +12,7 @@ export default function Index({ projects, statusOptions }) {
     return (
         <AppLayout>
             <Head title="Tugas Saya" />
-            <div className="mx-auto max-w-4xl space-y-5">
+            <div className="mx-auto min-w-0 break-words max-w-4xl space-y-5">
                 <PageHeader title="Tugas Saya" />
 
                 {projects.length === 0 && <EmptyState title="Belum ada project yang ditugaskan kepada Anda." />}
@@ -22,7 +22,7 @@ export default function Index({ projects, statusOptions }) {
                     return (
                         <section key={project.id} className="card overflow-hidden p-0">
                             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-5">
-                                <div>
+                                <div className="min-w-0 max-w-full">
                                     <h2 className="font-semibold text-text">{project.number}</h2>
                                     <p className="text-xs text-text-muted">{project.sales_order} · {project.customer} · status project: {project.status}{project.is_leader ? ' · Anda leader' : ''}</p>
                                     {project.status === 'in_progress' && (
@@ -31,7 +31,7 @@ export default function Index({ projects, statusOptions }) {
                                         </span>
                                     )}
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                     <Button href={`/technician/projects/${project.id}/delivery-notes`} variant="outline" size="sm">Delivery Note</Button>
                                     {project.is_leader && project.status === 'in_progress' && (
                                         <Link
@@ -44,21 +44,21 @@ export default function Index({ projects, statusOptions }) {
                                     )}
                                 </div>
                             </div>
-                            <table className="w-full text-left text-sm">
-                                <tbody className="divide-y divide-border">
+                            <div className="text-sm">
+                                <ul className="divide-y divide-border">
                                     {project.tasks.map((t) => (
-                                        <tr key={t.id} className="hover:bg-bg/70">
-                                            <td className="px-5 py-3">
+                                        <li key={t.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 hover:bg-bg/70 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:px-5">
+                                            <div className="min-w-0 first:col-span-2 sm:first:col-span-1">
                                                 <div className="font-medium text-text">{t.title}</div>
                                                 <div className="text-xs text-text-muted">{t.scheduled_date || 'Tanpa jadwal'}</div>
-                                            </td>
-                                            <td className="px-5 py-3"><span className={`badge ${taskBadge[t.status]}`}>{statusOptions.find((s) => s.value === t.status)?.label ?? t.status}</span></td>
-                                            <td className="px-5 py-3 text-right"><Link href={`/technician/tasks/${t.id}`} className="font-medium text-primary hover:underline">Buka</Link></td>
-                                        </tr>
+                                            </div>
+                                            <div className="min-w-0 first:col-span-2 sm:first:col-span-1"><span className={`badge ${taskBadge[t.status]}`}>{statusOptions.find((s) => s.value === t.status)?.label ?? t.status}</span></div>
+                                            <div className="text-right"><Link href={`/technician/tasks/${t.id}`} className="font-medium text-primary hover:underline">Buka</Link></div>
+                                        </li>
                                     ))}
-                                    {project.tasks.length === 0 && <tr><td className="px-5 py-6 text-center text-text-muted">Belum ada task.</td></tr>}
-                                </tbody>
-                            </table>
+                                    {project.tasks.length === 0 && <li><div className="px-5 py-6 text-center text-text-muted">Belum ada task.</div></li>}
+                                </ul>
+                            </div>
                         </section>
                     );
                 })}
