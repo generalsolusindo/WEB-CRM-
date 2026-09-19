@@ -111,8 +111,16 @@ export function getMenuForUser(auth) {
     const role = auth?.user?.role;
     const items = [...(menuConfig[role] ?? [])];
 
-    if (role === 'technician' && auth?.isProjectLeader === true) {
+    if ((role === 'technician' || auth?.user?.can_technician) && auth?.isProjectLeader === true) {
         items.push({ label: 'Submit BAST', href: '/technician/tasks', icon: FiCheckCircle });
+    }
+
+    if (role === 'vendor' && auth?.user?.can_technician) {
+        items.splice(1, 0, { label: 'Tugas Teknisi', href: '/technician/tasks', icon: FiTool });
+    }
+
+    if (role === 'vendor' && auth?.user?.can_surveyor) {
+        items.splice(1, 0, { label: 'Survey', href: '/technician/surveys', icon: FiClipboard });
     }
 
     return items;

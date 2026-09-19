@@ -18,6 +18,7 @@ export default function Index({ accounts, filters }) {
         { key: 'email', label: 'Email', render: (a) => <span className="text-text-muted">{a.email}</span> },
         { key: 'phone', label: 'Telepon', render: (a) => a.phone || '—' },
         { key: 'vendor', label: 'Vendor', render: (a) => a.vendor || '—' },
+        { key: 'functions', label: 'Fungsi', render: (a) => [a.can_technician && 'Teknisi', a.can_surveyor && 'Surveyor'].filter(Boolean).join(' · ') || 'PIC Vendor' },
         {
             key: 'status',
             label: 'Status',

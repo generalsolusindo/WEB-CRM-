@@ -70,7 +70,7 @@ class SowController extends Controller
                 'unit' => $item->unit,
             ]),
             'technicianOptions' => User::query()
-                ->where('role', 'technician')
+                ->where(fn ($q) => $q->where('role', 'technician')->orWhere('can_technician', true))
                 ->where('vendor_id', $project->vendor_id)
                 ->where('is_active', true)
                 ->orderBy('name')

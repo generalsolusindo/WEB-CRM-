@@ -13,7 +13,7 @@ class BastPolicy
      */
     public function create(User $user, Project $project): bool
     {
-        if ($user->role !== 'technician' || ! $user->is_active) {
+        if (! $user->canWorkAsTechnician()) {
             return false;
         }
 

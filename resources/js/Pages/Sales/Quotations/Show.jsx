@@ -1,18 +1,31 @@
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import { FiPrinter, FiEdit2, FiSend, FiCheck, FiX, FiCopy, FiTrash2, FiHash } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import CategoryBadge from '../../../Components/CategoryBadge';
-import { PageHeader, Card, CardHeader, Button, Info, InfoGrid, StatusBadge } from '../../../Components/ui';
+import { PageHeader, Card, CardHeader, Button, ConfirmDialog, Info, InfoGrid, PromptDialog, StatusBadge } from '../../../Components/ui';
 
 export default function Show({ quotation, history, totals, permissions, customerHasWhatsapp = false }) {
     const number = quotation.number ?? `QT-${String(quotation.id).padStart(6, '0')} / R${quotation.revision_number}`;
+    const [numberOpen, setNumberOpen] = useState(false);
+    const [numberProcessing, setNumberProcessing] = useState(false);
+    const [numberError, setNumberError] = useState('');
+    const [confirmation, setConfirmation] = useState(null);
+    const [actionProcessing, setActionProcessing] = useState(false);
 
-    function editNumber() {
-        const value = window.prompt('Nomor quotation baru:', quotation.number ?? '');
-        if (value && value.trim() !== '' && value.trim() !== quotation.number) {
-            router.patch(`/sales/quotations/${quotation.id}/number`, { number: value.trim() }, { preserveScroll: true });
+    function editNumber(value) {
+        if (value === quotation.number) {
+            setNumberOpen(false);
+            return;
         }
+        setNumberError('');
+        setNumberProcessing(true);
+        router.patch(`/sales/quotations/${quotation.id}/number`, { number: value }, {
+            preserveScroll: true,
+            onSuccess: () => setNumberOpen(false),
+            onError: (errors) => setNumberError(errors.number ?? 'Nomor quotation gagal diubah.'),
+            onFinish: () => setNumberProcessing(false),
+        });
     }
     const validUntil = quotation.valid_until
         ? new Date(quotation.valid_until).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -20,17 +33,36 @@ export default function Show({ quotation, history, totals, permissions, customer
     const orderedLines = [...quotation.lines].sort(
         (a, b) => (a.category === 'material' ? 0 : 1) - (b.category === 'material' ? 0 : 1),
     );
-    function action(path, message) { if (confirm(message)) router.post(path); }
-    function destroy() {
+    function askAction(config) {
+        setConfirmation(config);
+    }
+
+    function runAction() {
+        if (!confirmation) return;
+        setActionProcessing(true);
+        const method = confirmation.method ?? 'post';
+        router[method](confirmation.path, confirmation.data ?? {}, {
+            preserveScroll: true,
+            onSuccess: () => setConfirmation(null),
+            onFinish: () => setActionProcessing(false),
+        });
+    }
+
+    function askDestroy() {
         let warning = `Hapus quotation ${number} ini? Tindakan ini tidak bisa dibatalkan.`;
         if (quotation.status === 'confirmed') {
             warning = `Quotation ${number} ini sudah Confirmed — Sales Order-nya akan ikut terhapus sekaligus. Tindakan ini tidak bisa dibatalkan. Tetap hapus?`;
         } else if (quotation.whatsapp_sent_at) {
             warning = `Quotation ${number} ini sudah pernah dikirim ke customer lewat WhatsApp. Menghapusnya tidak akan menarik kembali pesan yang sudah diterima customer, dan tidak bisa dibatalkan. Tetap hapus?`;
         }
-        if (confirm(warning)) {
-            router.delete(`/sales/quotations/${quotation.id}`);
-        }
+        askAction({
+            title: 'Hapus quotation?',
+            description: warning,
+            confirmLabel: 'Hapus Quotation',
+            tone: 'danger',
+            method: 'delete',
+            path: `/sales/quotations/${quotation.id}`,
+        });
     }
 
     function sendWhatsapp() {
@@ -59,7 +91,7 @@ export default function Show({ quotation, history, totals, permissions, customer
                     actions={
                         <>
                             <Button href={`/sales/quotations/${quotation.id}/print`} external variant="outline" icon={FiPrinter}>Cetak / PDF</Button>
-                            {permissions.updateNumber && <Button onClick={editNumber} variant="outline" icon={FiHash}>Ubah Nomor</Button>}
+                            {permissions.updateNumber && <Button onClick={() => { setNumberError(''); setNumberOpen(true); }} variant="outline" icon={FiHash}>Ubah Nomor</Button>}
                             {permissions.update && <Button href={`/sales/quotations/${quotation.id}/edit`} variant="outline" icon={FiEdit2}>Edit</Button>}
                             {permissions.sendWhatsapp && (
                                 <Button
@@ -71,13 +103,39 @@ export default function Show({ quotation, history, totals, permissions, customer
                                     {quotation.whatsapp_sent_at ? 'Kirim Ulang via WhatsApp' : 'Kirim via WhatsApp'}
                                 </Button>
                             )}
-                            {permissions.send && <Button onClick={() => action(`/sales/quotations/${quotation.id}/send`, 'Tandai quotation sudah dikirim ke customer?')} icon={FiSend}>Tandai Terkirim</Button>}
+                            {permissions.send && <Button onClick={() => askAction({ title: 'Tandai quotation sebagai terkirim?', description: 'Status quotation akan diperbarui menjadi sudah dikirim ke customer.', confirmLabel: 'Tandai Terkirim', tone: 'info', path: `/sales/quotations/${quotation.id}/send` })} icon={FiSend}>Tandai Terkirim</Button>}
                             {permissions.confirm && <Button href={`/sales/quotations/${quotation.id}/confirm`} icon={FiCheck}>Confirm Deal</Button>}
-                            {permissions.reject && <Button onClick={() => action(`/sales/quotations/${quotation.id}/reject`, 'Tandai quotation ditolak customer?')} variant="ghost" icon={FiX} className="text-danger hover:bg-danger-soft hover:text-danger">Tandai Ditolak</Button>}
-                            {permissions.revise && <Button onClick={() => action(`/sales/quotations/${quotation.id}/revisions`, 'Buat revision baru dari quotation ini?')} variant="outline" icon={FiCopy}>Buat Revisi</Button>}
-                            {permissions.delete && <Button onClick={destroy} variant="ghost" icon={FiTrash2} className="text-danger hover:bg-danger-soft hover:text-danger">Hapus</Button>}
+                            {permissions.reject && <Button onClick={() => askAction({ title: 'Tandai quotation sebagai ditolak?', description: 'Status quotation akan berubah menjadi ditolak oleh customer.', confirmLabel: 'Tandai Ditolak', tone: 'danger', path: `/sales/quotations/${quotation.id}/reject` })} variant="ghost" icon={FiX} className="text-danger hover:bg-danger-soft hover:text-danger">Tandai Ditolak</Button>}
+                            {permissions.revise && <Button onClick={() => askAction({ title: 'Buat revisi quotation?', description: 'Sistem akan membuat revisi baru berdasarkan data quotation ini.', confirmLabel: 'Buat Revisi', tone: 'info', path: `/sales/quotations/${quotation.id}/revisions` })} variant="outline" icon={FiCopy}>Buat Revisi</Button>}
+                            {permissions.delete && <Button onClick={askDestroy} variant="ghost" icon={FiTrash2} className="text-danger hover:bg-danger-soft hover:text-danger">Hapus</Button>}
                         </>
                     }
+                />
+
+                <PromptDialog
+                    open={numberOpen}
+                    onClose={() => setNumberOpen(false)}
+                    onConfirm={editNumber}
+                    title="Ubah nomor quotation"
+                    description="Masukkan nomor quotation yang baru. Nomor harus unik."
+                    label="Nomor quotation"
+                    initialValue={quotation.number ?? ''}
+                    required
+                    maxLength={100}
+                    error={numberError}
+                    processing={numberProcessing}
+                    confirmLabel="Simpan Nomor"
+                />
+
+                <ConfirmDialog
+                    open={Boolean(confirmation)}
+                    onClose={() => setConfirmation(null)}
+                    onConfirm={runAction}
+                    title={confirmation?.title}
+                    description={confirmation?.description}
+                    tone={confirmation?.tone}
+                    confirmLabel={confirmation?.confirmLabel}
+                    processing={actionProcessing}
                 />
 
                 <Card>

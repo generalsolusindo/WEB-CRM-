@@ -116,7 +116,7 @@ class SurveyController extends Controller
             'canCancel' => request()->user()->can('cancel', $survey),
             'canManageTeam' => request()->user()->can('updateTeam', $survey),
             'surveyorOptions' => \App\Models\User::query()
-                ->where('role', 'technician')
+                ->where(fn ($q) => $q->where('role', 'technician')->orWhere('can_surveyor', true))
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name', 'phone', 'vendor_id'])

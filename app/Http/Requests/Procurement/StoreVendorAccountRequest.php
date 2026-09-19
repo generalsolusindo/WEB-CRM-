@@ -31,6 +31,8 @@ class StoreVendorAccountRequest extends FormRequest
                 'exists:vendors,id',
                 Rule::unique('users', 'vendor_id')->where(fn ($query) => $query->where('role', 'vendor')),
             ],
+            'can_technician' => ['sometimes', 'boolean'],
+            'can_surveyor' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
@@ -47,6 +49,8 @@ class StoreVendorAccountRequest extends FormRequest
     {
         $this->merge([
             'is_active' => $this->boolean('is_active', true),
+            'can_technician' => $this->boolean('can_technician'),
+            'can_surveyor' => $this->boolean('can_surveyor'),
             'username' => Str::lower(trim((string) $this->input('username'))),
         ]);
     }

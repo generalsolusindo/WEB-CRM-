@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { FiUserPlus, FiEdit2, FiTrash2, FiMessageCircle, FiGitMerge } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, Card, CardHeader, Button, Info, InfoGrid, StatusBadge, EmptyState, Modal, Select } from '../../../Components/ui';
+import { PageHeader, Card, CardHeader, Button, ConfirmDialog, Info, InfoGrid, StatusBadge, EmptyState, Modal, Select } from '../../../Components/ui';
 import { contactWhatsappLink } from '../../../Utils/whatsapp';
 
 export default function Show({ contact, leads, npwpDocumentUrl = null, otherContacts = [] }) {
@@ -11,17 +11,20 @@ export default function Show({ contact, leads, npwpDocumentUrl = null, otherCont
     const [mergeOpen, setMergeOpen] = useState(false);
     const [duplicateId, setDuplicateId] = useState('');
     const [merging, setMerging] = useState(false);
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     function destroy() {
-        if (confirm('Hapus contact ini?')) router.delete(`/sales/contacts/${contact.id}`);
+        setDeleting(true);
+        router.delete(`/sales/contacts/${contact.id}`, {
+            preserveScroll: true,
+            onSuccess: () => setDeleteOpen(false),
+            onFinish: () => setDeleting(false),
+        });
     }
 
     function submitMerge() {
         if (!duplicateId) return;
-        const duplicate = otherContacts.find((c) => String(c.id) === String(duplicateId));
-        if (!confirm(`Gabungkan "${duplicate?.name}" ke "${contact.name}"? Semua lead, quotation, dan dokumen milik "${duplicate?.name}" akan dipindah ke sini, lalu "${duplicate?.name}" akan dihapus. Tindakan ini tidak bisa dibatalkan.`)) {
-            return;
-        }
         setMerging(true);
         router.post(`/sales/contacts/${contact.id}/merge`, { duplicate_contact_id: duplicateId }, {
             onFinish: () => setMerging(false),
@@ -54,12 +57,12 @@ export default function Show({ contact, leads, npwpDocumentUrl = null, otherCont
                             {otherContacts.length > 0 && (
                                 <Button onClick={() => setMergeOpen(true)} variant="outline" icon={FiGitMerge}>Gabungkan Duplikat</Button>
                             )}
-                            <Button onClick={destroy} variant="ghost" icon={FiTrash2} className="text-danger hover:bg-danger-soft hover:text-danger">Hapus</Button>
+                            <Button onClick={() => setDeleteOpen(true)} variant="ghost" icon={FiTrash2} className="text-danger hover:bg-danger-soft hover:text-danger">Hapus</Button>
                         </>
                     }
                 />
 
-                <Modal open={mergeOpen} onClose={() => setMergeOpen(false)} title="Gabungkan Contact Duplikat" size="sm"
+                <Modal open={mergeOpen} onClose={() => setMergeOpen(false)} title="Gabungkan Contact Duplikat" size="sm" busy={merging}
                     footer={(
                         <>
                             <Button variant="outline" onClick={() => setMergeOpen(false)}>Batal</Button>
@@ -80,7 +83,23 @@ export default function Show({ contact, leads, npwpDocumentUrl = null, otherCont
                             <option key={c.id} value={c.id}>{c.name}{c.company_name ? ` · ${c.company_name}` : ''}</option>
                         ))}
                     </Select>
+                    {duplicateId && (
+                        <p className="mt-3 rounded-xl border border-danger/20 bg-danger-soft px-3 py-2 text-xs leading-relaxed text-danger">
+                            Contact yang dipilih akan dihapus permanen setelah seluruh data terkait dipindahkan ke {contact.name}.
+                        </p>
+                    )}
                 </Modal>
+
+                <ConfirmDialog
+                    open={deleteOpen}
+                    onClose={() => setDeleteOpen(false)}
+                    onConfirm={destroy}
+                    title="Hapus contact?"
+                    description={`Contact ${contact.name} akan dihapus. Tindakan ini tidak bisa dibatalkan.`}
+                    tone="danger"
+                    confirmLabel="Hapus Contact"
+                    processing={deleting}
+                />
 
                 <Card>
                     <InfoGrid>

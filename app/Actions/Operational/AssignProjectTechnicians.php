@@ -33,7 +33,9 @@ class AssignProjectTechnicians
 
             $validCount = User::query()
                 ->whereIn('id', $ids)
-                ->where('role', 'technician')
+                ->where(fn ($query) => $query
+                    ->where('role', 'technician')
+                    ->orWhere('can_technician', true))
                 ->where('is_active', true)
                 ->count();
 

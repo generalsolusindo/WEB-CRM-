@@ -25,14 +25,14 @@ class SowPolicy
             return $sow->project->delegated_to === $user->id;
         }
 
-        if ($this->isTechnician($user)) {
-            return $sow->technician_id === $user->id
-                && in_array($sow->status, SowStatus::visibleToTechnicianValues(), true);
-        }
-
         if ($this->isVendor($user)) {
             return $sow->project->vendor_id === $user->vendor_id
                 && in_array($sow->status, SowStatus::visibleToVendorValues(), true);
+        }
+
+        if ($this->isTechnician($user)) {
+            return $sow->technician_id === $user->id
+                && in_array($sow->status, SowStatus::visibleToTechnicianValues(), true);
         }
 
         return false;
@@ -54,7 +54,7 @@ class SowPolicy
     /** Teknisi yang ditunjuk menandatangani SOW. */
     public function signAsTechnician(User $user, Sow $sow): bool
     {
-        return $this->isTechnician($user)
+        return $user->canWorkAsTechnician()
             && $sow->technician_id === $user->id
             && $sow->status === SowStatus::PendingTechnicianSignature->value;
     }
@@ -115,7 +115,7 @@ class SowPolicy
 
     private function isTechnician(User $user): bool
     {
-        return $user->role === 'technician' && $user->is_active;
+        return $user->canWorkAsTechnician();
     }
 
     private function isVendor(User $user): bool

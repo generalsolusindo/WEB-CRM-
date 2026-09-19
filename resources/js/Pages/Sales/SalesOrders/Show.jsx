@@ -1,13 +1,16 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import { FiAward } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { Totals } from '../Quotations/Show';
 import CategoryBadge from '../../../Components/CategoryBadge';
 import { pickFile } from '../../../utils/fileValidation';
-import { PageHeader, Button, StatusBadge } from '../../../Components/ui';
+import { PageHeader, Button, ConfirmDialog, StatusBadge } from '../../../Components/ui';
 
 export default function Show({ salesOrder, totals, approvalDocs = [], canManageDocs = false, orderTypeLabel, paymentRuleLabel, requiredSettlementPhase, canCloseAsWon }) {
     const docForm = useForm({ signed_quotation: null, purchase_order: null, po_number: salesOrder.po_number ?? '', po_date: salesOrder.po_date ?? '' });
+    const [closeOpen, setCloseOpen] = useState(false);
+    const [closing, setClosing] = useState(false);
     function saveDocs(e) {
         e.preventDefault();
         docForm.post(`/sales/sales-orders/${salesOrder.id}/documents`, {
@@ -20,9 +23,12 @@ export default function Show({ salesOrder, totals, approvalDocs = [], canManageD
     const completed = salesOrder.status === 'completed';
 
     function closeAsWon() {
-        if (confirm('Tutup transaksi ini sebagai Won? Status Lead akan berubah menjadi Won.')) {
-            router.post(`/sales/sales-orders/${salesOrder.id}/close-won`);
-        }
+        setClosing(true);
+        router.post(`/sales/sales-orders/${salesOrder.id}/close-won`, {}, {
+            preserveScroll: true,
+            onSuccess: () => setCloseOpen(false),
+            onFinish: () => setClosing(false),
+        });
     }
 
     return <AppLayout><Head title={number} /><div className="mx-auto max-w-6xl space-y-5">
@@ -30,7 +36,18 @@ export default function Show({ salesOrder, totals, approvalDocs = [], canManageD
             title={<span className="flex items-center gap-3">{number} <StatusBadge status={salesOrder.status} label={label(salesOrder.status)} /></span>}
             subtitle={`${salesOrder.contact.name} · ${salesOrder.contact.company_name || 'Tanpa perusahaan'}`}
             back={{ href: '/sales/sales-orders', label: 'Kembali ke Sales Orders' }}
-            actions={canCloseAsWon && <Button onClick={closeAsWon} icon={FiAward}>Tandai Won</Button>}
+            actions={canCloseAsWon && <Button onClick={() => setCloseOpen(true)} icon={FiAward}>Tandai Won</Button>}
+        />
+
+        <ConfirmDialog
+            open={closeOpen}
+            onClose={() => setCloseOpen(false)}
+            onConfirm={closeAsWon}
+            title="Tutup transaksi sebagai Won?"
+            description="Status Sales Order akan menjadi selesai dan status Lead akan berubah menjadi Won."
+            tone="success"
+            confirmLabel="Ya, Tandai Won"
+            processing={closing}
         />
 
         <section className={`rounded-xl border p-5 ${completed ? 'border-success/30 bg-success/5' : canCloseAsWon ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'}`}><h2 className="font-semibold text-text">Status Penyelesaian Deal</h2><p className="mt-1 text-sm text-text-muted">{completed ? 'Deal sudah ditutup sebagai Won dan status Lead sudah diperbarui.' : canCloseAsWon ? 'Pembayaran wajib dan bukti pembayaran sudah lengkap. Deal siap ditutup sebagai Won.' : `Menunggu invoice fase ${phaseLabel(requiredSettlementPhase)} berstatus Paid dan memiliki bukti pembayaran.`}</p></section>

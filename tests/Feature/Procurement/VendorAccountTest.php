@@ -52,6 +52,30 @@ class VendorAccountTest extends TestCase
         $this->assertDatabaseMissing('users', ['email' => 'pic-kedua@vendor.test']);
     }
 
+    public function test_vendor_pic_can_keep_vendor_role_and_still_qualify_for_technician_and_surveyor_work(): void
+    {
+        $vendor = Vendor::create(['name' => 'Vendor Multi Func', 'provides_technical' => true, 'provides_survey' => true]);
+        $pic = User::factory()->create([
+            'role' => 'vendor',
+            'vendor_id' => $vendor->id,
+            'can_technician' => true,
+            'can_surveyor' => true,
+            'is_active' => true,
+        ]);
+
+        $this->assertSame('vendor', $pic->role);
+        $this->assertTrue($pic->canWorkAsTechnician());
+        $this->assertTrue($pic->canWorkAsSurveyor());
+        $this->assertTrue(User::query()
+            ->where(fn ($q) => $q->where('role', 'technician')->orWhere('can_technician', true))
+            ->where('id', $pic->id)
+            ->exists());
+        $this->assertTrue(User::query()
+            ->where(fn ($q) => $q->where('role', 'technician')->orWhere('can_surveyor', true))
+            ->where('id', $pic->id)
+            ->exists());
+    }
+
     public function test_procurement_can_upload_ktp_and_nik_when_creating_vendor_account(): void
     {
         Storage::fake('local');

@@ -39,6 +39,8 @@ class VendorAccountController extends Controller
                 'email' => $user->email,
                 'phone' => $user->phone,
                 'is_active' => $user->is_active,
+                'can_technician' => $user->can_technician,
+                'can_surveyor' => $user->can_surveyor,
                 'vendor' => $user->vendor?->name,
             ]);
 
@@ -70,6 +72,8 @@ class VendorAccountController extends Controller
             'password' => Hash::make($data['password']),
             'role' => 'vendor',
             'vendor_id' => $data['vendor_id'],
+            'can_technician' => $data['can_technician'] ?? false,
+            'can_surveyor' => $data['can_surveyor'] ?? false,
             'is_active' => $data['is_active'] ?? true,
         ]);
 
@@ -85,7 +89,7 @@ class VendorAccountController extends Controller
         abort_unless($vendorAccount->role === 'vendor', 404);
 
         return Inertia::render('Procurement/VendorAccounts/Form', [
-            'account' => $vendorAccount->only('id', 'name', 'username', 'email', 'phone', 'nik', 'vendor_id', 'is_active'),
+            'account' => $vendorAccount->only('id', 'name', 'username', 'email', 'phone', 'nik', 'vendor_id', 'can_technician', 'can_surveyor', 'is_active'),
             'vendorOptions' => $this->availableVendorOptions($vendorAccount->vendor_id),
             'ktpDocumentUrl' => $this->ktpDocumentUrl($vendorAccount),
         ]);
@@ -104,6 +108,8 @@ class VendorAccountController extends Controller
             'phone' => $data['phone'] ?? null,
             'nik' => $data['nik'] ?? null,
             'vendor_id' => $data['vendor_id'],
+            'can_technician' => $data['can_technician'] ?? false,
+            'can_surveyor' => $data['can_surveyor'] ?? false,
             'is_active' => $data['is_active'] ?? true,
         ]);
 

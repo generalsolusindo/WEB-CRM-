@@ -20,7 +20,9 @@ class UpdateSurveyTeamRequest extends FormRequest
             'surveyor_ids.*' => [
                 'integer',
                 'distinct',
-                Rule::exists('users', 'id')->where(fn ($q) => $q->where('role', 'technician')->where('is_active', true)),
+                Rule::exists('users', 'id')->where(fn ($q) => $q
+                    ->where(fn ($query) => $query->where('role', 'technician')->orWhere('can_surveyor', true))
+                    ->where('is_active', true)),
             ],
             'leader_id' => ['required', 'integer', Rule::in($this->input('surveyor_ids', []))],
         ];

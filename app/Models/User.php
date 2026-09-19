@@ -52,6 +52,8 @@ class User extends Authenticatable
         'password',
         'role',
         'vendor_id',
+        'can_technician',
+        'can_surveyor',
         'is_active',
     ];
 
@@ -76,7 +78,19 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'can_technician' => 'boolean',
+            'can_surveyor' => 'boolean',
         ];
+    }
+
+    public function canWorkAsTechnician(): bool
+    {
+        return $this->is_active && ($this->role === 'technician' || $this->can_technician);
+    }
+
+    public function canWorkAsSurveyor(): bool
+    {
+        return $this->is_active && ($this->role === 'technician' || $this->can_surveyor);
     }
 
     /**

@@ -117,7 +117,8 @@ class ProjectController extends Controller
             'statusOptions' => ProjectStatus::options(),
             'availabilityOptions' => ActualProcurementStatus::options(),
             'technicianOptions' => User::query()
-                ->where('role', 'technician')->where('is_active', true)
+                ->where(fn ($q) => $q->where('role', 'technician')->orWhere('can_technician', true))
+                ->where('is_active', true)
                 ->orderBy('name')->get(['id', 'name']),
             'vendorOptions' => \App\Models\Vendor::query()
                 ->where('provides_technical', true)

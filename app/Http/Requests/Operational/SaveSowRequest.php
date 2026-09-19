@@ -53,7 +53,9 @@ class SaveSowRequest extends FormRequest
             'technician_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('users', 'id')->where('role', 'technician')->where('vendor_id', $project?->vendor_id),
+                Rule::exists('users', 'id')
+                    ->where(fn ($q) => $q->where(fn ($query) => $query->where('role', 'technician')->orWhere('can_technician', true)))
+                    ->where('vendor_id', $project?->vendor_id),
             ],
             'technician_team_note' => ['nullable', 'string', 'max:500'],
             'client_pic_name' => ['nullable', 'string', 'max:255'],

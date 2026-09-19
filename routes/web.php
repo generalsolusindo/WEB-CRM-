@@ -233,7 +233,7 @@ Route::middleware('auth')->group(function () {
         Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
     });
 
-    Route::prefix('technician')->name('technician.')->middleware('role:technician')->group(function () {
+    Route::prefix('technician')->name('technician.')->middleware('role:technician,vendor')->group(function () {
         Route::get('surveys', [TechnicianSurveyController::class, 'index'])->name('surveys.index');
         Route::get('surveys/{survey}', [TechnicianSurveyController::class, 'show'])->name('surveys.show');
         Route::put('surveys/{survey}/report', [TechnicianSurveyController::class, 'saveReport'])->name('surveys.report.save');

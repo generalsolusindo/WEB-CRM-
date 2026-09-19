@@ -47,8 +47,10 @@ class HandleInertiaRequests extends Middleware
                     'name' => $user->name,
                     'email' => $user->email,
                     'role' => $user->role,
+                    'can_technician' => $user->can_technician,
+                    'can_surveyor' => $user->can_surveyor,
                 ] : null,
-                'isProjectLeader' => $user && $user->role === 'technician'
+                'isProjectLeader' => $user && $user->canWorkAsTechnician()
                     ? DB::table('project_technicians')
                         ->where('technician_id', $user->id)
                         ->where('is_leader', true)

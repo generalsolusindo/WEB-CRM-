@@ -151,8 +151,7 @@ class ProjectPolicy
     /** Absen kehadiran (selfie) — anggota tim teknisi, hanya selama project berjalan. */
     public function checkIn(User $user, Project $project): bool
     {
-        return $user->role === 'technician'
-            && $user->is_active
+        return $user->canWorkAsTechnician()
             && $project->status === ProjectStatus::InProgress->value
             && $project->technicians()->where('technician_id', $user->id)->exists();
     }

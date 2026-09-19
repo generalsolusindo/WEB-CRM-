@@ -14,6 +14,8 @@ export default function Form({ account = null, vendorOptions = [], ktpDocumentUr
         password: '',
         password_confirmation: '',
         vendor_id: account?.vendor_id ?? '',
+        can_technician: account?.can_technician ?? false,
+        can_surveyor: account?.can_surveyor ?? false,
         is_active: account?.is_active ?? true,
     });
 
@@ -74,6 +76,20 @@ export default function Form({ account = null, vendorOptions = [], ktpDocumentUr
                             <Field label="Konfirmasi Password">
                                 <Input type="password" value={data.password_confirmation} onChange={(e) => setData('password_confirmation', e.target.value)} />
                             </Field>
+                        </div>
+                        <div className="rounded-xl border border-border bg-surface-2 p-4">
+                            <h2 className="text-sm font-semibold text-text">Fungsi Tambahan</h2>
+                            <p className="mt-1 text-xs text-text-muted">PIC Vendor tetap dapat menandatangani SOW, dan dapat diberi fungsi lapangan berikut.</p>
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                <label className="flex items-center gap-2 text-sm font-medium text-text">
+                                    <input type="checkbox" checked={data.can_technician} onChange={(e) => setData('can_technician', e.target.checked)} className="accent-navy" />
+                                    Dapat ditugaskan sebagai Teknisi
+                                </label>
+                                <label className="flex items-center gap-2 text-sm font-medium text-text">
+                                    <input type="checkbox" checked={data.can_surveyor} onChange={(e) => setData('can_surveyor', e.target.checked)} className="accent-navy" />
+                                    Dapat ditugaskan sebagai Surveyor
+                                </label>
+                            </div>
                         </div>
                         <label className="flex items-center gap-2 text-sm font-medium text-text">
                             <input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} className="accent-navy" />

@@ -31,7 +31,7 @@ class ProjectTaskPolicy
 
     private function isProjectMember(User $user, ProjectTask $task): bool
     {
-        if ($user->role !== 'technician' || ! $user->is_active) {
+        if (! $user->canWorkAsTechnician()) {
             return false;
         }
 

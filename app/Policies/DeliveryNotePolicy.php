@@ -49,7 +49,7 @@ class DeliveryNotePolicy
 
     private function isProjectMember(User $user, DeliveryNote $deliveryNote): bool
     {
-        if ($user->role !== 'technician' || ! $user->is_active) {
+        if (! $user->canWorkAsTechnician()) {
             return false;
         }
 
@@ -60,7 +60,7 @@ class DeliveryNotePolicy
 
     private function isProjectLeader(User $user, DeliveryNote $deliveryNote): bool
     {
-        if ($user->role !== 'technician' || ! $user->is_active) {
+        if (! $user->canWorkAsTechnician()) {
             return false;
         }
 

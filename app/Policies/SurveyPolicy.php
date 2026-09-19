@@ -155,8 +155,7 @@ class SurveyPolicy
     /** Surveyor yang ditugaskan melihat survey-nya. */
     public function viewAsSurveyor(User $user, Survey $survey): bool
     {
-        return $user->role === 'technician'
-            && $user->is_active
+        return $user->canWorkAsSurveyor()
             && $survey->isSurveyor($user);
     }
 
@@ -186,8 +185,7 @@ class SurveyPolicy
     /** Hanya leader tim yang boleh mengirim laporan final ke Operasional. */
     public function submitReport(User $user, Survey $survey): bool
     {
-        return $user->role === 'technician'
-            && $user->is_active
+        return $user->canWorkAsSurveyor()
             && $survey->isLeader($user)
             && $survey->status === SurveyStatus::InProgress->value
             && $survey->hasCheckedIn($user);
