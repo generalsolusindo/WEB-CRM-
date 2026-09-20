@@ -8,6 +8,7 @@ use App\Actions\Procurement\SubmitProcurementPayment;
 use App\Enums\ActualProcurementStatus;
 use App\Enums\ProcurementPaymentStatus;
 use App\Http\Controllers\Concerns\BuildsProcurementPaymentView;
+use App\Http\Controllers\Concerns\BuildsVendorServicePayload;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Procurement\SaveProcurementSourcingRequest;
 use App\Models\ActualProcurement;
@@ -15,6 +16,8 @@ use App\Models\ProcurementPayment;
 use App\Models\Project;
 use App\Models\Vendor;
 use App\Models\VendorProduct;
+use App\Models\VendorServicePayment;
+use App\Models\WarehouseItem;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -23,18 +26,22 @@ use Inertia\Response;
 class ProjectProcurementController extends Controller
 {
     use BuildsProcurementPaymentView;
+    use BuildsVendorServicePayload;
 
     public function index(): Response
     {
         Gate::authorize('viewAny', ProcurementPayment::class);
 
         $projects = Project::query()
-            ->whereHas('actualProcurements')
+            ->where(fn ($q) => $q->whereHas('actualProcurements')
+                ->orWhere('needs_outside_vendor', true)
+                ->orWhereHas('vendorServicePayment'))
             ->where('status', '!=', 'completed')
             ->with([
                 'salesOrder:id,number,contact_id',
                 'salesOrder.contact:id,name',
                 'procurementPayment',
+                'vendorServicePayment.vendor:id,name',
             ])
             ->withCount([
                 'actualProcurements as items_count',
@@ -52,6 +59,10 @@ class ProjectProcurementController extends Controller
                 'payment_status' => $p->procurementPayment?->status->value,
                 'payment_status_label' => $p->procurementPayment?->status->label() ?? 'Belum diajukan',
                 'payment_number' => $p->procurementPayment?->number,
+                'needs_outside_vendor' => $p->needs_outside_vendor,
+                'vendor_service_status' => $p->vendorServicePayment?->status->value,
+                'vendor_service_status_label' => $p->vendorServicePayment?->status->label(),
+                'vendor_name' => $p->vendorServicePayment?->vendor?->name,
             ]);
 
         return Inertia::render('Procurement/ProjectProcurements/Index', [
@@ -69,6 +80,7 @@ class ProjectProcurementController extends Controller
             'actualProcurements' => fn ($q) => $q->orderBy('id'),
             'actualProcurements.vendor:id,name',
             'actualProcurements.warehouseItem:id,name,unit,qty_on_hand',
+            'vendorServicePayment.vendor:id,name',
             'procurementPayment.lumpSumVendor:id,name',
             'procurementPayment.pmReviewedBy:id,name',
             'procurementPayment.financePaidBy:id,name',
@@ -88,7 +100,12 @@ class ProjectProcurementController extends Controller
                 'customer' => $project->salesOrder->contact->name ?? '—',
                 'company' => $project->salesOrder->contact->company_name,
                 'sales_order' => $project->salesOrder->number,
+                'needs_outside_vendor' => $project->needs_outside_vendor,
             ],
+            'vendorService' => $this->vendorServicePayload($project->vendorServicePayment),
+            'vendorOptions' => Vendor::query()->where('provides_technical', true)->orderBy('name')->get(['id', 'name', 'bank_account_note']),
+            'serviceCostEstimate' => round((float) $project->salesOrder->lines()->where('category', 'service')->get()->sum(fn ($l) => (float) $l->qty * (float) $l->cost_price), 2),
+            'canManageVendorService' => request()->user()->can('manage', [VendorServicePayment::class, $project]),
             'items' => $project->actualProcurements->map(fn ($item) => [
                 'id' => $item->id,
                 'item_name' => $item->item_name,
@@ -144,7 +161,7 @@ class ProjectProcurementController extends Controller
                 ->with('vendor:id,name,bank_account_note')
                 ->orderBy('item_name')
                 ->get(['id', 'vendor_id', 'item_name', 'price', 'unit']),
-            'warehouseItems' => \App\Models\WarehouseItem::query()
+            'warehouseItems' => WarehouseItem::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'unit', 'qty_on_hand']),
         ]);

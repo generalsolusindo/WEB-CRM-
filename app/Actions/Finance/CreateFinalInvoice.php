@@ -5,6 +5,7 @@ namespace App\Actions\Finance;
 use App\Enums\InvoicePhase;
 use App\Enums\InvoiceStatus;
 use App\Enums\OrderType;
+use App\Enums\SalesOrderStatus;
 use App\Models\Invoice;
 use App\Models\SalesOrder;
 use App\Models\User;
@@ -24,6 +25,12 @@ class CreateFinalInvoice
                 ->whereKey($salesOrder->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            if ($order->status === SalesOrderStatus::Cancelled->value) {
+                throw ValidationException::withMessages([
+                    'sales_order' => 'Sales Order yang sudah dibatalkan tidak dapat dibuatkan invoice pelunasan.',
+                ]);
+            }
 
             if ($order->order_type === OrderType::MaterialOnly->value) {
                 throw ValidationException::withMessages([

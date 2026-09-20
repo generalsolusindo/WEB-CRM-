@@ -5,6 +5,7 @@ namespace App\Actions\Sales;
 use App\Enums\LeadStage;
 use App\Enums\QuotationStatus;
 use App\Models\ProcurementRequest;
+use App\Models\ProcurementRequestLine;
 use App\Models\Quotation;
 use App\Models\Tax;
 use App\Models\User;
@@ -13,6 +14,7 @@ use App\Services\Notifications\Notify;
 use App\Services\Sales\AgreedDpp;
 use App\Services\Sales\LinePricing;
 use App\Support\QuotationDefaults;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -91,16 +93,16 @@ class CreateQuotation
     }
 
     /**
-     * @param  \App\Models\ProcurementRequestLine  $source
+     * @param  ProcurementRequestLine  $source
      * @param  array<string, mixed>  $input
-     * @param  \Illuminate\Support\Collection<int, mixed>  $taxRates
+     * @param  Collection<int, mixed>  $taxRates
      * @return array<string, mixed>
      */
     private function buildLine($source, array $input, $taxRates): array
     {
         $taxId = $input['tax_id'] ?? $source->tax_id;
         $taxRate = $input['tax_rate'] ?? ($taxId ? (float) ($taxRates[$taxId] ?? 0) : 0.0);
-        $qty = isset($input['qty']) && $input['qty'] !== '' ? (float) $input['qty'] : (float) $source->qty;
+        $qty = (float) $source->qty;
 
         $priced = LinePricing::resolve(
             $qty,
@@ -110,22 +112,14 @@ class CreateQuotation
             isset($input['discount_amount']) ? (float) $input['discount_amount'] : null,
         );
 
-        $category = in_array($input['category'] ?? null, ['material', 'service', 'reimburse'], true)
-            ? $input['category']
-            : ($source->category ?? $source->vendorProduct?->category ?? 'material');
-
         return [
             'procurement_request_line_id' => $source->id,
-            'item_name' => ($input['item_name'] ?? '') !== '' ? $input['item_name'] : $source->item_name,
-            'category' => $category,
-            'description' => array_key_exists('description', $input)
-                ? ($input['description'] ?: null)
-                : $source->description,
-            'sourcing_note' => array_key_exists('sourcing_note', $input)
-                ? ($input['sourcing_note'] ?: null)
-                : $source->sourcing_note,
+            'item_name' => $source->item_name,
+            'category' => $source->category ?? $source->vendorProduct?->category ?? 'material',
+            'description' => $source->description,
+            'sourcing_note' => $source->sourcing_note,
             'qty' => $qty,
-            'unit' => ($input['unit'] ?? '') !== '' ? $input['unit'] : $source->unit,
+            'unit' => $source->unit,
             'cost_price' => $source->cost_price,
             'selling_price' => $input['selling_price'],
             'discount_percent' => $priced['discount_percent'],

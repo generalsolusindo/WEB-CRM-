@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { FiPlay, FiCheck, FiXCircle } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import CategoryBadge from '../../../Components/CategoryBadge';
-import { PageHeader, Card, Button, Modal, StatusBadge, CurrencyInput } from '../../../Components/ui';
+import { PageHeader, Card, Button, ConfirmDialog, Modal, StatusBadge, CurrencyInput } from '../../../Components/ui';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -13,15 +13,22 @@ function Alert({ text }) {
     return <div className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">{text}</div>;
 }
 
-export default function Show({ procurementRequest: pr, editable, canStart, canFinalize, hasNpwp = false, npwpDocumentUrl = null, availabilityOptions, taxes, catalog }) {
+export default function Show({ procurementRequest: pr, editable, canStart, canFinalize, isRecost = false, hasNpwp = false, npwpDocumentUrl = null, availabilityOptions, taxes, catalog }) {
     const number = `PR-${String(pr.id).padStart(6, '0')}`;
     const [rejectOpen, setRejectOpen] = useState(false);
+    const [confirmation, setConfirmation] = useState(null);
+    const [actionProcessing, setActionProcessing] = useState(false);
     const rejectForm = useForm({ rejection_reason: '' });
 
-    function markReady() {
-        if (confirm('Tandai PR ini Ready? Sales akan dinotifikasi untuk membuat Quotation.')) {
-            router.post(`/procurement/procurement-requests/${pr.id}/ready`);
-        }
+    function runAction() {
+        if (!confirmation) return;
+        setActionProcessing(true);
+        const endpoint = confirmation === 'ready' ? 'ready' : 'start';
+        router.post(`/procurement/procurement-requests/${pr.id}/${endpoint}`, {}, {
+            preserveScroll: true,
+            onSuccess: () => setConfirmation(null),
+            onFinish: () => setActionProcessing(false),
+        });
     }
     function submitReject(e) {
         e.preventDefault();
@@ -60,10 +67,6 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
         });
     }
 
-    function start() {
-        if (confirm('Tandai PR ini sedang dikerjakan?')) router.post(`/procurement/procurement-requests/${pr.id}/start`);
-    }
-
     function submit(e) {
         e.preventDefault();
         put(`/procurement/procurement-requests/${pr.id}/lines`, { preserveScroll: true });
@@ -81,12 +84,18 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
                     back={{ href: '/procurement/procurement-requests', label: 'Kembali' }}
                     actions={(
                         <>
-                            {canStart && <Button onClick={start} icon={FiPlay}>Mulai Kerjakan</Button>}
-                            {canFinalize && <Button onClick={markReady} icon={FiCheck} className="bg-success text-white hover:bg-success">Tandai Ready</Button>}
+                            {canStart && <Button onClick={() => setConfirmation('start')} icon={FiPlay}>Mulai Kerjakan</Button>}
+                            {canFinalize && <Button onClick={() => setConfirmation('ready')} icon={FiCheck} className="bg-success text-white hover:bg-success">Tandai Ready</Button>}
                             {canFinalize && <Button onClick={() => setRejectOpen(true)} variant="ghost" icon={FiXCircle} className="text-danger hover:bg-danger-soft hover:text-danger">Tolak PR</Button>}
                         </>
                     )}
                 />
+
+                {isRecost && pr.status !== 'ready' && (
+                    <div className="rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm font-medium text-warning">
+                        Costing ulang untuk revisi kebutuhan quotation. Periksa kembali vendor atau stok, harga beli, pajak, dan ketersediaan seluruh item sebelum menandai Ready.
+                    </div>
+                )}
 
                 {hasNpwp && (
                     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/25 bg-primary-soft px-4 py-3 text-sm font-medium text-primary-strong">
@@ -125,7 +134,11 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
                                     {pr.lines.map((line, i) => (
                                         <tr key={line.id}>
                                             <td className="px-3 py-3">
-                                                <div className="font-medium text-text">{line.item_name}<CategoryBadge category={data.lines[i].category} /></div>
+                                                <div className="flex flex-wrap items-center gap-1.5 font-medium text-text">
+                                                    {line.item_name}
+                                                    <CategoryBadge category={data.lines[i].category} />
+                                                    {line.revision_state && <RevisionBadge state={line.revision_state} />}
+                                                </div>
                                                 <div className="whitespace-pre-line text-xs text-text-muted">{line.description || '—'}</div>
                                                 {line.requirement?.notes && <div className="mt-1 text-xs text-warning">Catatan: {line.requirement.notes}</div>}
                                                 <label className="mt-2 block text-[11px] font-medium text-text-muted">Kategori
@@ -177,13 +190,27 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
                 </Card>
             </div>
 
+            <ConfirmDialog
+                open={confirmation !== null}
+                onClose={() => setConfirmation(null)}
+                onConfirm={runAction}
+                title={confirmation === 'ready' ? 'Tandai Procurement Request sebagai Ready?' : 'Mulai kerjakan Procurement Request?'}
+                description={confirmation === 'ready'
+                    ? 'Sales akan menerima notifikasi dan dapat melanjutkan pembuatan quotation.'
+                    : 'Status Procurement Request akan berubah menjadi sedang dikerjakan.'}
+                tone={confirmation === 'ready' ? 'success' : 'info'}
+                confirmLabel={confirmation === 'ready' ? 'Tandai Ready' : 'Mulai Kerjakan'}
+                processing={actionProcessing}
+            />
+
             <Modal
                 open={rejectOpen}
                 onClose={() => setRejectOpen(false)}
                 title="Tolak Procurement Request"
+                busy={rejectForm.processing}
                 footer={(
                     <>
-                        <Button type="button" variant="outline" onClick={() => setRejectOpen(false)}>Batal</Button>
+                        <Button type="button" variant="outline" onClick={() => setRejectOpen(false)} disabled={rejectForm.processing}>Batal</Button>
                         <Button type="submit" form="reject-pr-form" variant="danger" loading={rejectForm.processing}>Tolak &amp; Kembalikan</Button>
                     </>
                 )}
@@ -203,4 +230,16 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
             </Modal>
         </AppLayout>
     );
+}
+
+function RevisionBadge({ state }) {
+    const config = {
+        unchanged: ['Tidak Berubah', 'bg-success-soft text-success'],
+        changed: ['Diubah', 'bg-warning-soft text-warning'],
+        new: ['Baru', 'bg-info-soft text-info'],
+    }[state];
+
+    if (!config) return null;
+
+    return <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${config[1]}`}>{config[0]}</span>;
 }

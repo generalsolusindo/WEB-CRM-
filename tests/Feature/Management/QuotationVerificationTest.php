@@ -4,6 +4,7 @@ namespace Tests\Feature\Management;
 
 use App\Models\Contact;
 use App\Models\Lead;
+use App\Models\Notification;
 use App\Models\ProcurementRequest;
 use App\Models\Quotation;
 use App\Models\User;
@@ -100,6 +101,41 @@ class QuotationVerificationTest extends TestCase
         $this->assertNull($quotation->manager_review_status);
     }
 
+    public function test_manager_rejection_returns_same_quotation_to_full_review_flow(): void
+    {
+        $pm = User::factory()->create(['role' => 'project_manager', 'is_active' => true]);
+        [$quotation, $sales, $management] = $this->draftQuotation($pm);
+
+        $this->actingAs($pm)->post("/project-manager/quotations/{$quotation->id}/review", ['approved' => true]);
+        $this->actingAs($management)->post("/management/quotations/{$quotation->id}/review", [
+            'approved' => false,
+            'notes' => 'Margin perlu diperbaiki',
+        ])->assertRedirect();
+
+        $quotation->refresh();
+        $originalId = $quotation->id;
+        $line = $quotation->lines()->firstOrFail();
+
+        $this->actingAs($sales)->put("/sales/quotations/{$quotation->id}", [
+            'lines' => [[
+                'procurement_request_line_id' => $line->procurement_request_line_id,
+                'selling_price' => 1400000,
+            ]],
+        ])->assertRedirect();
+
+        $quotation->refresh();
+        $this->assertSame($originalId, $quotation->id);
+        $this->assertSame('draft', $quotation->status);
+        $this->assertNull($quotation->pm_review_status);
+        $this->assertNull($quotation->manager_review_status);
+        $this->assertDatabaseCount('quotations', 1);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $pm->id,
+            'type' => 'quotation.pending_pm_review',
+            'related_id' => $quotation->id,
+        ]);
+    }
+
     public function test_revision_notifies_pm_and_requires_review_again(): void
     {
         $pm = User::factory()->create(['role' => 'project_manager', 'is_active' => true]);
@@ -112,10 +148,10 @@ class QuotationVerificationTest extends TestCase
         $quotation->update(['status' => 'rejected']);
         $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/revisions")->assertRedirect();
 
-        $revision = \App\Models\Quotation::where('parent_quotation_id', $quotation->id)->firstOrFail();
+        $revision = Quotation::where('parent_quotation_id', $quotation->id)->firstOrFail();
         $this->assertNull($revision->pm_review_status);
 
-        $notification = \App\Models\Notification::where('user_id', $pm->id)
+        $notification = Notification::where('user_id', $pm->id)
             ->where('type', 'quotation.pending_pm_review')
             ->where('related_id', $revision->id)
             ->first();

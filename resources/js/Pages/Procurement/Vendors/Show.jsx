@@ -1,7 +1,8 @@
 import { Head, router } from '@inertiajs/react';
+import { useState } from 'react';
 import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, Card, CardHeader, Button, Info, InfoGrid } from '../../../Components/ui';
+import { PageHeader, Card, CardHeader, Button, ConfirmDialog, Info, InfoGrid } from '../../../Components/ui';
 
 function money(value) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(value || 0));
@@ -10,11 +11,27 @@ function money(value) {
 const CATEGORY_LABEL = { service: 'Jasa', reimburse: 'Biaya Reimburse' };
 
 export default function Show({ vendor }) {
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleting, setDeleting] = useState(false);
+
     function destroyVendor() {
-        if (confirm('Hapus vendor ini?')) router.delete(`/procurement/vendors/${vendor.id}`);
+        setDeleting(true);
+        router.delete(`/procurement/vendors/${vendor.id}`, {
+            onSuccess: () => setDeleteTarget(null),
+            onFinish: () => setDeleting(false),
+        });
     }
     function destroyProduct(id) {
-        if (confirm('Hapus produk ini?')) router.delete(`/procurement/vendor-products/${id}`, { preserveScroll: true });
+        setDeleting(true);
+        router.delete(`/procurement/vendor-products/${id}`, {
+            preserveScroll: true,
+            onSuccess: () => setDeleteTarget(null),
+            onFinish: () => setDeleting(false),
+        });
+    }
+    function confirmDelete() {
+        if (deleteTarget?.type === 'vendor') destroyVendor();
+        if (deleteTarget?.type === 'product') destroyProduct(deleteTarget.id);
     }
 
     return (
@@ -29,7 +46,7 @@ export default function Show({ vendor }) {
                         <>
                             <Button href={`/procurement/vendor-products/create?vendor_id=${vendor.id}`} icon={FiPlus}>Tambah Produk</Button>
                             <Button href={`/procurement/vendors/${vendor.id}/edit`} variant="outline" icon={FiEdit2}>Edit</Button>
-                            <Button onClick={destroyVendor} variant="ghost" icon={FiTrash2} className="text-danger hover:bg-danger-soft hover:text-danger">Hapus</Button>
+                            <Button onClick={() => setDeleteTarget({ type: 'vendor' })} variant="ghost" icon={FiTrash2} className="text-danger hover:bg-danger-soft hover:text-danger">Hapus</Button>
                         </>
                     )}
                 />
@@ -103,7 +120,7 @@ export default function Show({ vendor }) {
                                         <td className="px-4 py-3.5"><span className={`badge ${product.is_active ? 'badge-success' : 'badge-neutral'}`}>{product.is_active ? 'Aktif' : 'Nonaktif'}</span></td>
                                         <td className="whitespace-nowrap px-4 py-3.5 text-right">
                                             <a href={`/procurement/vendor-products/${product.id}/edit`} className="mr-3 font-medium text-primary hover:underline">Edit</a>
-                                            <button onClick={() => destroyProduct(product.id)} className="font-medium text-danger hover:underline">Hapus</button>
+                                            <button onClick={() => setDeleteTarget({ type: 'product', id: product.id, name: product.item_name })} className="font-medium text-danger hover:underline">Hapus</button>
                                         </td>
                                     </tr>
                                 ))}
@@ -113,6 +130,19 @@ export default function Show({ vendor }) {
                     </div>
                 </Card>
             </div>
+
+            <ConfirmDialog
+                open={deleteTarget !== null}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={confirmDelete}
+                title={deleteTarget?.type === 'vendor' ? 'Hapus vendor?' : 'Hapus produk?'}
+                description={deleteTarget?.type === 'vendor'
+                    ? `Vendor ${vendor.name} akan dihapus permanen jika belum digunakan oleh transaksi.`
+                    : `Produk ${deleteTarget?.name ?? ''} akan dihapus dari katalog vendor.`}
+                tone="danger"
+                confirmLabel={deleteTarget?.type === 'vendor' ? 'Hapus Vendor' : 'Hapus Produk'}
+                processing={deleting}
+            />
         </AppLayout>
     );
 }

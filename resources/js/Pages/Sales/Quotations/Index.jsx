@@ -51,7 +51,18 @@ export default function Index({ quotations, filters, statusOptions, temperatureO
                 </div>
             ),
         },
-        { key: 'status', label: 'Status', render: (q) => <StatusBadge status={q.status} /> },
+        {
+            key: 'status', label: 'Status',
+            render: (q) => {
+                const review = reviewState(q);
+                return (
+                    <div className="flex flex-col items-start gap-1.5">
+                        <StatusBadge status={q.status} />
+                        {q.status === 'draft' && <span className={`badge ${review.className}`}>{review.label}</span>}
+                    </div>
+                );
+            },
+        },
         {
             key: 'lead_temperature', label: 'Status Lead',
             render: (q) => (
@@ -124,4 +135,12 @@ function pipelineClass(value) {
     if (value === 'executed') return 'bg-success-soft text-success';
     if (value === 'deal') return 'bg-primary-soft text-primary-strong';
     return 'bg-warning-soft text-warning';
+}
+
+function reviewState(quotation) {
+    if (quotation.manager_review_status === 'approved') return { label: 'Disetujui', className: 'badge-success' };
+    if (quotation.manager_review_status === 'rejected') return { label: 'Perlu Revisi Manager', className: 'badge-danger' };
+    if (quotation.pm_review_status === 'approved') return { label: 'Menunggu Manager', className: 'badge-warning' };
+    if (quotation.pm_review_status === 'rejected') return { label: 'Perlu Revisi PM', className: 'badge-danger' };
+    return { label: 'Menunggu PM', className: 'badge-warning' };
 }

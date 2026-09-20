@@ -232,14 +232,25 @@ class SowSignatureChainTest extends TestCase
 
     public function test_cannot_reassign_project_vendor_once_sow_is_submitted(): void
     {
-        ['sow' => $sow, 'ops' => $ops] = $this->readyForSignature();
+        ['sow' => $sow] = $this->readyForSignature();
         $project = $sow->project;
+        $originalVendorId = $project->vendor_id;
         $otherVendor = Vendor::create(['name' => 'Vendor B', 'provides_technical' => true]);
+        $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
 
-        $this->actingAs($ops)->put("/operational/projects/{$project->id}/vendor", ['vendor_id' => $otherVendor->id])
-            ->assertForbidden();
-        $this->actingAs($ops)->put("/operational/projects/{$project->id}/vendor", ['vendor_id' => ''])
-            ->assertForbidden();
+        // Vendor kini diganti lewat Deal Vendor Jasa Procurement — tetap terkunci begitu SOW diproses.
+        $this->actingAs($procurement)->put("/procurement/project-procurements/{$project->id}/vendor-service", [
+            'vendor_id' => $otherVendor->id, 'total_fee' => 5000000, 'terms' => 'pay_at_end',
+            'bank_name' => 'BCA', 'account_number' => '123', 'account_holder' => 'PT B',
+        ])->assertSessionHasErrors('vendor_id');
+
+        $this->assertSame($originalVendorId, $project->fresh()->vendor_id);
+
+        // Vendor yang sama boleh menyimpan deal-nya (fee/termin), tidak memutus rantai tanda tangan.
+        $this->actingAs($procurement)->put("/procurement/project-procurements/{$project->id}/vendor-service", [
+            'vendor_id' => $originalVendorId, 'total_fee' => 5000000, 'terms' => 'pay_at_end',
+            'bank_name' => 'BCA', 'account_number' => '123', 'account_holder' => 'PT A',
+        ])->assertSessionHasNoErrors();
     }
 
     public function test_changing_vendor_while_draft_clears_stale_technician(): void
@@ -275,9 +286,13 @@ class SowSignatureChainTest extends TestCase
             'number' => 'SOW-001', 'project_name' => 'Jasa X', 'technician_id' => $technicianA->id,
         ]);
 
+        // Vendor kini diganti lewat Deal Vendor Jasa milik Procurement (bukan lagi oleh Operasional).
         $vendorB = Vendor::create(['name' => 'Vendor B', 'provides_technical' => true]);
-        $this->actingAs($ops)->put("/operational/projects/{$project->id}/vendor", ['vendor_id' => $vendorB->id])
-            ->assertRedirect();
+        $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
+        $this->actingAs($procurement)->put("/procurement/project-procurements/{$project->id}/vendor-service", [
+            'vendor_id' => $vendorB->id, 'total_fee' => 5000000, 'terms' => 'pay_at_end',
+            'bank_name' => 'BCA', 'account_number' => '123', 'account_holder' => 'PT B',
+        ])->assertRedirect();
 
         $sow = Sow::where('project_id', $project->id)->firstOrFail();
         $this->assertNull($sow->technician_id);

@@ -57,7 +57,17 @@ export default function Index({ projects, summary, filters }) {
             ),
         },
         { key: 'created_at', label: 'Mulai', render: (p) => p.created_at },
-        { key: 'hpp', label: 'HPP', align: 'right', render: (p) => <span className="tabular-nums text-text-muted">{money(p.hpp)}</span> },
+        {
+            key: 'hpp',
+            label: 'HPP',
+            align: 'right',
+            render: (p) => (
+                <div>
+                    <span className="tabular-nums text-text-muted">{money(p.hpp)}</span>
+                    {p.uses_vendor_fee && <div className="text-[11px] text-text-muted">termasuk fee vendor</div>}
+                </div>
+            ),
+        },
         { key: 'harga_jual', label: 'Harga Jual', align: 'right', render: (p) => <span className="tabular-nums text-text">{money(p.harga_jual)}</span> },
         {
             key: 'profit',

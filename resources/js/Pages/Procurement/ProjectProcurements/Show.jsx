@@ -1,7 +1,9 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import { FiSend, FiCheck } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, Card, CardHeader, Button, Info, InfoGrid, StatusBadge, CurrencyInput } from '../../../Components/ui';
+import { PageHeader, Card, CardHeader, Button, ConfirmDialog, Info, InfoGrid, StatusBadge, CurrencyInput } from '../../../Components/ui';
+import VendorServicePanel from './VendorServicePanel';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -9,7 +11,9 @@ function money(v) {
 
 const CONTROL = 'w-full rounded-lg border border-border-strong bg-surface px-2 py-1.5 text-xs outline-none transition focus:border-primary disabled:bg-bg disabled:text-text-muted';
 
-export default function Show({ project, items, payment, editable, canConfirm, canReceiveAll, history = [], vendors, catalog, warehouseItems = [] }) {
+export default function Show({ project, items, payment, editable, canConfirm, canReceiveAll, history = [], vendors, catalog, warehouseItems = [], vendorService = null, vendorOptions = [], canManageVendorService = false, serviceCostEstimate = 0 }) {
+    const [confirmation, setConfirmation] = useState(null);
+    const [actionProcessing, setActionProcessing] = useState(false);
     const { data, setData, post, processing, errors, transform } = useForm({
         pricing_mode: payment?.pricing_mode ?? 'itemized',
         lump_sum_vendor_id: payment?.lump_sum_vendor_id ?? '',
@@ -94,17 +98,44 @@ export default function Show({ project, items, payment, editable, canConfirm, ca
         post(`/procurement/project-procurements/${project.id}/submit`, { preserveScroll: true });
     }
     function confirmPayment() {
-        if (confirm('Konfirmasi bahwa semua pembayaran ke vendor sudah beres?')) {
-            router.post(`/procurement/project-procurements/${project.id}/confirm`, {}, { preserveScroll: true });
-        }
+        setActionProcessing(true);
+        router.post(`/procurement/project-procurements/${project.id}/confirm`, {}, {
+            preserveScroll: true,
+            onSuccess: () => setConfirmation(null),
+            onFinish: () => setActionProcessing(false),
+        });
     }
     function receiveItem(id) {
         router.post(`/procurement/project-procurements/items/${id}/receive`, {}, { preserveScroll: true });
     }
     function receiveAll() {
-        if (confirm('Tandai semua barang yang sudah dibayar sebagai diterima?')) {
-            router.post(`/procurement/project-procurements/${project.id}/receive-all`, {}, { preserveScroll: true });
-        }
+        setActionProcessing(true);
+        router.post(`/procurement/project-procurements/${project.id}/receive-all`, {}, {
+            preserveScroll: true,
+            onSuccess: () => setConfirmation(null),
+            onFinish: () => setActionProcessing(false),
+        });
+    }
+
+    function runConfirmedAction() {
+        if (confirmation === 'confirm-payment') confirmPayment();
+        if (confirmation === 'receive-all') receiveAll();
+    }
+
+    if (items.length === 0) {
+        return (
+            <AppLayout>
+                <Head title={`Vendor ${project.number}`} />
+                <div className="mx-auto max-w-5xl space-y-5">
+                    <PageHeader
+                        title={`Vendor Jasa ${project.number}`}
+                        subtitle={`${project.customer}${project.company ? ` · ${project.company}` : ''} · ${project.sales_order}`}
+                        back={{ href: '/procurement/project-procurements', label: 'Kembali' }}
+                    />
+                    <VendorServicePanel project={project} vendorService={vendorService} vendorOptions={vendorOptions} canManage={canManageVendorService} serviceCostEstimate={serviceCostEstimate} />
+                </div>
+            </AppLayout>
+        );
     }
 
     return (
@@ -121,6 +152,8 @@ export default function Show({ project, items, payment, editable, canConfirm, ca
                     subtitle={`${project.customer}${project.company ? ` · ${project.company}` : ''} · ${project.sales_order}`}
                     back={{ href: '/procurement/project-procurements', label: 'Kembali' }}
                 />
+
+                <VendorServicePanel project={project} vendorService={vendorService} vendorOptions={vendorOptions} canManage={canManageVendorService} serviceCostEstimate={serviceCostEstimate} />
 
                 {payment?.status === 'rejected_pm' && payment.pm_notes && (
                     <div className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">
@@ -311,8 +344,8 @@ export default function Show({ project, items, payment, editable, canConfirm, ca
                     )}
                     {(canConfirm || canReceiveAll) && (
                         <div className="flex flex-wrap justify-end gap-2 border-t border-border p-4">
-                            {canReceiveAll && <Button variant="outline" onClick={receiveAll}>Terima Semua Barang</Button>}
-                            {canConfirm && <Button icon={FiCheck} onClick={confirmPayment}>Konfirmasi Pembayaran</Button>}
+                            {canReceiveAll && <Button variant="outline" onClick={() => setConfirmation('receive-all')}>Terima Semua Barang</Button>}
+                            {canConfirm && <Button icon={FiCheck} onClick={() => setConfirmation('confirm-payment')}>Konfirmasi Pembayaran</Button>}
                         </div>
                     )}
                 </Card>
@@ -334,6 +367,19 @@ export default function Show({ project, items, payment, editable, canConfirm, ca
                     </Card>
                 )}
             </div>
+
+            <ConfirmDialog
+                open={confirmation !== null}
+                onClose={() => setConfirmation(null)}
+                onConfirm={runConfirmedAction}
+                title={confirmation === 'receive-all' ? 'Terima semua barang?' : 'Konfirmasi seluruh pembayaran vendor?'}
+                description={confirmation === 'receive-all'
+                    ? 'Semua barang yang sudah dibayar akan ditandai telah diterima.'
+                    : 'Pastikan seluruh pembayaran kepada vendor sudah selesai sebelum melanjutkan.'}
+                tone={confirmation === 'receive-all' ? 'success' : 'warning'}
+                confirmLabel={confirmation === 'receive-all' ? 'Terima Semua Barang' : 'Konfirmasi Pembayaran'}
+                processing={actionProcessing}
+            />
         </AppLayout>
     );
 }

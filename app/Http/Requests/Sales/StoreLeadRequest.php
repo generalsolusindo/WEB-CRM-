@@ -30,6 +30,7 @@ class StoreLeadRequest extends FormRequest
             ],
             'stage' => ['required', Rule::in([LeadStage::New->value])],
             'temperature' => ['sometimes', Rule::enum(LeadTemperature::class)],
+            'needs_outside_vendor' => ['sometimes', 'boolean'],
             'source' => ['nullable', Rule::enum(LeadSource::class)],
             'notes' => ['nullable', 'string'],
             'pic_name' => ['nullable', 'string', 'max:255'],

@@ -1,9 +1,9 @@
 import { Fragment, useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
-import { FiPrinter, FiEdit2, FiSend, FiCheck, FiX, FiCopy, FiTrash2, FiHash } from 'react-icons/fi';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { FiPrinter, FiEdit2, FiSend, FiCheck, FiX, FiCopy, FiTrash2, FiHash, FiRefreshCw } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import CategoryBadge from '../../../Components/CategoryBadge';
-import { PageHeader, Card, CardHeader, Button, ConfirmDialog, Info, InfoGrid, PromptDialog, StatusBadge } from '../../../Components/ui';
+import { PageHeader, Card, CardHeader, Button, ConfirmDialog, Field, Info, InfoGrid, Modal, PromptDialog, StatusBadge, Textarea } from '../../../Components/ui';
 
 export default function Show({ quotation, history, totals, permissions, customerHasWhatsapp = false }) {
     const number = quotation.number ?? `QT-${String(quotation.id).padStart(6, '0')} / R${quotation.revision_number}`;
@@ -12,6 +12,10 @@ export default function Show({ quotation, history, totals, permissions, customer
     const [numberError, setNumberError] = useState('');
     const [confirmation, setConfirmation] = useState(null);
     const [actionProcessing, setActionProcessing] = useState(false);
+    const [cancelOpen, setCancelOpen] = useState(false);
+    const cancelForm = useForm({ reason: '' });
+    const needsCorrection = quotation.pm_review_status === 'rejected' || quotation.manager_review_status === 'rejected';
+    const pricingPending = quotation.procurement_request.status === 'ready' && quotation.quoted_at === null;
 
     function editNumber(value) {
         if (value === quotation.number) {
@@ -49,16 +53,10 @@ export default function Show({ quotation, history, totals, permissions, customer
     }
 
     function askDestroy() {
-        let warning = `Hapus quotation ${number} ini? Tindakan ini tidak bisa dibatalkan.`;
-        if (quotation.status === 'confirmed') {
-            warning = `Quotation ${number} ini sudah Confirmed — Sales Order-nya akan ikut terhapus sekaligus. Tindakan ini tidak bisa dibatalkan. Tetap hapus?`;
-        } else if (quotation.whatsapp_sent_at) {
-            warning = `Quotation ${number} ini sudah pernah dikirim ke customer lewat WhatsApp. Menghapusnya tidak akan menarik kembali pesan yang sudah diterima customer, dan tidak bisa dibatalkan. Tetap hapus?`;
-        }
         askAction({
-            title: 'Hapus quotation?',
-            description: warning,
-            confirmLabel: 'Hapus Quotation',
+            title: 'Hapus draft quotation permanen?',
+            description: `Draft ${number}, seluruh baris, hasil review internal, dan notifikasi terkait akan dihapus permanen. Procurement Request tetap tersimpan agar hasil sourcing dapat digunakan kembali.`,
+            confirmLabel: 'Hapus Permanen',
             tone: 'danger',
             method: 'delete',
             path: `/sales/quotations/${quotation.id}`,
@@ -72,6 +70,21 @@ export default function Show({ quotation, history, totals, permissions, customer
                 const url = page.props.flash?.whatsappUrl;
                 if (url) window.open(url, '_blank', 'noopener');
             },
+        });
+    }
+
+    function closeCancellation() {
+        if (cancelForm.processing) return;
+        setCancelOpen(false);
+        cancelForm.reset();
+        cancelForm.clearErrors();
+    }
+
+    function cancelTransaction(event) {
+        event.preventDefault();
+        cancelForm.post(`/sales/quotations/${quotation.id}/cancel`, {
+            preserveScroll: true,
+            onSuccess: closeCancellation,
         });
     }
 
@@ -92,7 +105,8 @@ export default function Show({ quotation, history, totals, permissions, customer
                         <>
                             <Button href={`/sales/quotations/${quotation.id}/print`} external variant="outline" icon={FiPrinter}>Cetak / PDF</Button>
                             {permissions.updateNumber && <Button onClick={() => { setNumberError(''); setNumberOpen(true); }} variant="outline" icon={FiHash}>Ubah Nomor</Button>}
-                            {permissions.update && <Button href={`/sales/quotations/${quotation.id}/edit`} variant="outline" icon={FiEdit2}>Edit</Button>}
+                            {permissions.update && <Button href={`/sales/quotations/${quotation.id}/edit`} variant={needsCorrection || pricingPending ? 'primary' : 'outline'} icon={FiEdit2}>{pricingPending ? 'Lengkapi Harga Jual' : needsCorrection ? 'Perbaiki Quotation' : 'Edit'}</Button>}
+                            {permissions.reviseScope && <Button href={`/sales/quotations/${quotation.id}/scope-revision`} variant="outline" icon={FiRefreshCw}>Revisi Kebutuhan</Button>}
                             {permissions.sendWhatsapp && (
                                 <Button
                                     onClick={sendWhatsapp}
@@ -107,6 +121,7 @@ export default function Show({ quotation, history, totals, permissions, customer
                             {permissions.confirm && <Button href={`/sales/quotations/${quotation.id}/confirm`} icon={FiCheck}>Confirm Deal</Button>}
                             {permissions.reject && <Button onClick={() => askAction({ title: 'Tandai quotation sebagai ditolak?', description: 'Status quotation akan berubah menjadi ditolak oleh customer.', confirmLabel: 'Tandai Ditolak', tone: 'danger', path: `/sales/quotations/${quotation.id}/reject` })} variant="ghost" icon={FiX} className="text-danger hover:bg-danger-soft hover:text-danger">Tandai Ditolak</Button>}
                             {permissions.revise && <Button onClick={() => askAction({ title: 'Buat revisi quotation?', description: 'Sistem akan membuat revisi baru berdasarkan data quotation ini.', confirmLabel: 'Buat Revisi', tone: 'info', path: `/sales/quotations/${quotation.id}/revisions` })} variant="outline" icon={FiCopy}>Buat Revisi</Button>}
+                            {permissions.cancel && <Button onClick={() => setCancelOpen(true)} variant="ghost" icon={FiX} className="text-danger hover:bg-danger-soft hover:text-danger">Batalkan Transaksi</Button>}
                             {permissions.delete && <Button onClick={askDestroy} variant="ghost" icon={FiTrash2} className="text-danger hover:bg-danger-soft hover:text-danger">Hapus</Button>}
                         </>
                     }
@@ -138,6 +153,47 @@ export default function Show({ quotation, history, totals, permissions, customer
                     processing={actionProcessing}
                 />
 
+                <Modal
+                    open={cancelOpen}
+                    onClose={closeCancellation}
+                    busy={cancelForm.processing}
+                    title="Batalkan transaksi?"
+                    description="Quotation beserta revisi, Sales Order, dan invoice yang belum dibayar akan ditandai dibatalkan. Riwayat transaksi tetap tersimpan."
+                    footer={(
+                        <>
+                            <Button type="button" variant="outline" onClick={closeCancellation} disabled={cancelForm.processing}>Kembali</Button>
+                            <Button type="submit" form="cancel-transaction-form" variant="danger" disabled={cancelForm.processing}>
+                                {cancelForm.processing ? 'Membatalkan...' : 'Batalkan Transaksi'}
+                            </Button>
+                        </>
+                    )}
+                >
+                    <form id="cancel-transaction-form" onSubmit={cancelTransaction}>
+                        <Field label="Alasan pembatalan" error={cancelForm.errors.reason} required>
+                            <Textarea
+                                value={cancelForm.data.reason}
+                                onChange={(event) => cancelForm.setData('reason', event.target.value)}
+                                required
+                                rows={4}
+                                minLength={5}
+                                maxLength={2000}
+                                placeholder="Jelaskan alasan transaksi dibatalkan..."
+                            />
+                        </Field>
+                    </form>
+                </Modal>
+
+                {quotation.status === 'cancelled' && (
+                    <div className="rounded-xl border border-danger/25 bg-danger-soft p-4 text-sm text-danger">
+                        <p className="font-semibold">Transaksi dibatalkan</p>
+                        <p className="mt-1 whitespace-pre-line">{quotation.cancellation_reason}</p>
+                        <p className="mt-2 text-xs opacity-80">
+                            Oleh {quotation.cancelled_by_name ?? 'pengguna'}
+                            {quotation.cancelled_at ? ` · ${new Date(quotation.cancelled_at).toLocaleString('id-ID')}` : ''}
+                        </p>
+                    </div>
+                )}
+
                 <Card>
                     <InfoGrid cols={3}>
                         <Info label="Customer" value={quotation.contact.name} />
@@ -155,6 +211,17 @@ export default function Show({ quotation, history, totals, permissions, customer
                         </div>
                     )}
                 </Card>
+
+                {quotation.procurement_request.status !== 'ready' && (
+                    <div className="rounded-xl border border-info/25 bg-info-soft p-4 text-sm font-medium text-info">
+                        Revisi kebutuhan sedang diproses Procurement. Setelah costing berstatus Ready, Sales dapat melengkapi harga jual dan mengirim quotation ini kembali ke Project Manager.
+                    </div>
+                )}
+                {pricingPending && (
+                    <div className="rounded-xl border border-warning/25 bg-warning-soft p-4 text-sm font-medium text-warning">
+                        Costing ulang sudah selesai. Lengkapi dan simpan harga jual terlebih dahulu sebelum quotation dapat ditinjau kembali oleh Project Manager.
+                    </div>
+                )}
 
                 {quotation.status === 'draft' && <ReviewGate quotation={quotation} />}
 

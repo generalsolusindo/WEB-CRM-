@@ -3,6 +3,7 @@
 namespace App\Services\Sales;
 
 use App\Enums\OrderType;
+use App\Enums\SalesOrderStatus;
 use App\Models\Invoice;
 use App\Models\SalesOrder;
 
@@ -56,7 +57,8 @@ class SalesOrderSettlement
      */
     public function canCreateFinalInvoice(SalesOrder $salesOrder): bool
     {
-        if ($salesOrder->order_type === OrderType::MaterialOnly->value) {
+        if ($salesOrder->status === SalesOrderStatus::Cancelled->value
+            || $salesOrder->order_type === OrderType::MaterialOnly->value) {
             return false;
         }
 

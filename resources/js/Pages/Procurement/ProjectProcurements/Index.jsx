@@ -14,12 +14,35 @@ export default function Index({ projects }) {
                 </div>
             ),
         },
-        { key: 'customer', label: 'Customer', render: (p) => p.customer },
+        {
+            key: 'customer',
+            label: 'Customer',
+            render: (p) => (
+                <div>
+                    <div>{p.customer}</div>
+                    {p.needs_outside_vendor && !p.vendor_service_status && <span className="badge badge-warning">Butuh vendor luar</span>}
+                </div>
+            ),
+        },
         {
             key: 'items',
             label: 'Barang',
             align: 'right',
-            render: (p) => <span className="tabular-nums">{p.received_count}/{p.items_count} diterima</span>,
+            render: (p) => (p.items_count > 0
+                ? <span className="tabular-nums">{p.received_count}/{p.items_count} diterima</span>
+                : <span className="text-text-muted">—</span>),
+        },
+        {
+            key: 'vendor_service',
+            label: 'Vendor Jasa',
+            render: (p) => (p.vendor_service_status
+                ? (
+                    <div>
+                        <div className="text-sm text-text">{p.vendor_name}</div>
+                        <StatusBadge status={p.vendor_service_status} label={p.vendor_service_status_label} />
+                    </div>
+                )
+                : <span className="text-text-muted">—</span>),
         },
         {
             key: 'payment',
@@ -36,14 +59,14 @@ export default function Index({ projects }) {
             <div className="mx-auto max-w-5xl space-y-5">
                 <PageHeader
                     title="Pengadaan Project"
-                    subtitle="Sourcing barang material per project, lalu ajukan pembayaran ke Project Manager & Finance."
+                    subtitle="Sourcing barang material per project lalu ajukan pembayaran, serta deal vendor jasa untuk pekerjaan di luar jangkauan."
                 />
                 <DataTable
                     columns={columns}
                     rows={projects}
                     rowKey="id"
                     rowHref={(p) => `/procurement/project-procurements/${p.id}`}
-                    empty={<EmptyState title="Belum ada project yang butuh pengadaan barang." />}
+                    empty={<EmptyState title="Belum ada project yang butuh pengadaan barang atau vendor." />}
                 />
             </div>
         </AppLayout>

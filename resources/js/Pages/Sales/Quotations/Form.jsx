@@ -1,7 +1,6 @@
-import { Fragment, useRef } from "react";
+import { Fragment, useState } from "react";
 import { Head, Link, useForm } from "@inertiajs/react";
-import { FiPlus, FiTrash2 } from "react-icons/fi";
-import { PageHeader, Button, CurrencyInput } from "../../../Components/ui";
+import { PageHeader, Button, ConfirmDialog, CurrencyInput } from "../../../Components/ui";
 import AppLayout from '../../../Layouts/AppLayout';
 
 function money(v) {
@@ -44,32 +43,11 @@ function initialLine(line, taxes, editing) {
     };
 }
 
-function blankLine(key) {
-    return {
-        _key: key,
-        procurement_request_line_id: null,
-        item_name: '',
-        description: '',
-        qty: '1',
-        unit: '',
-        category: 'material',
-        sourcing_note: '',
-        cost_price: '',
-        selling_price: '',
-        discount_mode: 'percent',
-        discount_percent: '',
-        discount_amount: '',
-        tax_mode: 'none',
-        tax_id: '',
-        tax_rate: '',
-    };
-}
-
 export default function Form({ procurementRequest = null, quotation = null, taxes = [], defaultTerms = '', unitOptions = [] }) {
     const editing = Boolean(quotation);
     const sourceLines = editing ? quotation.lines : procurementRequest.lines;
     const customer = editing ? quotation.contact : procurementRequest.lead.contact;
-    const newLineCounter = useRef(0);
+    const [resetConfirmationOpen, setResetConfirmationOpen] = useState(false);
 
     const { data, setData, post, put, processing, errors, transform } = useForm({
         notes: quotation?.notes ?? '',
@@ -94,7 +72,6 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
             unit: l.unit,
             category: l.category,
             sourcing_note: l.sourcing_note,
-            cost_price: l.procurement_request_line_id === null ? (l.cost_price === '' ? null : Number(l.cost_price)) : undefined,
             selling_price: l.selling_price,
             discount_percent: l.discount_mode === 'percent' && l.discount_percent !== '' ? Number(l.discount_percent) : null,
             discount_amount: l.discount_mode === 'amount' && l.discount_amount !== '' ? Number(l.discount_amount) : null,
@@ -105,15 +82,6 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
 
     function setLine(i, patch) {
         setData('lines', data.lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
-    }
-
-    function addLine() {
-        newLineCounter.current += 1;
-        setData('lines', [...data.lines, blankLine(`new-${newLineCounter.current}`)]);
-    }
-
-    function removeLine(i) {
-        setData('lines', data.lines.filter((_, idx) => idx !== i));
     }
 
     const grossAll = r2(data.lines.reduce((s, l) => s + Number(l.qty || 0) * Number(l.selling_price || 0), 0));
@@ -178,9 +146,32 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
     const marginRp = r2(totals.dpp - totals.cost);
     const marginPct = totals.cost > 0 ? r2((totals.dpp - totals.cost) / totals.cost * 100) : null;
 
+    const reviewResetRequired = editing && (
+        quotation.status !== 'draft'
+        || quotation.pm_review_status !== null
+        || quotation.manager_review_status !== null
+    );
+    const rejectedByManager = quotation?.manager_review_status === 'rejected';
+    const rejectedByPm = quotation?.pm_review_status === 'rejected';
+    const rejection = rejectedByManager
+        ? { role: 'Manager', reviewer: quotation.manager_reviewer_name, notes: quotation.manager_review_notes }
+        : rejectedByPm
+            ? { role: 'Project Manager', reviewer: quotation.pm_reviewer_name, notes: quotation.pm_review_notes }
+            : null;
+
+    function save() {
+        editing
+            ? put(`/sales/quotations/${quotation.id}`)
+            : post(`/sales/procurement-requests/${procurementRequest.id}/quotations`);
+    }
+
     function submit(e) {
         e.preventDefault();
-        editing ? put(`/sales/quotations/${quotation.id}`) : post(`/sales/procurement-requests/${procurementRequest.id}/quotations`);
+        if (reviewResetRequired) {
+            setResetConfirmationOpen(true);
+            return;
+        }
+        save();
     }
 
     return (
@@ -193,8 +184,25 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                     back={{ href: editing ? `/sales/quotations/${quotation.id}` : `/sales/leads/${procurementRequest.lead_id}` }}
                 />
 
+                <ConfirmDialog
+                    open={resetConfirmationOpen}
+                    onClose={() => setResetConfirmationOpen(false)}
+                    onConfirm={save}
+                    title="Simpan perbaikan quotation?"
+                    description="Seluruh persetujuan Project Manager dan Manager akan direset. Quotation ini akan dikirim kembali kepada Project Manager untuk ditinjau dari awal."
+                    tone="warning"
+                    confirmLabel="Simpan & Kirim Ulang"
+                    processing={processing}
+                />
+
                 <form onSubmit={submit} className="space-y-5">
-                    {editing && quotation.status !== 'draft' && (
+                    {rejection && (
+                        <div className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger">
+                            <strong>Perlu diperbaiki — ditolak oleh {rejection.role}{rejection.reviewer ? ` (${rejection.reviewer})` : ''}.</strong>
+                            {rejection.notes && <p className="mt-1 whitespace-pre-line">Catatan: {rejection.notes}</p>}
+                        </div>
+                    )}
+                    {editing && quotation.status !== 'draft' && !rejection && (
                         <div className="rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm font-medium text-warning">
                             Quotation ini berstatus {quotation.status === 'sent' ? 'Terkirim' : 'Ditolak'}. Menyimpan perubahan akan mengembalikan status ke Draft dan approval PM/Manager perlu diulang dari awal.
                         </div>
@@ -234,8 +242,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                         <div className="border-b border-border p-5">
                             <h2 className="font-semibold text-text">Line Items</h2>
                             <p className="text-sm text-text-muted">
-                                Nama item, deskripsi, qty & unit bisa diubah bebas. Cost item lama tetap mengikuti data Procurement.
-                                {editing && ' Bisa tambah item baru atau hapus item yang tidak jadi dipakai.'}
+                                Kebutuhan dan harga beli mengikuti hasil Procurement. Sales mengatur harga jual, diskon, serta pajak quotation.
                             </p>
                         </div>
                         <div className="overflow-x-auto">
@@ -249,21 +256,19 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                         <th className="px-3 py-3">Diskon</th>
                                         <th className="px-3 py-3">Pajak %</th>
                                         <th className="px-3 py-3 text-right">DPP</th>
-                                        {editing && <th className="px-3 py-3"></th>}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                     {orderedIdx.map((i, pos) => {
                                         const line = data.lines[i];
                                         const c = calc(i);
-                                        const isNew = line.procurement_request_line_id === null;
                                         const group = line.category === 'material' ? 'material' : 'service';
                                         const prevGroup = pos === 0 ? null : (data.lines[orderedIdx[pos - 1]].category === 'material' ? 'material' : 'service');
                                         return (
                                           <Fragment key={line._key}>
                                             {group !== prevGroup && (
                                                 <tr className="bg-surface-2">
-                                                    <td colSpan={editing ? 8 : 7} className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
+                                                    <td colSpan="7" className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
                                                         {group === 'material' ? 'Material' : 'Jasa'}
                                                     </td>
                                                 </tr>
@@ -272,23 +277,23 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                                 <td className="px-3 py-3">
                                                     <input
                                                         type="text" value={data.lines[i].item_name}
-                                                        onChange={(e) => setLine(i, { item_name: e.target.value })}
-                                                        className="w-full rounded border border-border px-1.5 py-1 text-sm font-medium text-text"
+                                                        disabled
+                                                        className="w-full rounded border border-border bg-bg px-1.5 py-1 text-sm font-medium text-text-muted"
                                                     />
                                                     {errors[`lines.${i}.item_name`] && <span className="text-xs text-danger">{errors[`lines.${i}.item_name`]}</span>}
                                                     {errors[`lines.${i}.procurement_request_line_id`] && <span className="block text-xs text-danger">{errors[`lines.${i}.procurement_request_line_id`]}</span>}
                                                     <textarea
                                                         rows="2" value={data.lines[i].description}
-                                                        onChange={(e) => setLine(i, { description: e.target.value })}
+                                                        disabled
                                                         placeholder="Deskripsi (opsional, bisa multi-baris)"
                                                         className="mt-1 w-full rounded border border-border px-1.5 py-1 text-xs text-text-muted"
                                                     />
-                                                    <select value={data.lines[i].category} onChange={(e) => setLine(i, { category: e.target.value })} className="mt-1 rounded border border-border px-1 py-0.5 text-[11px]">
+                                                    <select disabled value={data.lines[i].category} className="mt-1 rounded border border-border bg-bg px-1 py-0.5 text-[11px]">
                                                         <option value="material">Material</option>
                                                         <option value="service">Jasa</option>
                                                         <option value="reimburse">Biaya Reimburse</option>
                                                     </select>
-                                                    <textarea rows="2" value={data.lines[i].sourcing_note} onChange={(e) => setLine(i, { sourcing_note: e.target.value })} placeholder="Catatan opsi merk (dari Procurement). Kosongkan bila tak perlu ditampilkan ke customer." className="mt-1 w-full rounded border border-border px-1.5 py-1 text-[11px]" />
+                                                    <textarea rows="2" disabled value={data.lines[i].sourcing_note} placeholder="Catatan sourcing dari Procurement" className="mt-1 w-full rounded border border-border bg-bg px-1.5 py-1 text-[11px]" />
                                                     <div className="mt-1 text-xs">
                                                         <span className={c.markup != null && c.markup < 0 ? 'text-danger' : 'text-text-muted'}>Markup {c.markup == null ? '—' : `${c.markup.toFixed(1)}%`}</span>
                                                         {' · '}
@@ -298,13 +303,13 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                                 <td className="min-w-24 px-3 py-3">
                                                     <input
                                                         type="number" min="0.01" step="0.01" value={data.lines[i].qty}
-                                                        onChange={(e) => setLine(i, { qty: e.target.value })}
-                                                        className="w-full rounded border border-border px-1.5 py-1 text-right text-xs"
+                                                        disabled
+                                                        className="w-full rounded border border-border bg-bg px-1.5 py-1 text-right text-xs"
                                                     />
                                                     <select
                                                         value={data.lines[i].unit}
-                                                        onChange={(e) => setLine(i, { unit: e.target.value })}
-                                                        className="mt-1 w-full rounded border border-border px-1 py-1 text-[11px]"
+                                                        disabled
+                                                        className="mt-1 w-full rounded border border-border bg-bg px-1 py-1 text-[11px]"
                                                     >
                                                         <option value="">— unit —</option>
                                                         {unitOptions.map((u) => <option key={u} value={u}>{u}</option>)}
@@ -316,14 +321,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                                     {errors[`lines.${i}.unit`] && <span className="block text-xs text-danger">{errors[`lines.${i}.unit`]}</span>}
                                                 </td>
                                                 <td className="min-w-28 px-3 py-3 text-right">
-                                                    {isNew ? (
-                                                        <>
-                                                            <CurrencyInput value={data.lines[i].cost_price} onChange={(e) => setLine(i, { cost_price: e.target.value })} placeholder="Harga beli" className="w-full rounded-lg border border-border px-2 py-1.5 text-right outline-none focus:border-navy" />
-                                                            {errors[`lines.${i}.cost_price`] && <span className="text-xs text-danger">{errors[`lines.${i}.cost_price`]}</span>}
-                                                        </>
-                                                    ) : (
-                                                        <span className="text-text-muted">{money(line.cost_price)}</span>
-                                                    )}
+                                                    <span className="text-text-muted">{money(line.cost_price)}</span>
                                                 </td>
                                                 <td className="min-w-36 px-3 py-3">
                                                     <CurrencyInput value={data.lines[i].selling_price} onChange={(e) => setLine(i, { selling_price: e.target.value })} className="w-full rounded-lg border border-border px-2 py-1.5 text-right outline-none focus:border-navy" />
@@ -354,43 +352,25 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                                     {errors[`lines.${i}.tax_rate`] && <span className="text-xs text-danger">{errors[`lines.${i}.tax_rate`]}</span>}
                                                 </td>
                                                 <td className="px-3 py-3 text-right font-medium text-text">{money(c.dpp)}</td>
-                                                {editing && (
-                                                    <td className="px-3 py-3 text-right">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeLine(i)}
-                                                            disabled={data.lines.length <= 1}
-                                                            title={data.lines.length <= 1 ? 'Minimal satu item' : 'Hapus item ini'}
-                                                            className="rounded-lg p-1.5 text-danger hover:bg-danger-soft disabled:cursor-not-allowed disabled:text-text-faint disabled:hover:bg-transparent"
-                                                        >
-                                                            <FiTrash2 className="h-4 w-4" />
-                                                        </button>
-                                                    </td>
-                                                )}
                                             </tr>
                                           </Fragment>
                                         );
                                     })}
                                 </tbody>
                                 <tfoot className="border-t border-border bg-surface-2 text-text">
-                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Subtotal Bruto</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.gross)}</td>{editing && <td></td>}</tr>
-                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Total Diskon{discPct > 0 ? ` (${discPct}%)` : ''}</td><td className="px-3 py-1.5 text-right font-medium text-danger">−{money(totals.discount)}</td>{editing && <td></td>}</tr>
-                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">DPP</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.dpp)}</td>{editing && <td></td>}</tr>
-                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Total PPN</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.tax)}</td>{editing && <td></td>}</tr>
-                                    <tr><td colSpan="6" className="px-3 py-3 text-right font-semibold">Grand Total</td><td className="px-3 py-3 text-right text-lg font-bold">{money(grand)}</td>{editing && <td></td>}</tr>
+                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Subtotal Bruto</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.gross)}</td></tr>
+                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Total Diskon{discPct > 0 ? ` (${discPct}%)` : ''}</td><td className="px-3 py-1.5 text-right font-medium text-danger">−{money(totals.discount)}</td></tr>
+                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">DPP</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.dpp)}</td></tr>
+                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Total PPN</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.tax)}</td></tr>
+                                    <tr><td colSpan="6" className="px-3 py-3 text-right font-semibold">Grand Total</td><td className="px-3 py-3 text-right text-lg font-bold">{money(grand)}</td></tr>
                                     {pph23Estimate > 0 && <>
-                                        <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi PPh 23 (2%) — jika customer memotong</td><td className="px-3 py-1.5 text-right text-xs font-medium text-warning">−{money(pph23Estimate)}</td>{editing && <td></td>}</tr>
-                                        <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi diterima tunai</td><td className="px-3 py-1.5 text-right text-xs font-medium">{money(r2(grand - pph23Estimate))}</td>{editing && <td></td>}</tr>
+                                        <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi PPh 23 (2%) — jika customer memotong</td><td className="px-3 py-1.5 text-right text-xs font-medium text-warning">−{money(pph23Estimate)}</td></tr>
+                                        <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi diterima tunai</td><td className="px-3 py-1.5 text-right text-xs font-medium">{money(r2(grand - pph23Estimate))}</td></tr>
                                     </>}
-                                    {marginPct != null && <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi margin keseluruhan</td><td className={`px-3 py-1.5 text-right text-xs font-medium ${marginPct < 0 ? 'text-danger' : 'text-success'}`}>{money(marginRp)} ({marginPct}%)</td>{editing && <td></td>}</tr>}
+                                    {marginPct != null && <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi margin keseluruhan</td><td className={`px-3 py-1.5 text-right text-xs font-medium ${marginPct < 0 ? 'text-danger' : 'text-success'}`}>{money(marginRp)} ({marginPct}%)</td></tr>}
                                 </tfoot>
                             </table>
                         </div>
-                        {editing && (
-                            <div className="border-t border-border p-4">
-                                <Button type="button" variant="outline" icon={FiPlus} onClick={addLine}>Tambah Item</Button>
-                            </div>
-                        )}
                     </section>
 
                     <div className="flex justify-end gap-3">

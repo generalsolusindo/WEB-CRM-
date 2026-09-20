@@ -37,6 +37,9 @@ class Invoice extends Model
         'whatsapp_sent_at',
         'whatsapp_sent_by',
         'created_by',
+        'cancelled_at',
+        'cancelled_by',
+        'cancellation_reason',
     ];
 
     /**
@@ -55,6 +58,7 @@ class Invoice extends Model
             'due_date' => 'date:Y-m-d',
             'whatsapp_sent_at' => 'datetime',
             'pph23_recorded_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 
@@ -100,6 +104,11 @@ class Invoice extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 
     public function lines(): HasMany

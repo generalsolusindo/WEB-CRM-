@@ -4,7 +4,7 @@ import { FiFileText, FiSend, FiXCircle, FiHash, FiEdit2 } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { Totals } from '../../Sales/Quotations/Show';
 import { pickFile } from '../../../utils/fileValidation';
-import { PageHeader, Card, CardHeader, Button, Field, Input, Info, InfoGrid, StatusBadge, CurrencyInput, Modal } from '../../../Components/ui';
+import { PageHeader, Card, CardHeader, Button, ConfirmDialog, Field, Input, Info, InfoGrid, StatusBadge, CurrencyInput, Modal, PromptDialog } from '../../../Components/ui';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -12,6 +12,11 @@ function money(v) {
 
 export default function Show({ invoice, payments, cancelledPayments = [], totals, totalPaid, customerHasWhatsapp = false, pph23 = null, settlement = null, permissions }) {
     const [cancelTarget, setCancelTarget] = useState(null);
+    const [confirmation, setConfirmation] = useState(null);
+    const [actionProcessing, setActionProcessing] = useState(false);
+    const [numberOpen, setNumberOpen] = useState(false);
+    const [numberProcessing, setNumberProcessing] = useState(false);
+    const [numberError, setNumberError] = useState('');
     const cancelForm = useForm({ reason: '' });
     function closeCancel() {
         if (cancelForm.processing) return;
@@ -60,15 +65,29 @@ export default function Show({ invoice, payments, cancelledPayments = [], totals
     })();
     const payForm = useForm({ amount_paid: '', paid_at: nowLocal, notes: '', proof: null });
 
-    function act(url, msg) {
-        if (confirm(msg)) router.post(url);
+    function runAction() {
+        if (!confirmation) return;
+        setActionProcessing(true);
+        router.post(confirmation.url, {}, {
+            preserveScroll: true,
+            onSuccess: () => setConfirmation(null),
+            onFinish: () => setActionProcessing(false),
+        });
     }
 
-    function editNumber() {
-        const value = window.prompt('Nomor invoice baru:', invoice.number ?? '');
-        if (value && value.trim() !== '' && value.trim() !== invoice.number) {
-            router.patch(`/finance/invoices/${invoice.id}/number`, { number: value.trim() }, { preserveScroll: true });
+    function editNumber(value) {
+        if (value === invoice.number) {
+            setNumberOpen(false);
+            return;
         }
+        setNumberError('');
+        setNumberProcessing(true);
+        router.patch(`/finance/invoices/${invoice.id}/number`, { number: value }, {
+            preserveScroll: true,
+            onSuccess: () => setNumberOpen(false),
+            onError: (errors) => setNumberError(errors.number ?? 'Nomor invoice gagal diubah.'),
+            onFinish: () => setNumberProcessing(false),
+        });
     }
 
     function submitPayment(e) {
@@ -98,7 +117,7 @@ export default function Show({ invoice, payments, cancelledPayments = [], totals
                         <>
                             <Button href={`/finance/invoices/${invoice.id}/pdf`} external variant="outline" icon={FiFileText}>Lihat PDF</Button>
                             {permissions.update && <Button href={`/finance/invoices/${invoice.id}/edit`} variant="outline" icon={FiEdit2}>Edit</Button>}
-                            {permissions.updateNumber && <Button onClick={editNumber} variant="outline" icon={FiHash}>Ubah Nomor</Button>}
+                            {permissions.updateNumber && <Button onClick={() => { setNumberError(''); setNumberOpen(true); }} variant="outline" icon={FiHash}>Ubah Nomor</Button>}
                             {permissions.sendWhatsapp && (
                                 <Button
                                     onClick={sendWhatsapp}
@@ -109,8 +128,8 @@ export default function Show({ invoice, payments, cancelledPayments = [], totals
                                     {invoice.whatsapp_sent_at ? 'Kirim Ulang via WhatsApp' : 'Kirim via WhatsApp'}
                                 </Button>
                             )}
-                            {permissions.send && <Button onClick={() => act(`/finance/invoices/${invoice.id}/send`, 'Tandai invoice sudah dikirim (tanpa WA)?')} variant="outline" icon={FiSend}>Tandai Terkirim</Button>}
-                            {permissions.cancel && <Button onClick={() => act(`/finance/invoices/${invoice.id}/cancel`, 'Batalkan invoice ini?')} variant="ghost" icon={FiXCircle} className="text-danger hover:bg-danger-soft hover:text-danger">Batalkan</Button>}
+                            {permissions.send && <Button onClick={() => setConfirmation({ type: 'send', url: `/finance/invoices/${invoice.id}/send` })} variant="outline" icon={FiSend}>Tandai Terkirim</Button>}
+                            {permissions.cancel && <Button onClick={() => setConfirmation({ type: 'cancel', url: `/finance/invoices/${invoice.id}/cancel` })} variant="ghost" icon={FiXCircle} className="text-danger hover:bg-danger-soft hover:text-danger">Batalkan</Button>}
                         </>
                     )}
                 />
@@ -288,7 +307,36 @@ export default function Show({ invoice, payments, cancelledPayments = [], totals
                     )}
                 </Card>
             </div>
-            <Modal open={cancelTarget !== null} onClose={closeCancel} title="Batalkan pencatatan pembayaran">
+
+            <PromptDialog
+                open={numberOpen}
+                onClose={() => setNumberOpen(false)}
+                onConfirm={editNumber}
+                title="Ubah nomor invoice"
+                description="Masukkan nomor invoice baru. Nomor harus unik."
+                label="Nomor invoice"
+                initialValue={invoice.number ?? ''}
+                required
+                maxLength={100}
+                error={numberError}
+                processing={numberProcessing}
+                confirmLabel="Simpan Nomor"
+            />
+
+            <ConfirmDialog
+                open={confirmation !== null}
+                onClose={() => setConfirmation(null)}
+                onConfirm={runAction}
+                title={confirmation?.type === 'cancel' ? 'Batalkan invoice?' : 'Tandai invoice sebagai terkirim?'}
+                description={confirmation?.type === 'cancel'
+                    ? 'Invoice akan dibatalkan dan tidak lagi dihitung sebagai tagihan aktif.'
+                    : 'Status invoice akan diperbarui menjadi sudah dikirim tanpa membuka WhatsApp.'}
+                tone={confirmation?.type === 'cancel' ? 'danger' : 'info'}
+                confirmLabel={confirmation?.type === 'cancel' ? 'Batalkan Invoice' : 'Tandai Terkirim'}
+                processing={actionProcessing}
+            />
+
+            <Modal open={cancelTarget !== null} onClose={closeCancel} title="Batalkan pencatatan pembayaran" busy={cancelForm.processing}>
                 <form onSubmit={cancelPayment} className="space-y-4">
                     <p className="text-sm">Batalkan pembayaran <strong>{money(cancelTarget?.amount_paid)}</strong> pada invoice {invoice.number}? Pembayaran lain tetap tercatat. Total dan status invoice akan dihitung ulang.</p>
                     <p className="text-sm text-text-muted">Ini koreksi pencatatan, bukan pengembalian uang. Project yang sudah dibuat tetap ada dan akan diberi pemberitahuan jika pembayaran awal menjadi belum lunas.</p>

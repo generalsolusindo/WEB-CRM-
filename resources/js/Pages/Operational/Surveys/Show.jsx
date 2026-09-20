@@ -1,7 +1,7 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, Button, StatusBadge } from '../../../Components/ui';
+import { PageHeader, Button, StatusBadge, PromptDialog } from '../../../Components/ui';
 
 export default function Show({ survey, report, canBrief, canVerify, canCancel, canManageTeam, surveyorOptions = [], checkIns = [] }) {
     const currentTeam = survey.team ?? [];
@@ -17,14 +17,18 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
         leader_id: currentLeader,
     });
     const verifyForm = useForm({ decision: 'approve', notes: '' });
+    const [cancelOpen, setCancelOpen] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
 
     function submitBrief(e) { e.preventDefault(); briefForm.post(`/operational/surveys/${survey.id}/brief`); }
     function submitTeam(e) { e.preventDefault(); teamForm.patch(`/operational/surveys/${survey.id}/team`, { preserveScroll: true }); }
     function submitVerify(e) { e.preventDefault(); verifyForm.post(`/operational/surveys/${survey.id}/verify`); }
-    function cancelSurvey() {
-        const reason = prompt('Alasan pembatalan survey (opsional):');
-        if (reason === null) return;
-        router.post(`/operational/surveys/${survey.id}/cancel`, { reason });
+    function cancelSurvey(reason) {
+        setCancelling(true);
+        router.post(`/operational/surveys/${survey.id}/cancel`, { reason }, {
+            onSuccess: () => setCancelOpen(false),
+            onFinish: () => setCancelling(false),
+        });
     }
 
     return (
@@ -35,7 +39,7 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
                     title={<span className="flex items-center gap-3">{survey.code} <StatusBadge status={survey.status} label={survey.status_label} tone="warning" /></span>}
                     subtitle={`${survey.customer} · ${survey.company || 'Tanpa perusahaan'}`}
                     back={{ href: '/operational/surveys', label: 'Kembali' }}
-                    actions={canCancel && <Button onClick={cancelSurvey} variant="ghost" className="text-danger hover:bg-danger-soft hover:text-danger">Batalkan Survey</Button>}
+                    actions={canCancel && <Button onClick={() => setCancelOpen(true)} variant="ghost" className="text-danger hover:bg-danger-soft hover:text-danger">Batalkan Survey</Button>}
                 />
 
                 <section className="grid gap-4 card p-6 sm:grid-cols-2">
@@ -167,6 +171,19 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
                     </section>
                 )}
             </div>
+            <PromptDialog
+                open={cancelOpen}
+                onClose={() => setCancelOpen(false)}
+                onConfirm={cancelSurvey}
+                title="Batalkan survey?"
+                description="Survey akan dibatalkan dan tidak dapat dilanjutkan dalam alur aktif."
+                label="Alasan pembatalan (opsional)"
+                placeholder="Tuliskan alasan pembatalan"
+                multiline
+                processing={cancelling}
+                confirmLabel="Batalkan Survey"
+                confirmVariant="danger"
+            />
         </AppLayout>
     );
 }

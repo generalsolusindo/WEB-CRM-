@@ -251,6 +251,14 @@ class LeadManagementTest extends TestCase
         [$sales, $quotation] = $this->quotationForLead();
         $lead = $quotation->lead;
         $pr = $quotation->procurementRequest;
+        Notification::create([
+            'user_id' => $sales->id,
+            'type' => 'procurement_request.ready',
+            'message' => 'PR siap dibuatkan quotation.',
+            'related_type' => $pr->getMorphClass(),
+            'related_id' => $pr->id,
+            'is_sent' => true,
+        ]);
 
         $this->actingAs($sales)->delete("/sales/leads/{$lead->id}")->assertRedirect('/sales/leads');
 
@@ -258,6 +266,10 @@ class LeadManagementTest extends TestCase
         $this->assertDatabaseMissing('requirements', ['lead_id' => $lead->id]);
         $this->assertDatabaseMissing('procurement_requests', ['id' => $pr->id]);
         $this->assertDatabaseMissing('quotations', ['id' => $quotation->id]);
+        $this->assertDatabaseMissing('notifications', [
+            'related_type' => $pr->getMorphClass(),
+            'related_id' => $pr->id,
+        ]);
     }
 
     public function test_lead_cannot_be_deleted_once_a_quotation_sales_order_has_invoice(): void

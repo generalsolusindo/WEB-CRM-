@@ -8,17 +8,23 @@ use App\Enums\InvoiceStatus;
 use App\Enums\OrderType;
 use App\Enums\ProcurementPaymentStatus;
 use App\Enums\ProcurementRequestStatus;
+use App\Enums\ProjectStatus;
 use App\Enums\SowStatus;
+use App\Enums\SurveyStatus;
 use App\Models\ActualProcurement;
 use App\Models\Bast;
 use App\Models\Invoice;
 use App\Models\ProcurementPayment;
 use App\Models\ProcurementRequest;
 use App\Models\Project;
+use App\Models\ProjectTask;
 use App\Models\Quotation;
 use App\Models\SalesOrder;
 use App\Models\Sow;
+use App\Models\Survey;
 use App\Models\User;
+use App\Models\VendorServicePayment;
+use App\Models\WarehouseItem;
 use App\Services\Sales\SalesOrderSettlement;
 
 /**
@@ -125,8 +131,14 @@ class MenuBadges
             ->filter(fn ($so) => $this->settlement->canCreateFinalInvoice($so))
             ->count();
 
+        // Tugas bayar vendor jasa: DP yang sudah diajukan, atau pelunasan yang BAST-nya sudah terverifikasi.
+        $vendorService = VendorServicePayment::query()->with('project')->whereIn('status', ['awaiting_dp', 'in_progress'])->get()
+            ->filter(fn ($p) => $p->canPayDp() || $p->canPayFinal())
+            ->count();
+
         return [
             '/finance/invoices' => $needsUpfrontInvoice + $draft + $unpaidSent + $overdue + $readyForFinal,
+            '/finance/vendor-service-payments' => $vendorService,
         ];
     }
 
@@ -168,14 +180,14 @@ class MenuBadges
     private function technician(User $user): array
     {
         return [
-            '/technician/tasks' => \App\Models\ProjectTask::query()
+            '/technician/tasks' => ProjectTask::query()
                 ->where('status', '!=', 'done')
                 ->whereHas('project', fn ($q) => $q
-                    ->where('status', \App\Enums\ProjectStatus::InProgress->value)
+                    ->where('status', ProjectStatus::InProgress->value)
                     ->whereHas('technicians', fn ($t) => $t->where('technician_id', $user->id)))
                 ->count(),
-            '/technician/surveys' => \App\Models\Survey::query()
-                ->where('status', \App\Enums\SurveyStatus::InProgress->value)
+            '/technician/surveys' => Survey::query()
+                ->where('status', SurveyStatus::InProgress->value)
                 ->whereHas('surveyorAssignments', fn ($q) => $q->where('technician_id', $user->id))
                 ->count(),
             '/technician/sows' => Sow::query()
@@ -225,7 +237,7 @@ class MenuBadges
     private function warehouse(): array
     {
         return [
-            '/warehouse/items' => \App\Models\WarehouseItem::query()->where('qty_on_hand', 0)->count(),
+            '/warehouse/items' => WarehouseItem::query()->where('qty_on_hand', 0)->count(),
         ];
     }
 }

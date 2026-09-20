@@ -1,5 +1,6 @@
 import { router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
+import { ConfirmDialog, PromptDialog } from '../../../Components/ui';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -9,6 +10,9 @@ const doneStatuses = ['verified', 'closed', 'cancelled'];
 
 export default function SurveyPanel({ leadId, surveys = [], requestable = false, deliveryOptions = [] }) {
     const [open, setOpen] = useState(false);
+    const [finalizeAction, setFinalizeAction] = useState(null);
+    const [cancelSurveyId, setCancelSurveyId] = useState(null);
+    const [actionProcessing, setActionProcessing] = useState(false);
     const { data, setData, post, processing, errors, reset } = useForm({
         site_region: '',
         site_address: '',
@@ -27,19 +31,24 @@ export default function SurveyPanel({ leadId, surveys = [], requestable = false,
         });
     }
 
-    function finalize(surveyId, copyItems) {
-        const msg = copyItems
-            ? 'Salin item rekomendasi ke daftar requirement dan tutup survey?'
-            : 'Tutup survey ini tanpa menyalin item?';
-        if (confirm(msg)) {
-            router.post(`/sales/leads/${leadId}/surveys/${surveyId}/finalize`, { copy_items: copyItems }, { preserveScroll: true });
-        }
+    function finalize() {
+        if (!finalizeAction) return;
+        setActionProcessing(true);
+        router.post(`/sales/leads/${leadId}/surveys/${finalizeAction.surveyId}/finalize`, { copy_items: finalizeAction.copyItems }, {
+            preserveScroll: true,
+            onSuccess: () => setFinalizeAction(null),
+            onFinish: () => setActionProcessing(false),
+        });
     }
 
-    function cancelSurvey(surveyId) {
-        const reason = prompt('Alasan pembatalan survey (opsional):');
-        if (reason === null) return;
-        router.post(`/sales/leads/${leadId}/surveys/${surveyId}/cancel`, { reason }, { preserveScroll: true });
+    function cancelSurvey(reason) {
+        if (!cancelSurveyId) return;
+        setActionProcessing(true);
+        router.post(`/sales/leads/${leadId}/surveys/${cancelSurveyId}/cancel`, { reason }, {
+            preserveScroll: true,
+            onSuccess: () => setCancelSurveyId(null),
+            onFinish: () => setActionProcessing(false),
+        });
     }
 
     return (
@@ -86,7 +95,7 @@ export default function SurveyPanel({ leadId, surveys = [], requestable = false,
 
                             {s.can_cancel && (
                                 <div className="mt-3">
-                                    <button onClick={() => cancelSurvey(s.id)} className="rounded-lg border border-danger/30 px-4 py-2 text-sm text-danger">Batalkan Survey</button>
+                                    <button onClick={() => setCancelSurveyId(s.id)} className="rounded-lg border border-danger/30 px-4 py-2 text-sm text-danger">Batalkan Survey</button>
                                 </div>
                             )}
 
@@ -111,7 +120,7 @@ export default function SurveyPanel({ leadId, surveys = [], requestable = false,
                                 <div className="mt-3 flex flex-wrap items-center gap-2">
                                     {s.report?.items?.length > 0 && (
                                         <button
-                                            onClick={() => finalize(s.id, true)}
+                                            onClick={() => setFinalizeAction({ surveyId: s.id, copyItems: true })}
                                             disabled={s.requirements_locked}
                                             title={s.requirements_locked ? 'Requirement terkunci (sudah dikirim ke Procurement)' : ''}
                                             className="btn btn-primary"
@@ -119,7 +128,7 @@ export default function SurveyPanel({ leadId, surveys = [], requestable = false,
                                             Salin {s.report.items.length} item ke Requirement &amp; Tutup
                                         </button>
                                     )}
-                                    <button onClick={() => finalize(s.id, false)} className="btn btn-outline">
+                                    <button onClick={() => setFinalizeAction({ surveyId: s.id, copyItems: false })} className="btn btn-outline">
                                         Tutup tanpa menyalin
                                     </button>
                                 </div>
@@ -166,6 +175,34 @@ export default function SurveyPanel({ leadId, surveys = [], requestable = false,
                     </div>
                 </form>
             )}
+
+            <ConfirmDialog
+                open={finalizeAction !== null}
+                onClose={() => setFinalizeAction(null)}
+                onConfirm={finalize}
+                title="Tutup survey?"
+                description={finalizeAction?.copyItems
+                    ? 'Item rekomendasi akan disalin ke daftar requirement, lalu survey ditutup.'
+                    : 'Survey akan ditutup tanpa menyalin item rekomendasi ke requirement.'}
+                tone="warning"
+                confirmLabel={finalizeAction?.copyItems ? 'Salin & Tutup Survey' : 'Tutup Survey'}
+                processing={actionProcessing}
+            />
+
+            <PromptDialog
+                open={cancelSurveyId !== null}
+                onClose={() => setCancelSurveyId(null)}
+                onConfirm={cancelSurvey}
+                title="Batalkan survey?"
+                description="Survey akan dihentikan dan tidak dapat dilanjutkan kembali."
+                label="Alasan pembatalan (opsional)"
+                placeholder="Tuliskan alasan pembatalan"
+                multiline
+                maxLength={1000}
+                confirmLabel="Batalkan Survey"
+                confirmVariant="danger"
+                processing={actionProcessing}
+            />
         </section>
     );
 }

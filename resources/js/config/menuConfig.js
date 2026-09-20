@@ -61,6 +61,7 @@ const menuConfig = {
         { label: 'Survey', href: '/finance/surveys', icon: FiClipboard },
         { label: 'Pembayaran Invoice', href: '/finance/payments', icon: FiCreditCard },
         { label: 'Pembayaran Vendor', href: '/finance/procurement-payments', icon: FiTruck },
+        { label: 'Vendor Jasa', href: '/finance/vendor-service-payments', icon: FiTool },
     ],
     management: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },

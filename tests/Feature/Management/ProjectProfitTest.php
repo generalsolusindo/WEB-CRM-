@@ -5,11 +5,11 @@ namespace Tests\Feature\Management;
 use App\Models\ActualProcurement;
 use App\Models\Contact;
 use App\Models\Lead;
-use App\Models\Project;
 use App\Models\ProcurementRequest;
+use App\Models\Project;
 use App\Models\Quotation;
-use App\Models\SalesOrder;
 use App\Models\User;
+use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -57,6 +57,32 @@ class ProjectProfitTest extends TestCase
             // HPP sekarang 2 x 800.000 = 1.600.000 (bukan lagi estimasi 2.000.000)
             ->where('projects.data.0.hpp', 1600000)
             ->where('projects.data.0.profit', 1000000));
+    }
+
+    public function test_vendor_deal_fee_replaces_service_cost_estimate_in_hpp(): void
+    {
+        $project = $this->plannedProject();
+        $vendor = Vendor::create(['name' => 'Vendor Jasa', 'provides_technical' => true]);
+        $project->vendorServicePayment()->create([
+            'number' => '1/GS-VP/09/2026', 'vendor_id' => $vendor->id, 'total_fee' => 500000, 'terms' => 'pay_at_end',
+            'bank_name' => 'BCA', 'account_number' => '1', 'account_holder' => 'x', 'status' => 'in_progress', 'released_at' => now(),
+        ]);
+
+        // Material 2 x 1.000.000 = 2.000.000, ditambah fee vendor 500.000 = HPP 2.500.000.
+        $this->actingAs($this->management())->get('/management/project-profit')
+            ->assertInertia(fn ($page) => $page
+                ->where('projects.data.0.hpp', 2500000)
+                ->where('projects.data.0.uses_vendor_fee', true)
+                ->where('projects.data.0.profit', 100000)
+                ->where('summary.total_profit', 100000));
+    }
+
+    public function test_project_without_vendor_deal_keeps_estimated_service_cost(): void
+    {
+        $this->plannedProject();
+
+        $this->actingAs($this->management())->get('/management/project-profit')
+            ->assertInertia(fn ($page) => $page->where('projects.data.0.uses_vendor_fee', false)->where('projects.data.0.hpp', 2000000));
     }
 
     public function test_can_filter_by_won_scope(): void

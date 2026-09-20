@@ -2,7 +2,7 @@ import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { FiFileText } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, PillTabs, Toolbar, FilterSelect, DataTable, StatusBadge, Pagination, EmptyState, Button } from '../../../Components/ui';
+import { PageHeader, PillTabs, Toolbar, FilterSelect, DataTable, StatusBadge, Pagination, EmptyState, Button, ConfirmDialog } from '../../../Components/ui';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -12,22 +12,27 @@ export default function Index({ needsInvoice, readyForFinal = [], invoices, filt
     const needsCount = needsInvoice.length + readyForFinal.length;
     const [tab, setTab] = useState(needsCount > 0 ? 'needs' : 'all');
     const [form, setForm] = useState(filters);
+    const [finalTarget, setFinalTarget] = useState(null);
+    const [creatingFinal, setCreatingFinal] = useState(false);
 
     function applyFilter(next) {
         const merged = { ...form, ...next };
         setForm(merged);
         router.get('/finance/invoices', merged, { preserveState: true, replace: true });
     }
-    function createFinal(soId) {
-        if (confirm('Buat Invoice Pelunasan (Final) untuk Sales Order ini?')) {
-            router.post(`/finance/sales-orders/${soId}/final-invoice`);
-        }
+    function createFinal() {
+        if (!finalTarget) return;
+        setCreatingFinal(true);
+        router.post(`/finance/sales-orders/${finalTarget.id}/final-invoice`, {}, {
+            onSuccess: () => setFinalTarget(null),
+            onFinish: () => setCreatingFinal(false),
+        });
     }
 
     const finalCols = [
         { key: 'number', label: 'Sales Order', render: (so) => <span className="font-semibold text-text">{so.number}</span> },
         { key: 'customer', label: 'Customer', render: (so) => <span className="text-text-muted">{so.customer}</span> },
-        { key: 'act', label: '', align: 'right', render: (so) => <Button size="sm" onClick={() => createFinal(so.id)}>Buat Final Invoice</Button> },
+        { key: 'act', label: '', align: 'right', render: (so) => <Button size="sm" onClick={() => setFinalTarget(so)}>Buat Final Invoice</Button> },
     ];
     const needsCols = [
         { key: 'number', label: 'Sales Order', render: (so) => <span className="font-semibold text-text">{so.number}</span> },
@@ -106,6 +111,17 @@ export default function Index({ needsInvoice, readyForFinal = [], invoices, filt
                     </div>
                 )}
             </div>
+
+            <ConfirmDialog
+                open={finalTarget !== null}
+                onClose={() => setFinalTarget(null)}
+                onConfirm={createFinal}
+                title="Buat invoice pelunasan?"
+                description={`Invoice pelunasan final akan dibuat untuk Sales Order ${finalTarget?.number ?? ''}.`}
+                tone="warning"
+                confirmLabel="Buat Final Invoice"
+                processing={creatingFinal}
+            />
         </AppLayout>
     );
 }

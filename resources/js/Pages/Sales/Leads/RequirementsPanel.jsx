@@ -1,12 +1,15 @@
 import { router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import CategoryBadge from '../../../Components/CategoryBadge';
+import { ConfirmDialog } from '../../../Components/ui';
 
 const emptyForm = { item_name: '', category: 'material', description: '', qty: '1', unit: '', notes: '' };
 
 export default function RequirementsPanel({ leadId, requirements, editable, unitOptions = [], canSubmitAddendum = false, isAddendumMode = false }) {
     const [editingId, setEditingId] = useState(null);
     const [submittingBatch, setSubmittingBatch] = useState(false);
+    const [confirmation, setConfirmation] = useState(null);
+    const [deleting, setDeleting] = useState(false);
     const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm(emptyForm);
 
     function beginEdit(item) {
@@ -37,25 +40,38 @@ export default function RequirementsPanel({ leadId, requirements, editable, unit
     }
 
     function destroy(id) {
-        if (confirm('Hapus requirement ini?')) {
-            router.delete(`/sales/leads/${leadId}/requirements/${id}`, { preserveScroll: true });
-        }
+        setDeleting(true);
+        router.delete(`/sales/leads/${leadId}/requirements/${id}`, {
+            preserveScroll: true,
+            onSuccess: () => setConfirmation(null),
+            onFinish: () => setDeleting(false),
+        });
     }
 
     function submitToProcurement() {
         if (submittingBatch) return;
-        if (confirm('Kirim semua requirement ke Procurement? Setelah dikirim, data akan dikunci.')) {
-            setSubmittingBatch(true);
-            router.post(`/sales/leads/${leadId}/submit-procurement`, {}, { preserveScroll: true, onFinish: () => setSubmittingBatch(false) });
-        }
+        setSubmittingBatch(true);
+        router.post(`/sales/leads/${leadId}/submit-procurement`, {}, {
+            preserveScroll: true,
+            onSuccess: () => setConfirmation(null),
+            onFinish: () => setSubmittingBatch(false),
+        });
     }
 
     function submitAddendum() {
         if (submittingBatch) return;
-        if (confirm('Ajukan requirement baru ini sebagai tambahan (addendum) ke Procurement? Sales Order yang sudah berjalan tidak akan berubah — ini jadi pengajuan tambahan terpisah.')) {
-            setSubmittingBatch(true);
-            router.post(`/sales/leads/${leadId}/submit-addendum`, {}, { preserveScroll: true, onFinish: () => setSubmittingBatch(false) });
-        }
+        setSubmittingBatch(true);
+        router.post(`/sales/leads/${leadId}/submit-addendum`, {}, {
+            preserveScroll: true,
+            onSuccess: () => setConfirmation(null),
+            onFinish: () => setSubmittingBatch(false),
+        });
+    }
+
+    function confirmAction() {
+        if (confirmation?.type === 'delete') destroy(confirmation.id);
+        if (confirmation?.type === 'procurement') submitToProcurement();
+        if (confirmation?.type === 'addendum') submitAddendum();
     }
 
     const newRequirementsCount = requirements.filter((r) => !r.submitted_at).length;
@@ -74,12 +90,12 @@ export default function RequirementsPanel({ leadId, requirements, editable, unit
                 <div className="flex items-center gap-2">
                     <span className="rounded-full bg-bg px-3 py-1 text-sm text-text-muted">{requirements.length} item</span>
                     {editable && !isAddendumMode && requirements.length > 0 && (
-                        <button onClick={submitToProcurement} disabled={submittingBatch} className="btn btn-primary">
+                        <button onClick={() => setConfirmation({ type: 'procurement' })} disabled={submittingBatch} className="btn btn-primary">
                             {submittingBatch ? 'Mengirim...' : 'Submit ke Procurement'}
                         </button>
                     )}
                     {canSubmitAddendum && newRequirementsCount > 0 && (
-                        <button onClick={submitAddendum} disabled={submittingBatch} className="btn btn-primary">
+                        <button onClick={() => setConfirmation({ type: 'addendum' })} disabled={submittingBatch} className="btn btn-primary">
                             {submittingBatch ? 'Mengirim...' : `Ajukan Tambahan (${newRequirementsCount} item baru)`}
                         </button>
                     )}
@@ -113,7 +129,7 @@ export default function RequirementsPanel({ leadId, requirements, editable, unit
                                             ) : (
                                                 <>
                                                     <button onClick={() => beginEdit(item)} className="mr-3 font-medium text-primary hover:underline">Edit</button>
-                                                    <button onClick={() => destroy(item.id)} className="font-medium text-danger hover:underline">Hapus</button>
+                                                    <button onClick={() => setConfirmation({ type: 'delete', id: item.id })} className="font-medium text-danger hover:underline">Hapus</button>
                                                 </>
                                             )}
                                         </td>
@@ -155,6 +171,21 @@ export default function RequirementsPanel({ leadId, requirements, editable, unit
                     <div className="flex justify-end gap-2">{editingId && <button type="button" onClick={cancel} className="btn btn-outline">Batal</button>}<button disabled={processing} className="btn btn-primary">{processing ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Tambah Item'}</button></div>
                 </form>
             )}
+
+            <ConfirmDialog
+                open={confirmation !== null}
+                onClose={() => setConfirmation(null)}
+                onConfirm={confirmAction}
+                title={confirmation?.type === 'delete' ? 'Hapus requirement?' : confirmation?.type === 'addendum' ? 'Ajukan requirement tambahan?' : 'Kirim requirement ke Procurement?'}
+                description={confirmation?.type === 'delete'
+                    ? 'Item requirement ini akan dihapus permanen.'
+                    : confirmation?.type === 'addendum'
+                        ? 'Requirement baru akan diajukan sebagai addendum terpisah. Sales Order yang sedang berjalan tidak akan berubah.'
+                        : 'Seluruh requirement akan dikirim ke Procurement dan data akan dikunci setelah berhasil dikirim.'}
+                tone={confirmation?.type === 'delete' ? 'danger' : 'warning'}
+                confirmLabel={confirmation?.type === 'delete' ? 'Hapus Requirement' : confirmation?.type === 'addendum' ? 'Ajukan Tambahan' : 'Kirim ke Procurement'}
+                processing={deleting || submittingBatch}
+            />
         </section>
     );
 }

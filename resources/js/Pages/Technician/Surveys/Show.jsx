@@ -3,6 +3,7 @@ import { useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { pickFile } from '../../../utils/fileValidation';
 import { PageHeader, StatusBadge } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 const emptyItem = { item_name: '', qty: 1, unit: '', notes: '' };
 
@@ -39,7 +40,12 @@ export default function Show({ survey, report, canWork, canSubmit, checkedIn, ca
         uploadForm.post(`/technician/surveys/${survey.id}/report/attachments`, { forceFormData: true, preserveScroll: true, onSuccess: () => uploadForm.reset() });
     }
     function removeAttachment(id) {
-        if (confirm('Hapus lampiran ini?')) router.delete(`/technician/surveys/${survey.id}/report/attachments/${id}`, { preserveScroll: true });
+        feedback.act({
+            method: 'delete',
+            url: `/technician/surveys/${survey.id}/report/attachments/${id}`,
+            confirm: { tone: 'danger', title: 'Hapus lampiran?', text: 'Lampiran ini akan dihapus dari laporan survey.', confirmLabel: 'Ya, hapus' },
+            success: { title: 'Lampiran dihapus' },
+        });
     }
     function submitReport() {
         setSubmitError(null);

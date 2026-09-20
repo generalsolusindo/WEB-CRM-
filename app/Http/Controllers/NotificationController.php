@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Notification;
+use App\Models\ProcurementRequest;
+use App\Models\Sow;
+use App\Models\VendorServicePayment;
 use Illuminate\Http\RedirectResponse;
 
 class NotificationController extends Controller
@@ -29,6 +32,12 @@ class NotificationController extends Controller
                 ? "/management/projects/{$notification->related_id}"
                 : "/operational/projects/{$notification->related_id}",
             'project_procurement.requested' => '/procurement/project-procurements',
+            'vendor_service.needed' => "/procurement/project-procurements/{$notification->related_id}",
+            'vendor_service.released',
+            'vendor_service.payment_cancelled' => "/operational/projects/{$notification->related_id}",
+            'vendor_service.dp_due',
+            'vendor_service.final_due',
+            'vendor_service.pay_after_bast' => $this->vendorServiceUrl($notification->related_id),
             'procurement_request.ready',
             'procurement_request.rejected' => $this->leadUrlForProcurementRequest($notification->related_id),
             'quotation.pending_pm_review' => "/project-manager/quotations/{$notification->related_id}",
@@ -48,16 +57,23 @@ class NotificationController extends Controller
         };
     }
 
+    private function vendorServiceUrl(?int $projectId): string
+    {
+        $id = VendorServicePayment::where('project_id', $projectId)->value('id');
+
+        return $id ? "/finance/vendor-service-payments/{$id}" : '/finance/vendor-service-payments';
+    }
+
     private function sowProjectUrl(?int $sowId): string
     {
-        $projectId = \App\Models\Sow::whereKey($sowId)->value('project_id');
+        $projectId = Sow::whereKey($sowId)->value('project_id');
 
         return $projectId ? "/operational/projects/{$projectId}/sow" : '/dashboard';
     }
 
     private function leadUrlForProcurementRequest(?int $procurementRequestId): string
     {
-        $leadId = \App\Models\ProcurementRequest::whereKey($procurementRequestId)->value('lead_id');
+        $leadId = ProcurementRequest::whereKey($procurementRequestId)->value('lead_id');
 
         return $leadId ? "/sales/leads/{$leadId}" : '/dashboard';
     }

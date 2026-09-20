@@ -9,6 +9,7 @@ enum QuotationStatus: string
     case Confirmed = 'confirmed';
     case Revised = 'revised';
     case Rejected = 'rejected';
+    case Cancelled = 'cancelled';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum QuotationStatus: string
             self::Confirmed => 'Confirmed',
             self::Revised => 'Revised',
             self::Rejected => 'Rejected',
+            self::Cancelled => 'Dibatalkan',
         };
     }
 

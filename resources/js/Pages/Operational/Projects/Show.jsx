@@ -1,16 +1,26 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, Button, StatusBadge, CurrencyInput } from '../../../Components/ui';
+import { PageHeader, Button, StatusBadge, CurrencyInput, ConfirmDialog } from '../../../Components/ui';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
 }
 
-export default function Show({ project, approvalDocs = [], bastRecords, taskPhotos, checkIns = [], materialStatus, procurementProgress, statusOptions, availabilityOptions, technicianOptions, vendorOptions = [], changeRequestTypes, permissions }) {
+export default function Show({ project, approvalDocs = [], bastRecords, taskPhotos, checkIns = [], materialStatus, procurementProgress, statusOptions, availabilityOptions, technicianOptions, changeRequestTypes, permissions }) {
     const number = `PRJ-${String(project.id).padStart(6, '0')}`;
     const so = project.sales_order;
     const isMaterialOnly = so.order_type === 'material_only';
+    const [completeOpen, setCompleteOpen] = useState(false);
+    const [completing, setCompleting] = useState(false);
+
+    function completeProject() {
+        setCompleting(true);
+        router.post(`/operational/projects/${project.id}/complete`, {}, {
+            onSuccess: () => setCompleteOpen(false),
+            onFinish: () => setCompleting(false),
+        });
+    }
 
     return (
         <AppLayout>
@@ -24,7 +34,7 @@ export default function Show({ project, approvalDocs = [], bastRecords, taskPhot
                         <>
                             {permissions.markReady && <Button onClick={() => router.post(`/operational/projects/${project.id}/ready`)} className="bg-success text-white hover:bg-success">Tandai Siap</Button>}
                             {permissions.start && <Button onClick={() => router.post(`/operational/projects/${project.id}/start`)}>Mulai Project</Button>}
-                            {permissions.completeDirect && <Button onClick={() => { if (confirm('Selesaikan project ini? Semua barang sudah dikonfirmasi terkirim penuh. (Material Only, tanpa BAST)')) router.post(`/operational/projects/${project.id}/complete`); }} className="bg-success text-white hover:bg-success">Selesaikan Project</Button>}
+                            {permissions.completeDirect && <Button onClick={() => setCompleteOpen(true)} className="bg-success text-white hover:bg-success">Selesaikan Project</Button>}
                         </>
                     )}
                 />
@@ -59,7 +69,7 @@ export default function Show({ project, approvalDocs = [], bastRecords, taskPhot
                 </section>
 
                 <Planning project={project} canPlan={permissions.plan} />
-                <VendorAssignment project={project} options={vendorOptions} editable={permissions.assignVendor} canViewSow={permissions.viewSow} />
+                <VendorAssignment project={project} canViewSow={permissions.viewSow} />
                 <ActualProcurement project={project} availabilityOptions={availabilityOptions} progress={procurementProgress} editable={permissions.manageExtraProcurement} />
                 {!isMaterialOnly && (
                     <>
@@ -82,18 +92,33 @@ export default function Show({ project, approvalDocs = [], bastRecords, taskPhot
                 )}
                 <ChangeRequests project={project} types={changeRequestTypes} editable={permissions.manageChangeRequests} />
             </div>
+            <ConfirmDialog
+                open={completeOpen}
+                onClose={() => setCompleteOpen(false)}
+                onConfirm={completeProject}
+                title="Selesaikan project?"
+                description="Pastikan semua barang telah dikonfirmasi terkirim penuh. Project Material Only akan selesai tanpa BAST."
+                tone="success"
+                confirmLabel="Selesaikan Project"
+                processing={completing}
+            />
         </AppLayout>
     );
 }
 
 function BastSection({ project, records, canVerify }) {
     const [rejecting, setRejecting] = useState(null);
+    const [approving, setApproving] = useState(null);
+    const [approveProcessing, setApproveProcessing] = useState(false);
     const form = useForm({ decision: 'reject', notes: '' });
 
     function approve(bastId) {
-        if (confirm('Verifikasi BAST ini? Project akan ditandai selesai.')) {
-            router.put(`/operational/projects/${project.id}/bast/${bastId}`, { decision: 'approve' }, { preserveScroll: true });
-        }
+        setApproveProcessing(true);
+        router.put(`/operational/projects/${project.id}/bast/${bastId}`, { decision: 'approve' }, {
+            preserveScroll: true,
+            onSuccess: () => setApproving(null),
+            onFinish: () => setApproveProcessing(false),
+        });
     }
     function submitReject(e) {
         e.preventDefault();
@@ -117,7 +142,7 @@ function BastSection({ project, records, canVerify }) {
                                 </div>
                                 {canVerify && b.status === 'submitted' && (
                                     <div className="flex gap-2">
-                                        <button onClick={() => approve(b.id)} className="rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white">Verifikasi</button>
+                                        <button onClick={() => setApproving(b.id)} className="rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white">Verifikasi</button>
                                         <button onClick={() => setRejecting(b.id)} className="rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-semibold text-danger">Tolak</button>
                                     </div>
                                 )}
@@ -142,6 +167,16 @@ function BastSection({ project, records, canVerify }) {
                     </div>
                 </form>
             )}
+            <ConfirmDialog
+                open={approving !== null}
+                onClose={() => setApproving(null)}
+                onConfirm={() => approve(approving)}
+                title="Verifikasi BAST?"
+                description="BAST akan disetujui dan project akan ditandai selesai."
+                tone="success"
+                confirmLabel="Verifikasi BAST"
+                processing={approveProcessing}
+            />
         </section>
     );
 }
@@ -227,10 +262,21 @@ function Planning({ project, canPlan }) {
 
 function ActualProcurement({ project, availabilityOptions, progress, editable }) {
     const form = useForm({ item_name: '', qty: '1', unit: '', cost_price: '' });
+    const [deleting, setDeleting] = useState(null);
+    const [deleteProcessing, setDeleteProcessing] = useState(false);
 
     function add(e) {
         e.preventDefault();
         form.post(`/operational/projects/${project.id}/actual-procurements`, { preserveScroll: true, onSuccess: () => form.reset() });
+    }
+
+    function removeItem() {
+        setDeleteProcessing(true);
+        router.delete(`/operational/projects/${project.id}/actual-procurements/${deleting}`, {
+            preserveScroll: true,
+            onSuccess: () => setDeleting(null),
+            onFinish: () => setDeleteProcessing(false),
+        });
     }
 
     const done = progress.total > 0 && progress.received === progress.total;
@@ -256,7 +302,7 @@ function ActualProcurement({ project, availabilityOptions, progress, editable })
                                 <td className="px-4 py-3 text-text-muted">{item.qty} {item.unit}</td>
                                 <td className="px-4 py-3 text-right text-text-muted">{money(item.cost_price)}</td>
                                 <td className="px-4 py-3"><span className={`badge ${item.status === 'received' ? 'badge-success' : item.status === 'purchased' ? 'badge-primary' : 'badge-warning'}`}>{availabilityOptions.find((o) => o.value === item.status)?.label ?? item.status}</span></td>
-                                {editable && <td className="px-4 py-3 text-right">{item.status === 'pending' && !item.procurement_payment_id && <button onClick={() => { if (confirm('Hapus item?')) router.delete(`/operational/projects/${project.id}/actual-procurements/${item.id}`, { preserveScroll: true }); }} className="text-danger">Hapus</button>}</td>}
+                                {editable && <td className="px-4 py-3 text-right">{item.status === 'pending' && !item.procurement_payment_id && <button onClick={() => setDeleting(item.id)} className="text-danger">Hapus</button>}</td>}
                             </tr>
                         ))}
                         {project.actual_procurements.length === 0 && <tr><td colSpan={editable ? 5 : 4} className="px-4 py-6 text-center text-text-muted">Tidak ada kebutuhan barang (murni jasa).</td></tr>}
@@ -273,23 +319,34 @@ function ActualProcurement({ project, availabilityOptions, progress, editable })
                     {Object.keys(form.errors).length > 0 && <span className="text-xs text-danger md:col-span-5">{Object.values(form.errors)[0]}</span>}
                 </form>
             )}
+            <ConfirmDialog
+                open={deleting !== null}
+                onClose={() => setDeleting(null)}
+                onConfirm={removeItem}
+                title="Hapus item pengadaan?"
+                description="Item ekstra ini akan dihapus dari kebutuhan barang project."
+                tone="danger"
+                confirmLabel="Hapus Item"
+                processing={deleteProcessing}
+            />
         </section>
     );
 }
 
-function VendorAssignment({ project, options, editable, canViewSow }) {
-    const form = useForm({ vendor_id: project.vendor_id ?? '' });
-
-    function save() {
-        form.put(`/operational/projects/${project.id}/vendor`, { preserveScroll: true });
-    }
+function VendorAssignment({ project, canViewSow }) {
+    const deal = project.vendor_service_payment;
+    const dealNote = !deal ? null
+        : deal.status === 'awaiting_dp' ? 'menunggu DP dibayar Finance sebelum project bisa dilanjutkan.'
+            : deal.status === 'paid' ? 'sudah lunas.'
+                : project.status === 'completed' ? 'BAST terverifikasi, pelunasan vendor menunggu dibayar Finance.'
+                    : 'vendor berjalan, pelunasan dibayar Finance setelah BAST diverifikasi.';
 
     return (
         <section className="card p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 className="mb-1 font-semibold text-text">Vendor Teknisi Luar</h2>
-                    <p className="text-sm text-text-muted">Tandai kalau project ini dikerjakan lewat vendor teknisi luar (di luar jangkauan tim internal) — dibutuhkan sebelum membuat SOW.</p>
+                    <p className="text-sm text-text-muted">Vendor luar ditentukan Procurement (deal, fee, dan pembayaran ditangani Procurement & Finance). Setelah dilepas, SOW dibuat dari sini.</p>
                 </div>
                 {canViewSow && (
                     <Link href={`/operational/projects/${project.id}/sow`} className="whitespace-nowrap btn btn-outline">
@@ -297,18 +354,17 @@ function VendorAssignment({ project, options, editable, canViewSow }) {
                     </Link>
                 )}
             </div>
-            {!editable ? (
-                <p className="mt-4 text-sm text-text">{project.vendor?.name ?? 'Tidak pakai vendor luar.'}</p>
-            ) : (
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                    <select value={form.data.vendor_id} onChange={(e) => form.setData('vendor_id', e.target.value)} className="rounded-lg border border-border px-3 py-2 text-sm">
-                        <option value="">Tidak pakai vendor luar</option>
-                        {options.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                    </select>
-                    <button onClick={save} disabled={form.processing} className="btn btn-primary">Simpan</button>
-                    {form.errors.vendor_id && <span className="text-xs text-danger">{form.errors.vendor_id}</span>}
+            {project.needs_outside_vendor && !deal && (
+                <div className="mt-3 rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm font-medium text-warning">
+                    Project ini ditandai butuh vendor luar. Procurement sedang mencari vendor — tunggu sampai deal-nya dikonfirmasi sebelum merencanakan tim sendiri.
                 </div>
             )}
+            {deal && (
+                <div className="mt-3 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-muted">
+                    Deal vendor sudah diisi Procurement — {dealNote}
+                </div>
+            )}
+            <p className="mt-4 text-sm text-text">{project.vendor?.name ?? 'Tidak pakai vendor luar.'}</p>
         </section>
     );
 }
@@ -384,6 +440,8 @@ function CheckIns({ items }) {
 
 function Tasks({ project, photos = {}, editable }) {
     const [editingId, setEditingId] = useState(null);
+    const [deleting, setDeleting] = useState(null);
+    const [deleteProcessing, setDeleteProcessing] = useState(false);
     const form = useForm({ title: '', description: '', scheduled_date: '' });
 
     function beginEdit(t) {
@@ -395,6 +453,14 @@ function Tasks({ project, photos = {}, editable }) {
         e.preventDefault();
         const opts = { preserveScroll: true, onSuccess: cancel };
         editingId ? form.put(`/operational/projects/${project.id}/tasks/${editingId}`, opts) : form.post(`/operational/projects/${project.id}/tasks`, opts);
+    }
+    function removeTask() {
+        setDeleteProcessing(true);
+        router.delete(`/operational/projects/${project.id}/tasks/${deleting}`, {
+            preserveScroll: true,
+            onSuccess: () => setDeleting(null),
+            onFinish: () => setDeleteProcessing(false),
+        });
     }
 
     return (
@@ -412,7 +478,7 @@ function Tasks({ project, photos = {}, editable }) {
                                 </div>
                             )}
                         </div>
-                        {editable && <div className="text-sm"><button onClick={() => beginEdit(t)} className="mr-3 text-info">Edit</button><button onClick={() => { if (confirm('Hapus task?')) router.delete(`/operational/projects/${project.id}/tasks/${t.id}`, { preserveScroll: true }); }} className="text-danger">Hapus</button></div>}
+                        {editable && <div className="text-sm"><button onClick={() => beginEdit(t)} className="mr-3 text-info">Edit</button><button onClick={() => setDeleting(t.id)} className="text-danger">Hapus</button></div>}
                     </div>
                 ))}
                 {project.tasks.length === 0 && <p className="text-sm text-text-muted">Belum ada task.</p>}
@@ -432,6 +498,16 @@ function Tasks({ project, photos = {}, editable }) {
                     </div>
                 </form>
             )}
+            <ConfirmDialog
+                open={deleting !== null}
+                onClose={() => setDeleting(null)}
+                onConfirm={removeTask}
+                title="Hapus task?"
+                description="Task ini akan dihapus dari project."
+                tone="danger"
+                confirmLabel="Hapus Task"
+                processing={deleteProcessing}
+            />
         </section>
     );
 }

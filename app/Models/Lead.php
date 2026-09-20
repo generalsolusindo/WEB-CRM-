@@ -24,6 +24,7 @@ class Lead extends Model
         'type',
         'stage',
         'temperature',
+        'needs_outside_vendor',
         'source',
         'notes',
         'pic_name',
@@ -38,6 +39,7 @@ class Lead extends Model
     {
         return [
             'delegated_at' => 'datetime',
+            'needs_outside_vendor' => 'boolean',
         ];
     }
 

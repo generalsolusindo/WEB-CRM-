@@ -54,7 +54,7 @@ class SourcingNoteTest extends TestCase
         $this->assertSame($note, Quotation::firstOrFail()->lines()->firstOrFail()->sourcing_note);
     }
 
-    public function test_sales_can_edit_or_clear_sourcing_note_on_quotation(): void
+    public function test_sales_cannot_override_or_clear_procurement_sourcing_note(): void
     {
         [$sales, $pr] = $this->submittedPr();
         $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
@@ -67,7 +67,7 @@ class SourcingNoteTest extends TestCase
         ]);
         $pr->update(['status' => 'ready']);
 
-        // Sales membuat quotation dengan catatan versi customer
+        // Payload Sales tidak boleh mengubah catatan sourcing dari Procurement.
         $this->actingAs($sales)->post("/sales/procurement-requests/{$pr->id}/quotations", [
             'lines' => [[
                 'procurement_request_line_id' => $line->id,
@@ -76,7 +76,7 @@ class SourcingNoteTest extends TestCase
             ]],
         ]);
         $q = Quotation::firstOrFail();
-        $this->assertSame('Tersedia merk Hikvision atau Dahua — mohon konfirmasi pilihan.', $q->lines()->firstOrFail()->sourcing_note);
+        $this->assertSame('internal draft', $q->lines()->firstOrFail()->sourcing_note);
 
         // clear pada update
         $this->actingAs($sales)->put("/sales/quotations/{$q->id}", [
@@ -86,6 +86,6 @@ class SourcingNoteTest extends TestCase
                 'sourcing_note' => '',
             ]],
         ])->assertRedirect();
-        $this->assertNull($q->lines()->firstOrFail()->sourcing_note);
+        $this->assertSame('internal draft', $q->lines()->firstOrFail()->sourcing_note);
     }
 }

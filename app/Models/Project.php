@@ -23,6 +23,7 @@ class Project extends Model
         'delegated_by',
         'delegated_at',
         'vendor_id',
+        'needs_outside_vendor',
     ];
 
     /**
@@ -34,6 +35,7 @@ class Project extends Model
             'planned_start' => 'date:Y-m-d',
             'planned_end' => 'date:Y-m-d',
             'delegated_at' => 'datetime',
+            'needs_outside_vendor' => 'boolean',
         ];
     }
 
@@ -113,6 +115,12 @@ class Project extends Model
     public function procurementPayments(): HasMany
     {
         return $this->hasMany(ProcurementPayment::class);
+    }
+
+    /** Deal jasa vendor luar untuk project ini (diisi Procurement). */
+    public function vendorServicePayment(): HasOne
+    {
+        return $this->hasOne(VendorServicePayment::class);
     }
 
     /** Pengajuan pembayaran pengadaan yang aktif (paling baru). */

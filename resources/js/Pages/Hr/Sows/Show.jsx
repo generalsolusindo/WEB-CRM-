@@ -1,6 +1,7 @@
 import { Head, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
+import { feedback } from '../../../Components/feedback';
 import { PageHeader } from '../../../Components/ui';
 
 export default function Show({ sow, canReview, canVerifySignatures }) {
@@ -8,9 +9,20 @@ export default function Show({ sow, canReview, canVerifySignatures }) {
     const [action, setAction] = useState(null);
     const reviewUrl = canVerifySignatures ? `/hr/sows/${sow.id}/verify-signatures` : `/hr/sows/${sow.id}/review`;
 
-    function submit(approved) {
+    async function submit(approved) {
+        const verifying = canVerifySignatures;
+        const subject = verifying ? 'tanda tangan SOW' : 'isi SOW';
+        const ok = await feedback.confirm(approved
+            ? { tone: 'question', title: `Setujui ${subject}?`, text: `${sow.number} akan diteruskan ke tahap berikutnya.`, confirmLabel: 'Ya, setujui' }
+            : { tone: 'danger', title: `Tolak ${subject}?`, text: `${sow.number} akan dikembalikan ke Operasional. Pastikan catatan penolakan sudah diisi.`, confirmLabel: 'Ya, tolak' });
+        if (!ok) return;
+
         setAction(approved ? 'approve' : 'reject');
         form.transform((data) => ({ ...data, approved }));
+        feedback.expect({
+            success: { title: approved ? 'Disetujui' : 'Dikembalikan ke Operasional', style: 'popup' },
+            error: { title: 'Gagal memproses SOW' },
+        });
         form.post(reviewUrl, { preserveScroll: true });
     }
 

@@ -1,14 +1,17 @@
 import { Head, router, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import { FiFileText } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { pickFile } from '../../../utils/fileValidation';
-import { PageHeader, Card, Button, Field, Input, Select, Info, InfoGrid, StatusBadge, CurrencyInput } from '../../../Components/ui';
+import { PageHeader, Card, Button, ConfirmDialog, Field, Input, Select, Info, InfoGrid, StatusBadge, CurrencyInput } from '../../../Components/ui';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
 }
 
 export default function Show({ survey, invoice, payments, taxes = [], canHandle, canVoidInvoice = false }) {
+    const [voidOpen, setVoidOpen] = useState(false);
+    const [voiding, setVoiding] = useState(false);
     const nowLocal = (() => {
         const d = new Date();
         d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -31,11 +34,12 @@ export default function Show({ survey, invoice, payments, taxes = [], canHandle,
     function issue(e) { e.preventDefault(); issueForm.post(`/finance/surveys/${survey.id}/invoice`); }
     function clear(e) { e.preventDefault(); clearForm.post(`/finance/surveys/${survey.id}/clear`); }
     function voidInvoice() {
-        const paid = Number(invoice.total_paid) > 0;
-        const msg = paid
-            ? `Ada pembayaran ${money(invoice.total_paid)} tercatat pada invoice ini. Membatalkan invoice TIDAK otomatis me-refund uang — proses refund manual di luar sistem. Lanjut batalkan?`
-            : 'Batalkan invoice survey ini? Survey akan kembali ke tahap Finance.';
-        if (confirm(msg)) router.post(`/finance/invoices/${invoice.id}/cancel`);
+        setVoiding(true);
+        router.post(`/finance/invoices/${invoice.id}/cancel`, {}, {
+            preserveScroll: true,
+            onSuccess: () => setVoidOpen(false),
+            onFinish: () => setVoiding(false),
+        });
     }
     function pay(e) {
         e.preventDefault();
@@ -100,7 +104,7 @@ export default function Show({ survey, invoice, payments, taxes = [], canHandle,
                                 <h2 className="font-semibold text-text">Invoice {invoice.number}</h2>
                                 <div className="flex items-center gap-2">
                                     <Button href={`/finance/invoices/${invoice.id}/pdf`} external variant="outline" size="sm" icon={FiFileText}>Lihat / Cetak PDF</Button>
-                                    {canVoidInvoice && <Button onClick={voidInvoice} variant="ghost" size="sm" className="text-danger hover:bg-danger-soft hover:text-danger">Batalkan Invoice</Button>}
+                                    {canVoidInvoice && <Button onClick={() => setVoidOpen(true)} variant="ghost" size="sm" className="text-danger hover:bg-danger-soft hover:text-danger">Batalkan Invoice</Button>}
                                     <StatusBadge status={invoice.status} />
                                 </div>
                             </div>
@@ -171,6 +175,19 @@ export default function Show({ survey, invoice, payments, taxes = [], canHandle,
                     )
                 )}
             </div>
+
+            <ConfirmDialog
+                open={voidOpen}
+                onClose={() => setVoidOpen(false)}
+                onConfirm={voidInvoice}
+                title="Batalkan invoice survey?"
+                description={Number(invoice?.total_paid) > 0
+                    ? `Pembayaran ${money(invoice.total_paid)} sudah tercatat. Pembatalan invoice tidak mengembalikan uang secara otomatis; refund harus diproses di luar sistem.`
+                    : 'Invoice akan dibatalkan dan survey dikembalikan ke tahap Finance.'}
+                tone="danger"
+                confirmLabel="Batalkan Invoice"
+                processing={voiding}
+            />
         </AppLayout>
     );
 }

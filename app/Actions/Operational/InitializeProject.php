@@ -26,7 +26,7 @@ class InitializeProject
                 ->with([
                     'contact:id,name',
                     'quotation.procurementRequest.lines.vendorProduct:id,vendor_id',
-                    'quotation.lead:id,delegated_to,delegated_by,delegated_at',
+                    'quotation.lead:id,delegated_to,delegated_by,delegated_at,needs_outside_vendor',
                 ])
                 ->whereKey($salesOrder->id)
                 ->lockForUpdate()
@@ -45,6 +45,7 @@ class InitializeProject
                     'delegated_to' => $lead?->delegated_to,
                     'delegated_by' => $lead?->delegated_by,
                     'delegated_at' => $lead?->delegated_at,
+                    'needs_outside_vendor' => (bool) $lead?->needs_outside_vendor,
                 ]);
             }
 
@@ -79,6 +80,17 @@ class InitializeProject
                     User::query()->where('role', 'procurement')->where('is_active', true)->get(),
                     'project_procurement.requested',
                     "Pengadaan barang untuk Sales Order {$order->number} ({$customer}) sudah bisa diproses.",
+                    $project,
+                );
+            }
+
+            // Project yang ditandai butuh vendor luar (petunjuk dari Sales) tetap perlu
+            // ditindaklanjuti Procurement walau tidak ada kebutuhan barang sama sekali.
+            if ($project->needs_outside_vendor && $project->vendorServicePayment()->doesntExist()) {
+                $this->notify->onceForEach(
+                    User::query()->where('role', 'procurement')->where('is_active', true)->get(),
+                    'vendor_service.needed',
+                    "Project untuk Sales Order {$order->number} ({$customer}) ditandai butuh vendor luar — carikan vendor & isi deal-nya.",
                     $project,
                 );
             }

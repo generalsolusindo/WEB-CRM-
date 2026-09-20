@@ -11,6 +11,8 @@ use App\Models\ProcurementRequest;
 use App\Models\Quotation;
 use App\Models\SalesOrder;
 use App\Models\User;
+use App\Models\Vendor;
+use App\Models\VendorProduct;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -235,7 +237,7 @@ class QuotationLifecycleTest extends TestCase
         $this->assertSame('1450000.00', $fresh->selling_price);
     }
 
-    public function test_editing_can_change_item_name_qty_and_unit(): void
+    public function test_commercial_edit_cannot_change_procurement_scope(): void
     {
         [$sales, $quotation] = $this->draftQuotation();
         $line = $quotation->lines()->firstOrFail();
@@ -254,12 +256,11 @@ class QuotationLifecycleTest extends TestCase
             ])
             ->assertRedirect();
 
-        $fresh = $quotation->lines()->first()->fresh();
-        $this->assertSame('Router Enterprise (revisi nama)', $fresh->item_name);
-        $this->assertSame('4.00', $fresh->qty);
-        $this->assertSame('unit', $fresh->unit);
-        // subtotal harus ikut dihitung ulang pakai qty baru (4 x 1300000)
-        $this->assertSame('5200000.00', $fresh->subtotal);
+        $fresh = $quotation->lines()->firstOrFail();
+        $this->assertSame($line->item_name, $fresh->item_name);
+        $this->assertSame($line->qty, $fresh->qty);
+        $this->assertSame($line->unit, $fresh->unit);
+        $this->assertSame('2600000.00', $fresh->subtotal);
     }
 
     public function test_editing_without_item_name_qty_unit_keeps_existing_values(): void
@@ -284,7 +285,7 @@ class QuotationLifecycleTest extends TestCase
         $this->assertSame($originalUnit, $fresh->unit);
     }
 
-    public function test_editing_can_add_a_new_line_not_from_procurement(): void
+    public function test_commercial_edit_cannot_add_a_line_outside_procurement(): void
     {
         [$sales, $quotation] = $this->draftQuotation();
         $line = $quotation->lines()->firstOrFail();
@@ -304,39 +305,9 @@ class QuotationLifecycleTest extends TestCase
                     ],
                 ],
             ])
-            ->assertRedirect();
+            ->assertSessionHasErrors('lines');
 
-        $this->assertSame(2, $quotation->lines()->count());
-        $newLine = $quotation->lines()->where('item_name', 'Kabel Tambahan')->firstOrFail();
-        $this->assertNull($newLine->procurement_request_line_id);
-        $this->assertSame('20000.00', $newLine->cost_price);
-        $this->assertSame('30000.00', $newLine->selling_price);
-        $this->assertSame('60000.00', $newLine->subtotal);
-    }
-
-    public function test_adding_a_new_line_without_cost_price_is_rejected(): void
-    {
-        [$sales, $quotation] = $this->draftQuotation();
-        $line = $quotation->lines()->firstOrFail();
-        $originalCount = $quotation->lines()->count();
-
-        $this->actingAs($sales)
-            ->put("/sales/quotations/{$quotation->id}", [
-                'lines' => [
-                    ['procurement_request_line_id' => $line->procurement_request_line_id, 'selling_price' => 1300000],
-                    [
-                        'procurement_request_line_id' => null,
-                        'item_name' => 'Item Tanpa Harga Beli',
-                        'qty' => 1,
-                        'unit' => 'unit',
-                        'category' => 'material',
-                        'selling_price' => 50000,
-                    ],
-                ],
-            ])
-            ->assertSessionHasErrors('lines.1.cost_price');
-
-        $this->assertSame($originalCount, $quotation->fresh()->lines()->count());
+        $this->assertSame(1, $quotation->lines()->count());
     }
 
     public function test_a_new_line_cannot_supply_its_own_procurement_request_line_id_from_elsewhere(): void
@@ -369,36 +340,197 @@ class QuotationLifecycleTest extends TestCase
                     ['procurement_request_line_id' => $otherLine->procurement_request_line_id, 'selling_price' => 1300000],
                 ],
             ])
-            ->assertSessionHasErrors('lines.1.procurement_request_line_id');
+            ->assertSessionHasErrors('lines');
     }
 
-    public function test_editing_can_delete_an_existing_line_leaving_at_least_one(): void
+    public function test_commercial_edit_cannot_remove_a_procurement_line(): void
     {
-        [$sales, $quotation] = $this->draftQuotation();
-        $line = $quotation->lines()->firstOrFail();
-
-        // Tambah satu line dulu supaya ada 2 baris, baru hapus salah satunya.
-        $this->actingAs($sales)->put("/sales/quotations/{$quotation->id}", [
+        [$sales, $pr] = $this->readyProcurementRequest();
+        $secondPrLine = $pr->lines()->create([
+            'item_name' => 'Kabel', 'qty' => 1, 'unit' => 'meter', 'category' => 'material',
+            'cost_price' => 10000, 'availability_status' => 'available',
+        ]);
+        $firstPrLine = $pr->lines()->whereKeyNot($secondPrLine->id)->firstOrFail();
+        $this->actingAs($sales)->post("/sales/procurement-requests/{$pr->id}/quotations", [
             'lines' => [
-                ['procurement_request_line_id' => $line->procurement_request_line_id, 'selling_price' => 1300000],
-                [
-                    'procurement_request_line_id' => null, 'item_name' => 'Item Kedua', 'qty' => 1,
-                    'unit' => 'unit', 'category' => 'material', 'cost_price' => 10000, 'selling_price' => 15000,
-                ],
+                ['procurement_request_line_id' => $firstPrLine->id, 'selling_price' => 1300000],
+                ['procurement_request_line_id' => $secondPrLine->id, 'selling_price' => 15000],
             ],
         ]);
-        $this->assertSame(2, $quotation->lines()->count());
+        $quotation = Quotation::where('procurement_request_id', $pr->id)->firstOrFail();
 
         $this->actingAs($sales)
             ->put("/sales/quotations/{$quotation->id}", [
                 'lines' => [
-                    ['procurement_request_line_id' => $line->procurement_request_line_id, 'selling_price' => 1300000],
+                    ['procurement_request_line_id' => $firstPrLine->id, 'selling_price' => 1300000],
                 ],
             ])
-            ->assertRedirect();
+            ->assertSessionHasErrors('lines');
 
-        $this->assertSame(1, $quotation->lines()->count());
-        $this->assertDatabaseMissing('quotation_lines', ['item_name' => 'Item Kedua']);
+        $this->assertSame(2, $quotation->lines()->count());
+    }
+
+    public function test_rejected_scope_revision_is_recosted_and_returns_to_the_same_quotation(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
+        $projectManager = User::factory()->create(['role' => 'project_manager', 'is_active' => true]);
+        $quotation->lead->update(['delegated_to' => $projectManager->id]);
+        $quotation->update(['pm_review_status' => 'rejected', 'pm_review_notes' => 'Tambahkan jasa instalasi.']);
+        $request = $quotation->procurementRequest;
+        $requestLine = $request->lines()->firstOrFail();
+        $vendor = Vendor::create(['name' => 'Vendor Existing']);
+        $product = VendorProduct::create([
+            'vendor_id' => $vendor->id,
+            'item_name' => 'Kabel Existing',
+            'category' => 'material',
+            'price' => 700000,
+            'unit' => 'meter',
+            'is_active' => true,
+        ]);
+        $unchangedRequestLine = $request->lines()->create([
+            'vendor_product_id' => $product->id,
+            'item_name' => 'Kabel Existing',
+            'category' => 'material',
+            'description' => 'Kabel dari costing awal',
+            'sourcing_note' => 'Vendor dan harga lama',
+            'qty' => 10,
+            'unit' => 'meter',
+            'cost_price' => 700000,
+            'availability_status' => 'available',
+        ]);
+        $quotation->lines()->create([
+            'procurement_request_line_id' => $unchangedRequestLine->id,
+            'item_name' => $unchangedRequestLine->item_name,
+            'category' => $unchangedRequestLine->category,
+            'description' => $unchangedRequestLine->description,
+            'sourcing_note' => $unchangedRequestLine->sourcing_note,
+            'qty' => $unchangedRequestLine->qty,
+            'unit' => $unchangedRequestLine->unit,
+            'cost_price' => $unchangedRequestLine->cost_price,
+            'selling_price' => 900000,
+            'discount_percent' => 0,
+            'discount_amount' => 0,
+            'markup_percent' => 28.57,
+            'tax_rate' => 0,
+            'subtotal' => 9000000,
+        ]);
+
+        $this->actingAs($sales)->put("/sales/quotations/{$quotation->id}/scope-revision", [
+            'lines' => [
+                [
+                    'procurement_request_line_id' => $requestLine->id,
+                    'item_name' => 'Router Enterprise Revisi',
+                    'description' => 'Spesifikasi diperbarui',
+                    'qty' => 3,
+                    'unit' => 'unit',
+                    'category' => 'material',
+                ],
+                [
+                    'procurement_request_line_id' => $unchangedRequestLine->id,
+                    'item_name' => $unchangedRequestLine->item_name,
+                    'description' => $unchangedRequestLine->description,
+                    'qty' => $unchangedRequestLine->qty,
+                    'unit' => $unchangedRequestLine->unit,
+                    'category' => $unchangedRequestLine->category,
+                ],
+                [
+                    'procurement_request_line_id' => null,
+                    'item_name' => 'Jasa Instalasi',
+                    'description' => 'Instalasi dan konfigurasi',
+                    'qty' => 1,
+                    'unit' => 'lot',
+                    'category' => 'service',
+                ],
+            ],
+        ])->assertRedirect("/sales/quotations/{$quotation->id}");
+
+        $this->assertSame('submitted', $request->fresh()->status);
+        $this->assertSame('procurement', $quotation->lead->fresh()->stage);
+        $this->assertNull($quotation->fresh()->pm_review_status);
+        $this->assertDatabaseCount('quotations', 1);
+        $this->assertDatabaseHas('notifications', [
+            'user_id' => $procurement->id,
+            'type' => 'procurement_request.recost_requested',
+            'related_id' => $request->id,
+        ]);
+        $this->assertDatabaseHas('procurement_request_lines', [
+            'id' => $unchangedRequestLine->id,
+            'vendor_product_id' => $product->id,
+            'sourcing_note' => 'Vendor dan harga lama',
+            'cost_price' => 700000,
+            'availability_status' => 'available',
+        ]);
+        $this->assertDatabaseHas('procurement_request_lines', [
+            'id' => $requestLine->id,
+            'vendor_product_id' => null,
+            'sourcing_note' => null,
+            'cost_price' => 0,
+            'availability_status' => 'searching',
+        ]);
+
+        // Kompatibilitas data yang sempat di-reset oleh implementasi recost lama.
+        $unchangedRequestLine->update([
+            'sourcing_note' => null,
+            'cost_price' => 0,
+            'availability_status' => 'searching',
+        ]);
+        $this->actingAs($procurement)->get("/procurement/procurement-requests/{$request->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('procurementRequest.lines.0.revision_state', 'changed')
+                ->where('procurementRequest.lines.1.revision_state', 'unchanged')
+                ->where('procurementRequest.lines.1.cost_price', '700000.00')
+                ->where('procurementRequest.lines.1.sourcing_note', 'Vendor dan harga lama')
+                ->where('procurementRequest.lines.1.availability_status', 'available')
+                ->where('procurementRequest.lines.2.revision_state', 'new'));
+        $unchangedRequestLine->update([
+            'vendor_product_id' => $product->id,
+            'sourcing_note' => 'Vendor dan harga lama',
+            'cost_price' => 700000,
+            'availability_status' => 'available',
+        ]);
+
+        $this->actingAs($sales)->get("/sales/quotations/{$quotation->id}/edit")->assertForbidden();
+
+        $this->actingAs($procurement)->post("/procurement/procurement-requests/{$request->id}/start")->assertRedirect();
+        $recostLines = $request->fresh()->lines()->orderBy('id')->get();
+        $this->actingAs($procurement)->put("/procurement/procurement-requests/{$request->id}/lines", [
+            'lines' => $recostLines->map(fn ($line, $index) => [
+                'id' => $line->id,
+                'category' => $line->category,
+                'sourcing_note' => $line->item_name === 'Kabel Existing' ? $line->sourcing_note : ($index === 0 ? 'Stok gudang' : 'Vendor jasa'),
+                'vendor_product_id' => $line->vendor_product_id,
+                'cost_price' => $line->item_name === 'Kabel Existing' ? $line->cost_price : ($index === 0 ? 1100000 : 250000),
+                'tax_id' => null,
+                'availability_status' => 'available',
+            ])->all(),
+        ])->assertRedirect();
+        $this->actingAs($procurement)->post("/procurement/procurement-requests/{$request->id}/ready")->assertRedirect();
+
+        $quotation->refresh()->load('lines');
+        $this->assertSame($quotation->id, Quotation::sole()->id);
+        $this->assertSame('ready', $request->fresh()->status);
+        $this->assertSame('quotation', $quotation->lead->fresh()->stage);
+        $this->assertCount(3, $quotation->lines);
+        $this->assertSame('1100000.00', $quotation->lines->firstWhere('item_name', 'Router Enterprise Revisi')->cost_price);
+        $this->assertSame('0.00', $quotation->lines->firstWhere('item_name', 'Jasa Instalasi')->selling_price);
+        $this->assertSame('700000.00', $quotation->lines->firstWhere('item_name', 'Kabel Existing')->cost_price);
+        $this->assertNull($quotation->quoted_at);
+        $this->actingAs($projectManager)
+            ->post("/project-manager/quotations/{$quotation->id}/review", ['approved' => true])
+            ->assertForbidden();
+
+        $this->actingAs($sales)->put("/sales/quotations/{$quotation->id}", [
+            'lines' => $quotation->lines->map(fn ($line) => [
+                'procurement_request_line_id' => $line->procurement_request_line_id,
+                'selling_price' => $line->item_name === 'Jasa Instalasi' ? 400000 : 1500000,
+            ])->all(),
+        ])->assertRedirect("/sales/quotations/{$quotation->id}");
+
+        $this->assertSame('400000.00', $quotation->fresh()->lines()->where('item_name', 'Jasa Instalasi')->value('selling_price'));
+        $this->actingAs($projectManager)
+            ->post("/project-manager/quotations/{$quotation->id}/review", ['approved' => true])
+            ->assertRedirect();
     }
 
     public function test_cost_price_sent_by_client_for_an_existing_line_is_ignored(): void
@@ -602,6 +734,9 @@ class QuotationLifecycleTest extends TestCase
     public function test_draft_quotation_can_be_deleted_by_its_owner(): void
     {
         [$sales, $quotation] = $this->draftQuotation();
+        $lead = $quotation->lead;
+        $procurementRequest = $quotation->procurementRequest;
+        $sourceLine = $procurementRequest->lines()->firstOrFail();
 
         $this->actingAs($sales)
             ->delete("/sales/quotations/{$quotation->id}")
@@ -609,30 +744,54 @@ class QuotationLifecycleTest extends TestCase
 
         $this->assertDatabaseMissing('quotations', ['id' => $quotation->id]);
         $this->assertDatabaseCount('quotation_lines', 0);
+        $this->assertDatabaseHas('procurement_requests', ['id' => $procurementRequest->id, 'status' => 'ready']);
+        $this->assertSame('procurement', $lead->fresh()->stage);
+
+        $this->actingAs($sales)->post("/sales/procurement-requests/{$procurementRequest->id}/quotations", [
+            'lines' => [[
+                'procurement_request_line_id' => $sourceLine->id,
+                'selling_price' => 1400000,
+            ]],
+        ])->assertRedirect();
+
+        $this->assertDatabaseCount('quotations', 1);
     }
 
-    public function test_sent_quotation_can_also_be_deleted(): void
+    public function test_sent_quotation_cannot_be_deleted_permanently(): void
     {
         [$sales, $quotation] = $this->draftQuotation();
         $quotation->update(['status' => 'sent']);
 
         $this->actingAs($sales)
             ->delete("/sales/quotations/{$quotation->id}")
-            ->assertRedirect('/sales/quotations');
+            ->assertForbidden();
 
-        $this->assertDatabaseMissing('quotations', ['id' => $quotation->id]);
+        $this->assertDatabaseHas('quotations', ['id' => $quotation->id]);
+
     }
 
-    public function test_rejected_quotation_can_also_be_deleted(): void
+    public function test_rejected_quotation_cannot_be_deleted_permanently(): void
     {
         [$sales, $quotation] = $this->draftQuotation();
         $quotation->update(['status' => 'rejected']);
 
         $this->actingAs($sales)
             ->delete("/sales/quotations/{$quotation->id}")
-            ->assertRedirect('/sales/quotations');
+            ->assertForbidden();
 
-        $this->assertDatabaseMissing('quotations', ['id' => $quotation->id]);
+        $this->assertDatabaseHas('quotations', ['id' => $quotation->id]);
+    }
+
+    public function test_draft_previously_sent_to_customer_cannot_be_deleted_permanently(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $quotation->update(['whatsapp_sent_at' => now(), 'whatsapp_sent_by' => $sales->id]);
+
+        $this->actingAs($sales)
+            ->delete("/sales/quotations/{$quotation->id}")
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('quotations', ['id' => $quotation->id]);
     }
 
     public function test_quotation_with_a_revision_cannot_be_deleted(): void
@@ -646,6 +805,12 @@ class QuotationLifecycleTest extends TestCase
             ->assertForbidden();
 
         $this->assertDatabaseHas('quotations', ['id' => $quotation->id]);
+
+        $revision = $quotation->revisions()->firstOrFail();
+        $this->actingAs($sales)
+            ->delete("/sales/quotations/{$revision->id}")
+            ->assertForbidden();
+        $this->assertDatabaseHas('quotations', ['id' => $revision->id]);
     }
 
     public function test_deleting_a_quotation_also_clears_its_dangling_notifications(): void
@@ -686,18 +851,109 @@ class QuotationLifecycleTest extends TestCase
         $this->assertDatabaseHas('quotations', ['id' => $quotation->id]);
     }
 
-    public function test_confirmed_quotation_can_be_deleted_when_sales_order_has_no_invoice_or_project(): void
+    public function test_confirmed_quotation_cannot_be_deleted_even_without_invoice_or_project(): void
     {
         [$sales, $salesOrder] = $this->confirmedSalesOrder('material_only');
         $quotation = $salesOrder->quotation;
 
         $this->actingAs($sales)
             ->delete("/sales/quotations/{$quotation->id}")
-            ->assertRedirect('/sales/quotations');
+            ->assertForbidden();
 
-        $this->assertDatabaseMissing('quotations', ['id' => $quotation->id]);
-        $this->assertDatabaseMissing('sales_orders', ['id' => $salesOrder->id]);
-        $this->assertDatabaseCount('sales_order_lines', 0);
+        $this->assertDatabaseHas('quotations', ['id' => $quotation->id]);
+        $this->assertDatabaseHas('sales_orders', ['id' => $salesOrder->id]);
+    }
+
+    public function test_sent_quotation_can_be_cancelled_without_deleting_its_history(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $quotation->update(['status' => 'sent']);
+
+        $this->actingAs($sales)
+            ->post("/sales/quotations/{$quotation->id}/cancel", ['reason' => 'Customer membatalkan kebutuhan.'])
+            ->assertRedirect("/sales/quotations/{$quotation->id}");
+
+        $quotation->refresh();
+        $this->assertSame('cancelled', $quotation->status);
+        $this->assertSame($sales->id, $quotation->cancelled_by);
+        $this->assertSame('Customer membatalkan kebutuhan.', $quotation->cancellation_reason);
+        $this->assertNotNull($quotation->cancelled_at);
+        $this->assertSame('lost', $quotation->lead->fresh()->stage);
+        $this->assertDatabaseHas('procurement_requests', ['id' => $quotation->procurement_request_id]);
+        $this->assertDatabaseHas('quotation_lines', ['quotation_id' => $quotation->id]);
+    }
+
+    public function test_cancelling_a_revision_cancels_the_complete_quotation_chain(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $quotation->update(['status' => 'sent']);
+        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/revisions")->assertRedirect();
+        $revision = $quotation->revisions()->firstOrFail();
+
+        $this->actingAs($sales)
+            ->post("/sales/quotations/{$revision->id}/cancel", ['reason' => 'Seluruh penawaran dihentikan customer.'])
+            ->assertRedirect("/sales/quotations/{$revision->id}");
+
+        $this->assertSame('cancelled', $quotation->fresh()->status);
+        $this->assertSame('cancelled', $revision->fresh()->status);
+    }
+
+    public function test_cancellation_propagates_to_sales_order_and_unpaid_invoice(): void
+    {
+        [$sales, $salesOrder] = $this->confirmedSalesOrder('material_only');
+        $quotation = $salesOrder->quotation;
+        $invoice = Invoice::create([
+            'sales_order_id' => $salesOrder->id,
+            'invoice_phase' => 'full',
+            'status' => 'sent',
+            'amount' => 2600000,
+            'tax_amount' => 0,
+        ]);
+
+        $this->actingAs($sales)
+            ->post("/sales/quotations/{$quotation->id}/cancel", ['reason' => 'Pesanan dibatalkan sebelum pembayaran.'])
+            ->assertRedirect("/sales/quotations/{$quotation->id}");
+
+        $this->assertSame('cancelled', $quotation->fresh()->status);
+        $this->assertSame('cancelled', $salesOrder->fresh()->status);
+        $this->assertSame('cancelled', $invoice->fresh()->status);
+        $this->assertSame($sales->id, $salesOrder->fresh()->cancelled_by);
+        $this->assertSame($sales->id, $invoice->fresh()->cancelled_by);
+    }
+
+    public function test_transaction_with_payment_cannot_be_cancelled(): void
+    {
+        [$sales, $salesOrder] = $this->confirmedSalesOrder('material_only');
+        $invoice = Invoice::create([
+            'sales_order_id' => $salesOrder->id,
+            'invoice_phase' => 'full',
+            'status' => 'partially_paid',
+            'amount' => 2600000,
+            'tax_amount' => 0,
+        ]);
+        Payment::create([
+            'invoice_id' => $invoice->id,
+            'amount_paid' => 100000,
+            'paid_at' => now(),
+        ]);
+
+        $this->actingAs($sales)
+            ->post("/sales/quotations/{$salesOrder->quotation_id}/cancel", ['reason' => 'Mencoba membatalkan transaksi.'])
+            ->assertForbidden();
+
+        $this->assertSame('confirmed', $salesOrder->fresh()->status);
+        $this->assertSame('partially_paid', $invoice->fresh()->status);
+    }
+
+    public function test_pristine_draft_uses_permanent_delete_instead_of_cancellation(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+
+        $this->actingAs($sales)
+            ->post("/sales/quotations/{$quotation->id}/cancel", ['reason' => 'Belum pernah diproses.'])
+            ->assertForbidden();
+
+        $this->assertSame('draft', $quotation->fresh()->status);
     }
 
     public function test_confirmed_quotation_cannot_be_deleted_once_an_invoice_exists(): void
@@ -736,7 +992,7 @@ class QuotationLifecycleTest extends TestCase
         $this->assertDatabaseHas('sales_orders', ['id' => $salesOrder->id]);
     }
 
-    public function test_deleting_confirmed_quotation_also_removes_sales_order_attachments_and_notifications(): void
+    public function test_blocked_confirmed_deletion_preserves_sales_order_attachments_and_notifications(): void
     {
         Storage::fake('local');
         [$sales, $salesOrder] = $this->confirmedSalesOrder('material_only');
@@ -759,11 +1015,11 @@ class QuotationLifecycleTest extends TestCase
             'is_sent' => true,
         ]);
 
-        $this->actingAs($sales)->delete("/sales/quotations/{$quotation->id}")->assertRedirect();
+        $this->actingAs($sales)->delete("/sales/quotations/{$quotation->id}")->assertForbidden();
 
-        $this->assertDatabaseMissing('attachments', ['attachable_type' => $salesOrder->getMorphClass(), 'attachable_id' => $salesOrder->id]);
-        Storage::disk('local')->assertMissing('sales-orders/signed-quotation.pdf');
-        $this->assertDatabaseMissing('notifications', ['related_type' => $salesOrder->getMorphClass(), 'related_id' => $salesOrder->id]);
+        $this->assertDatabaseHas('attachments', ['attachable_type' => $salesOrder->getMorphClass(), 'attachable_id' => $salesOrder->id]);
+        Storage::disk('local')->assertExists('sales-orders/signed-quotation.pdf');
+        $this->assertDatabaseHas('notifications', ['related_type' => $salesOrder->getMorphClass(), 'related_id' => $salesOrder->id]);
     }
 
     public function test_sales_role_cannot_create_invoices_through_any_route(): void

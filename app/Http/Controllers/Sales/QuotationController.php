@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers\Sales;
 
+use App\Actions\Sales\CancelQuotationTransaction;
 use App\Actions\Sales\CreateQuotation;
+use App\Actions\Sales\RequestQuotationRecost;
 use App\Actions\Sales\UpdateQuotation;
 use App\Enums\LeadStage;
 use App\Enums\LeadTemperature;
 use App\Enums\QuotationStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Sales\CancelQuotationRequest;
+use App\Http\Requests\Sales\ReviseQuotationScopeRequest;
 use App\Http\Requests\Sales\SaveQuotationRequest;
 use App\Http\Requests\Sales\UpdateQuotationNumberRequest;
 use App\Http\Requests\Sales\UpdateQuotationRequest;
@@ -27,7 +31,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -155,7 +158,11 @@ class QuotationController extends Controller
             'parent:id,revision_number,status',
             'pmReviewedBy:id,name',
             'managerReviewedBy:id,name',
+            'cancelledBy:id,name',
         ]);
+        $quotation->setAttribute('pm_reviewer_name', $quotation->pmReviewedBy?->name);
+        $quotation->setAttribute('manager_reviewer_name', $quotation->managerReviewedBy?->name);
+        $quotation->setAttribute('cancelled_by_name', $quotation->cancelledBy?->name);
 
         $history = Quotation::query()
             ->where('procurement_request_id', $quotation->procurement_request_id)
@@ -170,6 +177,7 @@ class QuotationController extends Controller
             'customerHasWhatsapp' => $quotation->contact?->whatsappNumber() !== null,
             'permissions' => [
                 'update' => request()->user()->can('update', $quotation),
+                'reviseScope' => request()->user()->can('reviseScope', $quotation),
                 'delete' => request()->user()->can('delete', $quotation),
                 'send' => request()->user()->can('send', $quotation),
                 'sendWhatsapp' => request()->user()->can('sendWhatsapp', $quotation),
@@ -177,6 +185,7 @@ class QuotationController extends Controller
                 'revise' => request()->user()->can('revise', $quotation),
                 'reject' => request()->user()->can('reject', $quotation),
                 'confirm' => request()->user()->can('confirm', $quotation),
+                'cancel' => request()->user()->can('cancel', $quotation),
             ],
         ]);
     }
@@ -187,13 +196,42 @@ class QuotationController extends Controller
         $quotation->load([
             'contact:id,name,company_name,email,phone,address,npwp',
             'lines.tax:id,name,rate',
+            'pmReviewedBy:id,name',
+            'managerReviewedBy:id,name',
         ]);
+        $quotation->setAttribute('pm_reviewer_name', $quotation->pmReviewedBy?->name);
+        $quotation->setAttribute('manager_reviewer_name', $quotation->managerReviewedBy?->name);
 
         return Inertia::render('Sales/Quotations/Form', [
             'quotation' => $quotation,
             'taxes' => $this->activeTaxes(),
             'unitOptions' => Requirement::UNITS,
         ]);
+    }
+
+    public function editScope(Quotation $quotation): Response
+    {
+        Gate::authorize('reviseScope', $quotation);
+        $quotation->load([
+            'contact:id,name,company_name',
+            'procurementRequest.lines' => fn ($query) => $query->orderBy('id'),
+        ]);
+
+        return Inertia::render('Sales/Quotations/ScopeRevision', [
+            'quotation' => $quotation,
+            'unitOptions' => Requirement::UNITS,
+        ]);
+    }
+
+    public function requestRecost(
+        ReviseQuotationScopeRequest $request,
+        Quotation $quotation,
+        RequestQuotationRecost $action,
+    ): RedirectResponse {
+        $action->handle($quotation, $request->validated('lines'));
+
+        return redirect()->route('sales.quotations.show', $quotation)
+            ->with('success', 'Revisi kebutuhan dikirim ke Procurement untuk costing ulang.');
     }
 
     /** @return Collection<int, Tax> */
@@ -295,39 +333,37 @@ class QuotationController extends Controller
     {
         Gate::authorize('delete', $quotation);
 
-        $hadSalesOrder = $quotation->salesOrder()->exists();
+        $lead = $quotation->lead;
 
-        DB::transaction(function () use ($quotation) {
+        DB::transaction(function () use ($quotation, $lead) {
             // Bersihkan notifikasi PM/Manager/Sales yang menunjuk ke quotation ini
             // (mis. "perlu diverifikasi") supaya tidak ada link mati di bell notifikasi.
             Notification::where('related_type', $quotation->getMorphClass())
                 ->where('related_id', $quotation->id)
                 ->delete();
 
-            // Quotation Confirmed yang belum ada Invoice/Project (dijamin policy delete())
-            // boleh dihapus sekalian dengan Sales Order-nya — bersihkan juga dokumen
-            // (signed quotation/PO) dan notifikasi Finance yang menunjuk ke Sales Order itu,
-            // supaya tidak ada file/notifikasi menggantung setelah Sales Order-nya hilang.
-            if ($salesOrder = $quotation->salesOrder) {
-                $salesOrder->attachments()->get()->each(
-                    fn ($attachment) => Storage::disk('local')->delete($attachment->file_path)
-                );
-                $salesOrder->attachments()->delete();
-
-                Notification::where('related_type', $salesOrder->getMorphClass())
-                    ->where('related_id', $salesOrder->id)
-                    ->delete();
-
-                $salesOrder->delete();
-            }
-
             $quotation->delete();
+
+            // Procurement Request tetap dipertahankan agar hasil sourcing dapat dipakai
+            // kembali. Tanpa quotation aktif, pipeline kembali ke tahap Procurement.
+            if ($lead && $lead->quotations()->doesntExist() && $lead->procurementRequests()->exists()) {
+                $lead->update(['stage' => LeadStage::Procurement->value]);
+            }
         });
 
         return redirect()->route('sales.quotations.index')
-            ->with('success', $hadSalesOrder
-                ? 'Quotation dan Sales Order-nya berhasil dihapus.'
-                : 'Quotation berhasil dihapus.');
+            ->with('success', 'Draft quotation berhasil dihapus permanen.');
+    }
+
+    public function cancel(
+        CancelQuotationRequest $request,
+        Quotation $quotation,
+        CancelQuotationTransaction $action,
+    ): RedirectResponse {
+        $action->handle($quotation, $request->user(), $request->validated('reason'));
+
+        return redirect()->route('sales.quotations.show', $quotation)
+            ->with('success', 'Transaksi dan seluruh rangkaiannya berhasil dibatalkan.');
     }
 
     /** Ubah nomor quotation secara manual, mis. menyambung dari sistem lama. */

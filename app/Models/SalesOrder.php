@@ -31,6 +31,9 @@ class SalesOrder extends Model
         'po_date',
         'confirmed_at',
         'confirmed_by',
+        'cancelled_at',
+        'cancelled_by',
+        'cancellation_reason',
     ];
 
     /** @return array<string, string> */
@@ -40,6 +43,7 @@ class SalesOrder extends Model
             'agreed_dpp' => 'decimal:2',
             'dp_percent' => 'decimal:2',
             'po_date' => 'date:Y-m-d',
+            'cancelled_at' => 'datetime',
         ];
     }
 
@@ -68,6 +72,11 @@ class SalesOrder extends Model
     public function confirmedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'confirmed_by');
+    }
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 
     public function lines(): HasMany

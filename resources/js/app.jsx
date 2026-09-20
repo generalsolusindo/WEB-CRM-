@@ -2,6 +2,8 @@ import '../css/app.css';
 import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
+import FeedbackHost from './Components/FeedbackHost';
+import { installFlashListener } from './Components/feedback';
 
 // Cegah scroll wheel mengubah nilai <input type="number"> secara tidak sengaja:
 // saat di-scroll, lepas fokus dari field sehingga wheel kembali menggulung halaman.
@@ -22,6 +24,7 @@ createInertiaApp({
             import.meta.glob('./Pages/**/*.jsx'),
         ),
     setup({ el, App, props }) {
-        createRoot(el).render(<App {...props} />);
+        createRoot(el).render(<><App {...props} /><FeedbackHost /></>);
+        installFlashListener(props.initialPage.props.flash);
     },
 });

@@ -7,6 +7,7 @@ export default function Form({ lead = null, contacts, stageOptions, sourceOption
     const { data, setData, post, put, processing, errors } = useForm({
         contact_id: lead?.contact_id ?? selectedContactId ?? '',
         stage: lead?.stage ?? 'new', temperature: lead?.temperature ?? 'cold', source: lead?.source ?? '', notes: lead?.notes ?? '',
+        needs_outside_vendor: Boolean(lead?.needs_outside_vendor),
         pic_name: lead?.pic_name ?? '', pic_position: lead?.pic_position ?? '', pic_phone: lead?.pic_phone ?? '',
     });
 
@@ -51,6 +52,14 @@ export default function Form({ lead = null, contacts, stageOptions, sourceOption
                                 {temperatureOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                             </Select>
                         </Field>
+
+                        <label className="flex items-start gap-2 text-sm sm:col-span-2">
+                            <input type="checkbox" checked={data.needs_outside_vendor} onChange={(e) => setData('needs_outside_vendor', e.target.checked)} className="mt-0.5 accent-navy" />
+                            <span>
+                                <span className="font-medium text-text">Lokasi di luar jangkauan / kemungkinan butuh vendor luar</span>
+                                <span className="block text-xs text-text-muted">Hanya petunjuk untuk Procurement & Operasional — keputusan vendor tetap di Procurement.</span>
+                            </span>
+                        </label>
 
                         <Field label="Source" error={errors.source}>
                             <Select value={data.source} onChange={(e) => setData('source', e.target.value)}>

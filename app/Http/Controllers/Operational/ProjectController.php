@@ -4,17 +4,20 @@ namespace App\Http\Controllers\Operational;
 
 use App\Actions\Operational\MarkProjectReady;
 use App\Enums\ActualProcurementStatus;
+use App\Enums\ChangeRequestType;
 use App\Enums\ProjectStatus;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Operational\AssignProjectVendorRequest;
 use App\Http\Requests\Operational\PlanningRequest;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\Notifications\Notify;
+use App\Services\Operational\MaterialDeliveryStatus;
+use App\Services\Sales\CustomerApprovalDocs;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -73,6 +76,7 @@ class ProjectController extends Controller
             'changeRequests' => fn ($q) => $q->latest(),
             'changeRequests.requestedBy:id,name',
             'vendor:id,name,contact_person,phone',
+            'vendorServicePayment:id,project_id,vendor_id,terms,status,released_at',
         ]);
 
         $user = request()->user();
@@ -85,14 +89,14 @@ class ProjectController extends Controller
             'submitter' => $bast->submitter?->only('name'),
             'documents' => $bast->attachments
                 ->where('category', 'bast_document')
-                ->map(fn ($a) => ['id' => $a->id, 'url' => \Illuminate\Support\Facades\Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay())])
+                ->map(fn ($a) => ['id' => $a->id, 'url' => Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay())])
                 ->values(),
         ]);
 
         $taskPhotos = $project->tasks->mapWithKeys(fn ($task) => [
             $task->id => $task->attachments
                 ->whereIn('category', ['task_before', 'task_after'])
-                ->map(fn ($a) => ['id' => $a->id, 'category' => $a->category, 'url' => \Illuminate\Support\Facades\Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay())])
+                ->map(fn ($a) => ['id' => $a->id, 'category' => $a->category, 'url' => Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay())])
                 ->values(),
         ]);
 
@@ -100,7 +104,7 @@ class ProjectController extends Controller
             'id' => $a->id,
             'technician' => $a->uploader?->name,
             'at' => $a->created_at,
-            'url' => \Illuminate\Support\Facades\Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay()),
+            'url' => Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay()),
         ]);
 
         $procurementItems = $project->actualProcurements;
@@ -108,11 +112,11 @@ class ProjectController extends Controller
 
         return Inertia::render('Operational/Projects/Show', [
             'project' => $project,
-            'approvalDocs' => \App\Services\Sales\CustomerApprovalDocs::of($project->salesOrder),
+            'approvalDocs' => CustomerApprovalDocs::of($project->salesOrder),
             'bastRecords' => $bastRecords,
             'taskPhotos' => $taskPhotos,
             'checkIns' => $checkIns,
-            'materialStatus' => \App\Services\Operational\MaterialDeliveryStatus::of($project->salesOrder),
+            'materialStatus' => MaterialDeliveryStatus::of($project->salesOrder),
             'procurementProgress' => ['received' => $received, 'total' => $procurementItems->count()],
             'statusOptions' => ProjectStatus::options(),
             'availabilityOptions' => ActualProcurementStatus::options(),
@@ -120,10 +124,7 @@ class ProjectController extends Controller
                 ->where(fn ($q) => $q->where('role', 'technician')->orWhere('can_technician', true))
                 ->where('is_active', true)
                 ->orderBy('name')->get(['id', 'name']),
-            'vendorOptions' => \App\Models\Vendor::query()
-                ->where('provides_technical', true)
-                ->orderBy('name')->get(['id', 'name']),
-            'changeRequestTypes' => \App\Enums\ChangeRequestType::options(),
+            'changeRequestTypes' => ChangeRequestType::options(),
             'permissions' => [
                 'plan' => $user->can('update', $project),
                 'manageResources' => $user->can('manageResources', $project),
@@ -136,25 +137,9 @@ class ProjectController extends Controller
                 'completeDirect' => $user->can('completeDirect', $project->loadMissing('salesOrder')),
                 'manageChangeRequests' => $user->can('manageChangeRequests', $project),
                 'manageBastDraft' => $user->can('manageBastDraft', $project),
-                'assignVendor' => $user->can('assignVendor', $project),
                 'viewSow' => $user->can('viewSow', $project),
             ],
         ]);
-    }
-
-    public function assignVendor(AssignProjectVendorRequest $request, Project $project): RedirectResponse
-    {
-        $vendorId = $request->validated('vendor_id');
-        $project->update(['vendor_id' => $vendorId]);
-
-        // Draft SOW yang sudah menunjuk teknisi dari vendor lama jadi tidak valid lagi
-        // begitu vendor project diganti — kosongkan supaya Operational memilih ulang.
-        $sow = $project->sow;
-        if ($sow && $sow->technician_id && $sow->technician?->vendor_id !== $vendorId) {
-            $sow->update(['technician_id' => null]);
-        }
-
-        return back()->with('success', $vendorId ? 'Project ditandai dikerjakan lewat vendor.' : 'Penandaan vendor luar dibatalkan.');
     }
 
     public function planning(PlanningRequest $request, Project $project, Notify $notify): RedirectResponse
@@ -216,7 +201,7 @@ class ProjectController extends Controller
                         ProjectStatus::InProgress->value,
                     ], true)
                     && $locked->actualProcurements->every(fn ($i) => $i->status === ActualProcurementStatus::Received->value)
-                    && \App\Services\Operational\MaterialDeliveryStatus::of($locked->salesOrder)['is_complete'],
+                    && MaterialDeliveryStatus::of($locked->salesOrder)['is_complete'],
                 409,
             );
             $locked->update(['status' => ProjectStatus::Completed->value]);

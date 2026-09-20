@@ -9,7 +9,7 @@ export default function Index({ requests, filters, statusOptions }) {
     function submit(e) { e.preventDefault(); router.get('/procurement/procurement-requests', form, { preserveState: true, replace: true }); }
 
     const columns = [
-        { key: 'number', label: 'Nomor PR', render: (pr) => <span className="font-semibold text-text">PR-{String(pr.id).padStart(6, '0')}</span> },
+        { key: 'number', label: 'Nomor PR', render: (pr) => <div><span className="font-semibold text-text">PR-{String(pr.id).padStart(6, '0')}</span>{pr.quotations_count > 0 && pr.status !== 'ready' && <div className="mt-1 text-xs font-medium text-warning">Costing ulang</div>}</div> },
         {
             key: 'customer',
             label: 'Customer',

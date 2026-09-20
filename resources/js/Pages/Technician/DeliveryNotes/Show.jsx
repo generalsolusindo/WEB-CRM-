@@ -1,12 +1,15 @@
-import { Head, router } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 export default function Show({ deliveryNote: dn, canReceive }) {
     function confirmReceive() {
-        if (confirm('Konfirmasi bahwa barang di Delivery Note ini sudah diterima di lokasi?')) {
-            router.post(`/technician/delivery-notes/${dn.id}/receive`);
-        }
+        feedback.act({
+            url: `/technician/delivery-notes/${dn.id}/receive`,
+            confirm: { tone: 'question', title: 'Barang sudah diterima?', text: 'Pastikan semua barang di Delivery Note ini sudah sampai di lokasi.', confirmLabel: 'Ya, sudah diterima' },
+            success: { title: 'Penerimaan tercatat', style: 'popup' },
+        });
     }
 
     return (

@@ -33,6 +33,9 @@ class Quotation extends Model
         'terms',
         'whatsapp_sent_at',
         'whatsapp_sent_by',
+        'cancelled_at',
+        'cancelled_by',
+        'cancellation_reason',
         'agreed_dpp',
         'pm_review_status',
         'pm_reviewed_by',
@@ -55,6 +58,7 @@ class Quotation extends Model
             'manager_reviewed_at' => 'datetime',
             'is_addendum' => 'boolean',
             'whatsapp_sent_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 
@@ -71,6 +75,11 @@ class Quotation extends Model
     public function managerReviewedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'manager_reviewed_by');
+    }
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 
     public function procurementRequest(): BelongsTo

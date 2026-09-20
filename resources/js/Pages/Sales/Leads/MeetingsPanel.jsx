@@ -1,10 +1,13 @@
 import { router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
+import { ConfirmDialog } from '../../../Components/ui';
 
 const emptyForm = { title: '', meeting_date: '', location: '', attendees: '', notes: '' };
 
 export default function MeetingsPanel({ leadId, meetings, editable }) {
     const [editingId, setEditingId] = useState(null);
+    const [deletingId, setDeletingId] = useState(null);
+    const [deleting, setDeleting] = useState(false);
     const { data, setData, post, put, processing, errors, reset, clearErrors } = useForm(emptyForm);
 
     function beginEdit(item) {
@@ -33,10 +36,14 @@ export default function MeetingsPanel({ leadId, meetings, editable }) {
             : post(`/sales/leads/${leadId}/meetings`, options);
     }
 
-    function destroy(id) {
-        if (confirm('Hapus data meeting ini?')) {
-            router.delete(`/sales/leads/${leadId}/meetings/${id}`, { preserveScroll: true });
-        }
+    function destroy() {
+        if (!deletingId) return;
+        setDeleting(true);
+        router.delete(`/sales/leads/${leadId}/meetings/${deletingId}`, {
+            preserveScroll: true,
+            onSuccess: () => setDeletingId(null),
+            onFinish: () => setDeleting(false),
+        });
     }
 
     return (
@@ -64,7 +71,7 @@ export default function MeetingsPanel({ leadId, meetings, editable }) {
                                 {editable && (
                                     <div className="whitespace-nowrap text-sm">
                                         <button onClick={() => beginEdit(item)} className="mr-3 text-info">Edit</button>
-                                        <button onClick={() => destroy(item.id)} className="text-danger">Hapus</button>
+                                        <button onClick={() => setDeletingId(item.id)} className="text-danger">Hapus</button>
                                     </div>
                                 )}
                             </div>
@@ -105,6 +112,17 @@ export default function MeetingsPanel({ leadId, meetings, editable }) {
                     </div>
                 </form>
             )}
+
+            <ConfirmDialog
+                open={deletingId !== null}
+                onClose={() => setDeletingId(null)}
+                onConfirm={destroy}
+                title="Hapus data meeting?"
+                description="Catatan meeting atau MoM ini akan dihapus permanen."
+                tone="danger"
+                confirmLabel="Hapus Meeting"
+                processing={deleting}
+            />
         </section>
     );
 }

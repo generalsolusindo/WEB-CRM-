@@ -1,13 +1,17 @@
-import { Head, router } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { FiPlus } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Button, DataTable, EmptyState } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 export default function Index({ taxes }) {
     function destroy(tax) {
-        if (confirm(`Hapus pajak "${tax.name}"?`)) {
-            router.delete(`/admin/taxes/${tax.id}`);
-        }
+        feedback.act({
+            method: 'delete',
+            url: `/admin/taxes/${tax.id}`,
+            confirm: { tone: 'danger', title: 'Hapus pajak?', text: `"${tax.name}" akan dihapus. Pajak yang sudah dipakai di dokumen tidak bisa dihapus.`, confirmLabel: 'Ya, hapus' },
+            success: { title: 'Pajak dihapus' },
+        });
     }
 
     const columns = [

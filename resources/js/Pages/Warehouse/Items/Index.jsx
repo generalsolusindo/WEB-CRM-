@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { FiPlus, FiPlusCircle, FiMinusCircle } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Toolbar, SearchInput, Button, DataTable, EmptyState, Pagination, Modal, Field, Input } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 export default function Index({ items, filters, canManage }) {
     const [search, setSearch] = useState(filters.search ?? '');
@@ -14,9 +15,12 @@ export default function Index({ items, filters, canManage }) {
     }
 
     function destroy(item) {
-        if (confirm(`Hapus barang "${item.name}"?`)) {
-            router.delete(`/warehouse/items/${item.id}`);
-        }
+        feedback.act({
+            method: 'delete',
+            url: `/warehouse/items/${item.id}`,
+            confirm: { tone: 'danger', title: 'Hapus barang?', text: `"${item.name}" akan dihapus dari daftar stok gudang.`, confirmLabel: 'Ya, hapus' },
+            success: { title: 'Barang dihapus', style: 'popup' },
+        });
     }
 
     const columns = [

@@ -3,11 +3,9 @@
 namespace Tests\Feature\Sales;
 
 use App\Models\Contact;
-use App\Models\Invoice;
 use App\Models\Lead;
 use App\Models\ProcurementRequest;
 use App\Models\Quotation;
-use App\Models\SalesOrder;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorProduct;
@@ -68,7 +66,7 @@ class LineCategoryTest extends TestCase
         $this->assertSame('material', Quotation::firstOrFail()->lines()->firstOrFail()->category);
     }
 
-    public function test_sales_can_override_category_and_it_flows_to_invoice(): void
+    public function test_sales_cannot_override_procurement_category(): void
     {
         [$sales, $pr] = $this->readyPr('material');
 
@@ -80,16 +78,7 @@ class LineCategoryTest extends TestCase
             ]],
         ]);
         $quotation = Quotation::firstOrFail();
-        $this->assertSame('service', $quotation->lines()->firstOrFail()->category);
-
-        $quotation->update(['status' => 'sent']);
-        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload('service_only'));
-        $so = SalesOrder::firstOrFail();
-        $this->assertSame('service', $so->lines()->firstOrFail()->category);
-
-        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
-        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'dp']);
-        $this->assertSame('service', Invoice::firstOrFail()->lines()->firstOrFail()->category);
+        $this->assertSame('material', $quotation->lines()->firstOrFail()->category);
     }
 
     public function test_requirement_category_flows_to_pr_line_and_quotation_default(): void
@@ -171,7 +160,7 @@ class LineCategoryTest extends TestCase
         $this->assertSame('reimburse', $pr->lines->first()->fresh()->category);
     }
 
-    public function test_invalid_category_rejected(): void
+    public function test_quotation_ignores_category_input_from_sales(): void
     {
         [$sales, $pr] = $this->readyPr('material');
 
@@ -181,6 +170,8 @@ class LineCategoryTest extends TestCase
                 'selling_price' => 1300000,
                 'category' => 'jasa-salah',
             ]],
-        ])->assertSessionHasErrors('lines.0.category');
+        ])->assertRedirect();
+
+        $this->assertSame('material', Quotation::firstOrFail()->lines()->firstOrFail()->category);
     }
 }

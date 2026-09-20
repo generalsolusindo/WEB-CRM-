@@ -56,39 +56,16 @@ class UpdateQuotation
 
             $taxRates = Tax::pluck('rate', 'id');
 
-            // Snapshot baris lama SEBELUM dihapus, dikunci per procurement_request_line_id —
-            // dipakai dua hal: (1) fallback nilai field yang tidak dikirim ulang oleh client
-            // untuk baris lama (payload boleh parsial), (2) sumber cost_price yang sesungguhnya
-            // untuk baris lama (tidak pernah dipercaya dari input client, supaya Sales tidak
-            // bisa memalsukan margin pada item yang sudah divalidasi Procurement).
+            // Struktur kebutuhan dan cost selalu berasal dari Procurement. Editor quotation
+            // hanya menangani nilai komersial seperti selling price dan diskon.
             $existingByPrLineId = $locked->lines->keyBy('procurement_request_line_id');
-
-            // Ganti seluruh baris (bukan cuma update satu-satu yang harus selalu cocok dengan
-            // set procurement_request_line_id semula) — supaya Sales bisa bebas menambah &
-            // menghapus item saat edit, bukan cuma mengubah nilai item yang sudah ada. Pola ini
-            // sama seperti UpdateInvoice.
             $locked->lines()->delete();
 
             foreach ($data['lines'] as $input) {
-                $prLineId = isset($input['procurement_request_line_id']) ? (int) $input['procurement_request_line_id'] : null;
-                $existing = $prLineId !== null ? $existingByPrLineId->get($prLineId) : null;
-
-                $costPrice = $existing !== null
-                    ? (float) $existing->cost_price
-                    : round((float) ($input['cost_price'] ?? 0), 2);
-
-                $qty = isset($input['qty']) && $input['qty'] !== '' ? (float) $input['qty'] : (float) ($existing->qty ?? 0);
-                $itemName = ($input['item_name'] ?? '') !== '' ? $input['item_name'] : ($existing->item_name ?? '');
-                $unit = ($input['unit'] ?? '') !== '' ? $input['unit'] : ($existing->unit ?? '');
-                $category = in_array($input['category'] ?? null, ['material', 'service', 'reimburse'], true)
-                    ? $input['category']
-                    : ($existing->category ?? 'material');
-                $description = array_key_exists('description', $input)
-                    ? ($input['description'] ?: null)
-                    : ($existing->description ?? null);
-                $sourcingNote = array_key_exists('sourcing_note', $input)
-                    ? ($input['sourcing_note'] ?: null)
-                    : ($existing->sourcing_note ?? null);
+                $prLineId = (int) $input['procurement_request_line_id'];
+                $existing = $existingByPrLineId->get($prLineId);
+                $costPrice = (float) $existing->cost_price;
+                $qty = (float) $existing->qty;
 
                 $taxId = array_key_exists('tax_id', $input) ? $input['tax_id'] : ($existing->tax_id ?? null);
                 $taxRate = $input['tax_rate'] ?? ($taxId ? (float) ($taxRates[$taxId] ?? 0) : (float) ($existing->tax_rate ?? 0));
@@ -103,12 +80,12 @@ class UpdateQuotation
 
                 $locked->lines()->create([
                     'procurement_request_line_id' => $prLineId,
-                    'item_name' => $itemName,
-                    'category' => $category,
-                    'description' => $description,
-                    'sourcing_note' => $sourcingNote,
+                    'item_name' => $existing->item_name,
+                    'category' => $existing->category,
+                    'description' => $existing->description,
+                    'sourcing_note' => $existing->sourcing_note,
                     'qty' => $qty,
-                    'unit' => $unit,
+                    'unit' => $existing->unit,
                     'cost_price' => $costPrice,
                     'selling_price' => $input['selling_price'],
                     'discount_percent' => $priced['discount_percent'],

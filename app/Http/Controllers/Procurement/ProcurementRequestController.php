@@ -13,10 +13,12 @@ use App\Http\Requests\Procurement\SaveProcurementRequestLinesRequest;
 use App\Models\ProcurementRequest;
 use App\Models\Tax;
 use App\Models\VendorProduct;
+use App\Support\ProcurementScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -36,7 +38,7 @@ class ProcurementRequestController extends Controller
         $requests = ProcurementRequest::query()
             ->where('status', '!=', ProcurementRequestStatus::Draft->value)
             ->with(['lead.contact:id,name,company_name'])
-            ->withCount('lines')
+            ->withCount(['lines', 'quotations'])
             ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search) {
                 $query->where('id', $search)
                     ->orWhereHas('lead.contact', fn ($contact) => $contact
@@ -70,15 +72,40 @@ class ProcurementRequestController extends Controller
 
         $contact = $procurementRequest->lead->contact;
         $npwpDocument = $contact->npwpDocument();
+        $quotation = $procurementRequest->quotations()->with('lines')->latest('id')->first();
+
+        if ($quotation && $procurementRequest->status !== ProcurementRequestStatus::Ready->value) {
+            $quotationLines = $quotation->lines->keyBy('procurement_request_line_id');
+            $procurementRequest->lines->each(function ($line) use ($quotationLines) {
+                $original = $quotationLines->get($line->id);
+                $state = match (true) {
+                    $original === null => 'new',
+                    ProcurementScope::differs($original, $line) => 'changed',
+                    default => 'unchanged',
+                };
+                $line->setAttribute('revision_state', $state);
+
+                // Memulihkan tampilan data lama yang sempat ter-reset oleh versi alur
+                // recost sebelumnya. Nilai ini akan tersimpan kembali saat Procurement
+                // menekan Simpan; vendor tidak tersedia di snapshot quotation.
+                if ($state === 'unchanged' && (float) $line->cost_price <= 0) {
+                    $line->setAttribute('cost_price', $original->cost_price);
+                    $line->setAttribute('sourcing_note', $line->sourcing_note ?: $original->sourcing_note);
+                    $line->setAttribute('tax_id', $line->tax_id ?: $original->tax_id);
+                    $line->setAttribute('availability_status', 'available');
+                }
+            });
+        }
 
         return Inertia::render('Procurement/Requests/Show', [
             'procurementRequest' => $procurementRequest,
+            'isRecost' => $quotation !== null,
             'editable' => request()->user()->can('update', $procurementRequest),
             'canStart' => request()->user()->can('start', $procurementRequest),
             'canFinalize' => request()->user()->can('finalize', $procurementRequest),
             'hasNpwp' => filled($contact->npwp),
             'npwpDocumentUrl' => $npwpDocument
-                ? \Illuminate\Support\Facades\Storage::disk('local')->temporaryUrl($npwpDocument->file_path, now()->addDay())
+                ? Storage::disk('local')->temporaryUrl($npwpDocument->file_path, now()->addDay())
                 : null,
             'availabilityOptions' => AvailabilityStatus::options(),
             'taxes' => Tax::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'rate']),

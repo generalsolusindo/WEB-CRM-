@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Enums\QuotationStatus;
 use App\Models\ProcurementRequest;
 use App\Models\Quotation;
+use App\Models\SalesOrder;
 use App\Models\User;
 
 class QuotationPolicy
@@ -38,6 +39,17 @@ class QuotationPolicy
     public function update(User $user, Quotation $quotation): bool
     {
         return $this->owns($user, $quotation)
+            && $quotation->status !== QuotationStatus::Cancelled->value
+            && $quotation->procurementRequest?->status === 'ready'
+            && ! $quotation->salesOrder()->exists()
+            && ! $quotation->revisions()->exists();
+    }
+
+    public function reviseScope(User $user, Quotation $quotation): bool
+    {
+        return $this->owns($user, $quotation)
+            && $quotation->procurementRequest?->status === 'ready'
+            && ($quotation->pm_review_status === 'rejected' || $quotation->manager_review_status === 'rejected')
             && ! $quotation->salesOrder()->exists()
             && ! $quotation->revisions()->exists();
     }
@@ -45,30 +57,47 @@ class QuotationPolicy
     /** Ubah nomor quotation secara manual (mis. menyambung dari sistem lama) — bisa di status apa saja. */
     public function updateNumber(User $user, Quotation $quotation): bool
     {
-        return $this->owns($user, $quotation);
+        return $this->owns($user, $quotation)
+            && $quotation->status !== QuotationStatus::Cancelled->value;
     }
 
-    /**
-     * Bisa dihapus di status apa saja termasuk Confirmed, selama belum punya revisi
-     * (akan memutus rantai riwayat revisi) DAN — kalau sudah jadi Sales Order — Sales
-     * Order itu belum punya Invoice atau Project sama sekali. Begitu Finance atau
-     * Operational mulai memproses (Invoice/Project dibuat), quotation & Sales Order-nya
-     * terkunci permanen dari hapus, supaya tidak pernah ada skenario menghapus quotation
-     * ikut menghilangkan jejak transaksi/pembayaran/pekerjaan yang sudah nyata terjadi.
-     */
-    public function delete(User $user, Quotation $quotation): bool
+    /** Batalkan rangkaian transaksi yang sudah berjalan tetapi belum punya realisasi Project/pembayaran. */
+    public function cancel(User $user, Quotation $quotation): bool
     {
-        if (! $this->owns($user, $quotation) || $quotation->revisions()->exists()) {
+        if (! $this->owns($user, $quotation) || $quotation->status === QuotationStatus::Cancelled->value) {
             return false;
         }
 
-        $salesOrder = $quotation->salesOrder;
+        $rootId = $quotation->parent_quotation_id ?? $quotation->id;
+        $chain = Quotation::query()
+            ->where(fn ($query) => $query->where('id', $rootId)->orWhere('parent_quotation_id', $rootId));
+        $chainIds = (clone $chain)->pluck('id');
+        $orders = SalesOrder::query()->whereIn('quotation_id', $chainIds);
 
-        if ($salesOrder === null) {
-            return true;
-        }
+        $hasBusinessActivity = (clone $chain)
+            ->where(function ($query) {
+                $query->where('status', '!=', QuotationStatus::Draft->value)
+                    ->orWhereNotNull('whatsapp_sent_at')
+                    ->orWhereNotNull('parent_quotation_id');
+            })->exists() || (clone $orders)->exists();
 
-        return ! $salesOrder->invoices()->exists() && ! $salesOrder->projects()->exists();
+        return $hasBusinessActivity
+            && ! (clone $orders)->whereIn('status', ['completed', 'won'])->exists()
+            && ! (clone $orders)->whereHas('projects')->exists()
+            && ! (clone $orders)->whereHas('invoices', fn ($query) => $query
+                ->whereIn('status', ['partially_paid', 'paid'])
+                ->orWhereHas('payments'))->exists();
+    }
+
+    /** Hapus permanen hanya untuk draft awal yang belum menghasilkan aktivitas bisnis. */
+    public function delete(User $user, Quotation $quotation): bool
+    {
+        return $this->owns($user, $quotation)
+            && $quotation->status === QuotationStatus::Draft->value
+            && $quotation->whatsapp_sent_at === null
+            && $quotation->parent_quotation_id === null
+            && ! $quotation->revisions()->exists()
+            && ! $quotation->salesOrder()->exists();
     }
 
     /**
@@ -98,6 +127,8 @@ class QuotationPolicy
     {
         return $this->isProjectManager($user)
             && $quotation->lead?->delegated_to === $user->id
+            && $quotation->procurementRequest?->status === 'ready'
+            && $quotation->quoted_at !== null
             && $quotation->status === QuotationStatus::Draft->value
             && $quotation->pm_review_status === null;
     }
@@ -105,6 +136,8 @@ class QuotationPolicy
     public function reviewAsManager(User $user, Quotation $quotation): bool
     {
         return $this->isManagement($user)
+            && $quotation->procurementRequest?->status === 'ready'
+            && $quotation->quoted_at !== null
             && $quotation->status === QuotationStatus::Draft->value
             && $quotation->pm_review_status === 'approved'
             && $quotation->manager_review_status === null;

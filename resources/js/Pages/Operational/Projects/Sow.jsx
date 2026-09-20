@@ -1,10 +1,12 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader } from '../../../Components/ui';
+import { PageHeader, ConfirmDialog } from '../../../Components/ui';
 
 export default function Sow({ project, vendor, technicianOptions = [], sow, signatures, canEdit, canSignOperational, canRestartSignatures }) {
     const [signing, setSigning] = useState(false);
+    const [confirmation, setConfirmation] = useState(null);
+    const [actionProcessing, setActionProcessing] = useState(false);
 
     function signOperational() {
         setSigning(true);
@@ -12,9 +14,11 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
     }
 
     function restartSignatures() {
-        if (confirm('Ulangi proses tanda tangan Teknisi & PIC Vendor?')) {
-            router.post(`/operational/sows/${sow.id}/restart-signatures`);
-        }
+        setActionProcessing(true);
+        router.post(`/operational/sows/${sow.id}/restart-signatures`, {}, {
+            onSuccess: () => setConfirmation(null),
+            onFinish: () => setActionProcessing(false),
+        });
     }
     const fileInput = useRef(null);
     const form = useForm({
@@ -58,12 +62,8 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
     function submit(e) {
         e.preventDefault();
         if (!isDraftLike) {
-            const ok = confirm(
-                'SOW ini sudah berjalan di proses review/tanda tangan. Menyimpan perubahan akan MERESET seluruh ' +
-                'review & tanda tangan yang sudah dikumpulkan (HR, Teknisi, PIC Vendor, dst) — statusnya kembali ke ' +
-                'Draft dan harus dikirim ulang dari awal. Lanjutkan?'
-            );
-            if (!ok) return;
+            setConfirmation({ type: 'reset-process' });
+            return;
         }
         form.put(`/operational/projects/${project.id}/sow`, { preserveScroll: true });
     }
@@ -80,12 +80,65 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
     }
 
     function deleteImage(imageId) {
-        if (confirm('Hapus gambar ini?')) router.delete(`/operational/projects/${project.id}/sow/images/${imageId}`, { preserveScroll: true });
+        setConfirmation({ type: 'delete-main-image', id: imageId });
     }
 
     function submitToHr() {
-        if (confirm('Kirim SOW ini ke HR untuk direview?')) router.post(`/operational/projects/${project.id}/sow/submit`);
+        setConfirmation({ type: 'submit-hr' });
     }
+
+    function runConfirmedAction() {
+        if (confirmation?.type === 'reset-process') {
+            form.put(`/operational/projects/${project.id}/sow`, {
+                preserveScroll: true,
+                onSuccess: () => setConfirmation(null),
+            });
+            return;
+        }
+        if (confirmation?.type === 'restart-signatures') {
+            restartSignatures();
+            return;
+        }
+
+        setActionProcessing(true);
+        const options = {
+            preserveScroll: true,
+            onSuccess: () => setConfirmation(null),
+            onFinish: () => setActionProcessing(false),
+        };
+        if (confirmation?.type === 'delete-main-image') {
+            router.delete(`/operational/projects/${project.id}/sow/images/${confirmation.id}`, options);
+        } else if (confirmation?.type === 'submit-hr') {
+            router.post(`/operational/projects/${project.id}/sow/submit`, {}, options);
+        }
+    }
+
+    const confirmationContent = {
+        'restart-signatures': {
+            title: 'Ulangi proses tanda tangan?',
+            description: 'Tanda tangan Teknisi dan PIC Vendor akan dimulai ulang dari awal.',
+            tone: 'warning',
+            confirmLabel: 'Ulangi Proses',
+        },
+        'reset-process': {
+            title: 'Simpan dan reset proses SOW?',
+            description: 'Seluruh review dan tanda tangan yang sudah dikumpulkan akan direset. Status SOW kembali ke Draft dan harus dikirim ulang dari awal.',
+            tone: 'danger',
+            confirmLabel: 'Simpan & Reset',
+        },
+        'delete-main-image': {
+            title: 'Hapus gambar?',
+            description: 'Gambar pendukung ini akan dihapus dari SOW.',
+            tone: 'danger',
+            confirmLabel: 'Hapus Gambar',
+        },
+        'submit-hr': {
+            title: 'Kirim SOW ke HR?',
+            description: 'SOW akan dikirim ke HR untuk ditinjau sebelum proses tanda tangan dilanjutkan.',
+            tone: 'info',
+            confirmLabel: 'Kirim ke HR',
+        },
+    }[confirmation?.type];
 
     const isDraftLike = !sow.status || sow.status === 'draft' || sow.status === 'rejected_by_hr';
 
@@ -163,7 +216,7 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
                     <section className="rounded-xl border-2 border-danger/40 bg-danger/5 p-6 shadow-sm">
                         <h2 className="mb-1 font-semibold text-danger">Tanda Tangan Ditolak HR</h2>
                         <p className="mb-3 text-sm text-danger">HR menolak tanda tangan Teknisi/PIC Vendor. Ulangi proses tanda tangan dari awal.</p>
-                        <button onClick={restartSignatures} className="btn btn-primary">Ulangi Proses Tanda Tangan</button>
+                        <button onClick={() => setConfirmation({ type: 'restart-signatures' })} className="btn btn-primary">Ulangi Proses Tanda Tangan</button>
                     </section>
                 )}
 
@@ -337,6 +390,16 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
                     )}
                 </form>
             </div>
+            <ConfirmDialog
+                open={Boolean(confirmationContent)}
+                onClose={() => setConfirmation(null)}
+                onConfirm={runConfirmedAction}
+                title={confirmationContent?.title}
+                description={confirmationContent?.description}
+                tone={confirmationContent?.tone}
+                confirmLabel={confirmationContent?.confirmLabel}
+                processing={actionProcessing || (confirmation?.type === 'reset-process' && form.processing)}
+            />
         </AppLayout>
     );
 }
@@ -401,6 +464,7 @@ function TextArea({ value, onChange, error, placeholder }) {
 }
 
 function ScopeSections({ project, sections, canEdit, canEditImages, onChange }) {
+    const [removeIndex, setRemoveIndex] = useState(null);
     function addSection() {
         onChange([...sections, { id: null, title: 'Sub Bab Baru', content: '', images: [] }]);
     }
@@ -410,9 +474,12 @@ function ScopeSections({ project, sections, canEdit, canEditImages, onChange }) 
     }
 
     function removeSection(index) {
-        if (confirm(`Hapus sub-bab "${sections[index].title}"? Perubahan diterapkan saat Simpan Draft.`)) {
-            onChange(sections.filter((_, i) => i !== index));
-        }
+        setRemoveIndex(index);
+    }
+
+    function confirmRemoveSection() {
+        onChange(sections.filter((_, i) => i !== removeIndex));
+        setRemoveIndex(null);
     }
 
     function moveSection(index, direction) {
@@ -447,12 +514,23 @@ function ScopeSections({ project, sections, canEdit, canEditImages, onChange }) 
                 </button>
             )}
             {canEdit && <p className="text-xs text-text-muted">Perubahan judul, isi, urutan, penambahan, dan penghapusan sub-bab disimpan bersama tombol Simpan Draft.</p>}
+            <ConfirmDialog
+                open={removeIndex !== null}
+                onClose={() => setRemoveIndex(null)}
+                onConfirm={confirmRemoveSection}
+                title="Hapus sub-bab?"
+                description={`Sub-bab “${removeIndex !== null ? sections[removeIndex]?.title : ''}” akan dihapus saat Simpan Draft.`}
+                tone="danger"
+                confirmLabel="Hapus Sub-bab"
+            />
         </div>
     );
 }
 
 function ScopeSectionCard({ project, section, letter, isFirst, isLast, canEdit, canEditImages, onChange, onRemove, onMove }) {
     const fileRef = useRef(null);
+    const [deleteImageId, setDeleteImageId] = useState(null);
+    const [deleteProcessing, setDeleteProcessing] = useState(false);
 
     function uploadImages(e) {
         const files = Array.from(e.target.files || []);
@@ -466,9 +544,12 @@ function ScopeSectionCard({ project, section, letter, isFirst, isLast, canEdit, 
     }
 
     function deleteImage(imageId) {
-        if (confirm('Hapus gambar ini?')) {
-            router.delete(`/operational/projects/${project.id}/sow/scope-sections/${section.id}/images/${imageId}`, { preserveScroll: true });
-        }
+        setDeleteProcessing(true);
+        router.delete(`/operational/projects/${project.id}/sow/scope-sections/${section.id}/images/${imageId}`, {
+            preserveScroll: true,
+            onSuccess: () => setDeleteImageId(null),
+            onFinish: () => setDeleteProcessing(false),
+        });
     }
 
     if (!canEdit) {
@@ -515,11 +596,21 @@ function ScopeSectionCard({ project, section, letter, isFirst, isLast, canEdit, 
                     {section.images.map((img) => (
                         <div key={img.id} className="group relative">
                             <a href={img.url} target="_blank" rel="noreferrer"><img src={img.url} className="h-24 w-full rounded-lg border border-border object-cover" /></a>
-                            {canEditImages && <button type="button" onClick={() => deleteImage(img.id)} className="absolute right-1 top-1 rounded-full bg-danger px-2 py-0.5 text-xs text-white opacity-0 group-hover:opacity-100">✕</button>}
+                            {canEditImages && <button type="button" onClick={() => setDeleteImageId(img.id)} className="absolute right-1 top-1 rounded-full bg-danger px-2 py-0.5 text-xs text-white opacity-0 group-hover:opacity-100">✕</button>}
                         </div>
                     ))}
                 </div>
             )}
+            <ConfirmDialog
+                open={deleteImageId !== null}
+                onClose={() => setDeleteImageId(null)}
+                onConfirm={() => deleteImage(deleteImageId)}
+                title="Hapus gambar sub-bab?"
+                description="Gambar pendukung ini akan dihapus dari sub-bab SOW."
+                tone="danger"
+                confirmLabel="Hapus Gambar"
+                processing={deleteProcessing}
+            />
         </div>
     );
 }

@@ -9,6 +9,7 @@ use App\Http\Controllers\Finance\InvoiceController;
 use App\Http\Controllers\Finance\PaymentController;
 use App\Http\Controllers\Finance\ProcurementPaymentController as FinanceProcurementPaymentController;
 use App\Http\Controllers\Finance\SurveyController as FinanceSurveyController;
+use App\Http\Controllers\Finance\VendorServicePaymentController;
 use App\Http\Controllers\Hr\SowController as HrSowController;
 use App\Http\Controllers\Management\OpportunityController as ManagementOpportunityController;
 use App\Http\Controllers\Management\ProjectController as ManagementProjectController;
@@ -30,6 +31,7 @@ use App\Http\Controllers\Operational\SowController;
 use App\Http\Controllers\Operational\SurveyController as OperationalSurveyController;
 use App\Http\Controllers\Procurement\ProcurementRequestController;
 use App\Http\Controllers\Procurement\ProjectProcurementController;
+use App\Http\Controllers\Procurement\ProjectVendorServiceController;
 use App\Http\Controllers\Procurement\SurveyController as ProcurementSurveyController;
 use App\Http\Controllers\Procurement\TechnicianAccountController;
 use App\Http\Controllers\Procurement\VendorAccountController;
@@ -193,6 +195,8 @@ Route::middleware('auth')->group(function () {
             ->name('project-procurements.show');
         Route::put('project-procurements/{project}/sourcing', [ProjectProcurementController::class, 'saveSourcing'])
             ->name('project-procurements.sourcing');
+        Route::put('project-procurements/{project}/vendor-service', [ProjectVendorServiceController::class, 'save'])
+            ->name('project-procurements.vendor-service');
         Route::post('project-procurements/{project}/submit', [ProjectProcurementController::class, 'submit'])
             ->name('project-procurements.submit');
         Route::post('project-procurements/{project}/confirm', [ProjectProcurementController::class, 'confirm'])
@@ -224,6 +228,10 @@ Route::middleware('auth')->group(function () {
         Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
         Route::post('invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
         Route::post('invoices/{invoice}/payments/{payment}/cancel', [PaymentController::class, 'cancel'])->name('invoices.payments.cancel');
+        Route::get('vendor-service-payments', [VendorServicePaymentController::class, 'index'])->name('vendor-service-payments.index');
+        Route::get('vendor-service-payments/{vendorServicePayment}', [VendorServicePaymentController::class, 'show'])->name('vendor-service-payments.show');
+        Route::post('vendor-service-payments/{vendorServicePayment}/pay', [VendorServicePaymentController::class, 'pay'])->name('vendor-service-payments.pay');
+        Route::post('vendor-service-payments/{vendorServicePayment}/entries/{entry}/cancel', [VendorServicePaymentController::class, 'cancel'])->name('vendor-service-payments.cancel');
         Route::get('procurement-payments', [FinanceProcurementPaymentController::class, 'index'])->name('procurement-payments.index');
         Route::get('procurement-payments/{procurementPayment}', [FinanceProcurementPaymentController::class, 'show'])->name('procurement-payments.show');
         Route::post('procurement-payments/{procurementPayment}/pay', [FinanceProcurementPaymentController::class, 'pay'])->name('procurement-payments.pay');
@@ -267,8 +275,6 @@ Route::middleware('auth')->group(function () {
     Route::prefix('operational')->name('operational.')->middleware('role:operational')->group(function () {
         Route::put('projects/{project}/planning', [ProjectController::class, 'planning'])
             ->name('projects.planning');
-        Route::put('projects/{project}/vendor', [ProjectController::class, 'assignVendor'])
-            ->name('projects.vendor');
         Route::post('projects/{project}/ready', [ProjectController::class, 'markReady'])
             ->name('projects.ready');
         Route::post('projects/{project}/start', [ProjectController::class, 'start'])
@@ -381,6 +387,10 @@ Route::middleware('auth')->group(function () {
             ->name('quotations.send-whatsapp');
         Route::patch('quotations/{quotation}/number', [QuotationController::class, 'updateNumber'])
             ->name('quotations.number.update');
+        Route::get('quotations/{quotation}/scope-revision', [QuotationController::class, 'editScope'])
+            ->name('quotations.scope-revision.edit');
+        Route::put('quotations/{quotation}/scope-revision', [QuotationController::class, 'requestRecost'])
+            ->name('quotations.scope-revision.update');
         Route::get('procurement-requests/{procurementRequest}/quotations/create', [QuotationController::class, 'create'])
             ->name('procurement-requests.quotations.create');
         Route::post('procurement-requests/{procurementRequest}/quotations', [QuotationController::class, 'store'])
@@ -389,6 +399,8 @@ Route::middleware('auth')->group(function () {
             ->name('quotations.send');
         Route::post('quotations/{quotation}/reject', [QuotationController::class, 'reject'])
             ->name('quotations.reject');
+        Route::post('quotations/{quotation}/cancel', [QuotationController::class, 'cancel'])
+            ->name('quotations.cancel');
         Route::post('quotations/{quotation}/revisions', QuotationRevisionController::class)
             ->name('quotations.revisions.store');
         Route::get('quotations/{quotation}/confirm', [QuotationConfirmationController::class, 'create'])

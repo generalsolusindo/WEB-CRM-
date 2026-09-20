@@ -7,6 +7,7 @@ use App\Models\Notification;
 use App\Models\ProcurementRequest;
 use App\Models\Quotation;
 use App\Models\Survey;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -27,10 +28,10 @@ class DeleteLead
     public function handle(Lead $lead): void
     {
         DB::transaction(function () use ($lead) {
+            $this->deleteNotificationsFor($lead);
+
             foreach (Quotation::where('lead_id', $lead->id)->get() as $quotation) {
-                Notification::where('related_type', $quotation->getMorphClass())
-                    ->where('related_id', $quotation->id)
-                    ->delete();
+                $this->deleteNotificationsFor($quotation);
 
                 if ($salesOrder = $quotation->salesOrder) {
                     $salesOrder->attachments()->get()->each(
@@ -38,9 +39,7 @@ class DeleteLead
                     );
                     $salesOrder->attachments()->delete();
 
-                    Notification::where('related_type', $salesOrder->getMorphClass())
-                        ->where('related_id', $salesOrder->id)
-                        ->delete();
+                    $this->deleteNotificationsFor($salesOrder);
 
                     $salesOrder->delete();
                 }
@@ -48,15 +47,20 @@ class DeleteLead
                 $quotation->delete();
             }
 
-            ProcurementRequest::where('lead_id', $lead->id)->get()->each->delete();
+            foreach (ProcurementRequest::where('lead_id', $lead->id)->get() as $procurementRequest) {
+                $this->deleteNotificationsFor($procurementRequest);
+                $procurementRequest->delete();
+            }
 
             foreach (Survey::where('lead_id', $lead->id)->with('report')->get() as $survey) {
+                $this->deleteNotificationsFor($survey);
                 $survey->attachments()->get()->each(
                     fn ($attachment) => Storage::disk('local')->delete($attachment->file_path)
                 );
                 $survey->attachments()->delete();
 
                 if ($survey->report) {
+                    $this->deleteNotificationsFor($survey->report);
                     $survey->report->attachments()->get()->each(
                         fn ($attachment) => Storage::disk('local')->delete($attachment->file_path)
                     );
@@ -68,5 +72,12 @@ class DeleteLead
             // otomatis lewat foreign key cascadeOnDelete begitu Lead ini dihapus.
             $lead->delete();
         });
+    }
+
+    private function deleteNotificationsFor(Model $related): void
+    {
+        Notification::where('related_type', $related->getMorphClass())
+            ->where('related_id', $related->getKey())
+            ->delete();
     }
 }

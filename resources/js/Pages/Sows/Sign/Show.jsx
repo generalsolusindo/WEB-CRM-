@@ -1,7 +1,8 @@
-import { Head, router } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
 import SignaturePad from '../../../Components/SignaturePad';
+import { feedback } from '../../../Components/feedback';
 import { PageHeader } from '../../../Components/ui';
 
 export default function Show({ sow, canSign, signUrl, roleLabel, backHref, autoSign = false }) {
@@ -10,9 +11,17 @@ export default function Show({ sow, canSign, signUrl, roleLabel, backHref, autoS
 
     function submit() {
         if (!autoSign && !signature) return;
-        setProcessing(true);
-        router.post(signUrl, autoSign ? {} : { signature }, {
-            onFinish: () => setProcessing(false),
+        feedback.act({
+            url: signUrl,
+            data: autoSign ? {} : { signature },
+            confirm: {
+                tone: 'question',
+                title: 'Tanda tangani SOW ini?',
+                text: `Tanda tangan Anda sebagai ${roleLabel} akan dibubuhkan pada SOW ${sow.number} dan tidak bisa ditarik kembali.`,
+                confirmLabel: 'Ya, tanda tangani',
+            },
+            success: { title: 'SOW ditandatangani', style: 'popup' },
+            visit: { onStart: () => setProcessing(true), onFinish: () => setProcessing(false), preserveScroll: false },
         });
     }
 

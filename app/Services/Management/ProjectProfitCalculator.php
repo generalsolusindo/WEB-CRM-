@@ -16,8 +16,9 @@ use App\Models\Project;
  * - Baris material: ActualProcurement.cost_price — otomatis "aktual kalau sudah
  *   ada, estimasi kalau belum", karena diisi = estimasi saat Project dibuat, lalu
  *   ditimpa Procurement dengan harga beli sungguhan begitu barang sudah disourcing.
- * - Baris jasa: cost_price dari Sales Order Line — jasa tidak melalui pembelian
- *   vendor, jadi tidak pernah punya data ActualProcurement.
+ * - Baris jasa: cost_price dari Sales Order Line (estimasi). Kalau project dikerjakan vendor
+ *   luar dan Procurement sudah mengisi Deal Vendor Jasa, total fee deal itu MENGGANTIKAN
+ *   seluruh estimasi biaya jasa (fee yang disepakati/dibayar = biaya jasa sebenarnya).
  *
  * Harga jual = subtotal (DPP) Sales Order yang dikonfirmasi customer.
  *
@@ -35,9 +36,12 @@ class ProjectProfitCalculator
         $materialCost = round($project->actualProcurements->sum(
             fn ($ap) => (float) $ap->qty * (float) $ap->cost_price
         ), 2);
-        $serviceCost = round($lines->where('category', 'service')->sum(
-            fn ($l) => (float) $l->qty * (float) $l->cost_price
-        ), 2);
+        $vendorFee = $project->vendorServicePayment?->total_fee;
+        $serviceCost = $vendorFee !== null
+            ? round((float) $vendorFee, 2)
+            : round($lines->where('category', 'service')->sum(
+                fn ($l) => (float) $l->qty * (float) $l->cost_price
+            ), 2);
         $hpp = round($materialCost + $serviceCost, 2);
         $profit = round($sellingTotal - $hpp, 2);
 
@@ -51,6 +55,7 @@ class ProjectProfitCalculator
             'is_won' => $project->salesOrder->status === 'won',
             'created_at' => $project->created_at->format('Y-m-d'),
             'hpp' => $hpp,
+            'uses_vendor_fee' => $vendorFee !== null,
             'harga_jual' => $sellingTotal,
             'profit' => $profit,
             'margin_percent' => $hpp > 0 ? round($profit / $hpp * 100, 2) : null,
@@ -65,6 +70,7 @@ class ProjectProfitCalculator
             'salesOrder.contact:id,name,company_name',
             'salesOrder.lines:id,sales_order_id,category,qty,cost_price,subtotal',
             'actualProcurements:id,project_id,qty,cost_price',
+            'vendorServicePayment:id,project_id,total_fee',
         ];
     }
 }

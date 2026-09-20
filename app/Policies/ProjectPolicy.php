@@ -95,6 +95,7 @@ class ProjectPolicy
     {
         return $this->isOperational($user)
             && $project->salesOrder?->order_type !== 'material_only'
+            && $this->vendorReleased($project)
             && in_array($project->status, [
                 ProjectStatus::Planning->value,
                 ProjectStatus::WaitingResource->value,
@@ -105,6 +106,7 @@ class ProjectPolicy
     {
         return $this->isOperational($user)
             && $project->salesOrder?->order_type !== 'material_only'
+            && $this->vendorReleased($project)
             && $project->status === ProjectStatus::Ready->value;
     }
 
@@ -177,25 +179,22 @@ class ProjectPolicy
     }
 
     /**
-     * Tandai project ini dikerjakan lewat vendor teknisi luar (atau batalkan).
-     * Tidak boleh diubah lagi setelah SOW-nya mulai diproses (submit ke HR atau
-     * lebih jauh) — supaya tidak memutus rantai tanda tangan yang sedang berjalan.
+     * Gerbang vendor luar: project yang butuh vendor baru boleh dilanjutkan Operasional
+     * (SOW, siap, mulai) setelah dilepas — yaitu DP dibayar Finance, atau termin bayar
+     * di akhir. Project yang ditandai butuh vendor tapi deal-nya belum diisi Procurement
+     * juga masih tertahan. Project tanpa penanda & tanpa deal (termasuk data lama) tidak terkena.
      */
-    public function assignVendor(User $user, Project $project): bool
+    public function vendorReleased(Project $project): bool
     {
-        if (! $this->isOperational($user)) {
-            return false;
-        }
+        $deal = $project->vendorServicePayment;
 
-        $sow = $project->sow;
-
-        return $sow === null || in_array($sow->status, [SowStatus::Draft->value, SowStatus::RejectedByHr->value], true);
+        return $deal ? $deal->released_at !== null : ! $project->needs_outside_vendor;
     }
 
     /** Lihat SOW — Operational, kapan saja selama project pakai vendor luar. */
     public function viewSow(User $user, Project $project): bool
     {
-        return $this->isOperational($user) && $project->vendor_id !== null;
+        return $this->isOperational($user) && $project->vendor_id !== null && $this->vendorReleased($project);
     }
 
     /**
@@ -208,7 +207,7 @@ class ProjectPolicy
      */
     public function manageSow(User $user, Project $project): bool
     {
-        if (! $this->isOperational($user) || $project->vendor_id === null) {
+        if (! $this->isOperational($user) || $project->vendor_id === null || ! $this->vendorReleased($project)) {
             return false;
         }
 

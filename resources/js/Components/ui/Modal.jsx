@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { FiX } from 'react-icons/fi';
 
 const SIZE = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' };
+const modalStack = [];
+let originalBodyOverflow = '';
 
 const FOCUSABLE = [
     'a[href]', 'button:not([disabled])', 'input:not([disabled])', 'select:not([disabled])',
@@ -11,10 +13,11 @@ const FOCUSABLE = [
 
 export default function Modal({
     open, onClose, title, description, children, footer, size = 'md', busy = false,
-    closeOnBackdrop = true, closeOnEscape = true, initialFocusRef,
+    closeOnBackdrop = true, closeOnEscape = true, initialFocusRef, ariaDescribedBy, bare = false,
 }) {
     const panelRef = useRef(null);
     const previouslyFocusedRef = useRef(null);
+    const modalIdRef = useRef(Symbol('modal'));
     const stateRef = useRef({ onClose, busy, closeOnEscape });
     const titleId = useId();
     const descriptionId = useId();
@@ -23,8 +26,10 @@ export default function Modal({
     useEffect(() => {
         if (!open) return undefined;
 
+        const modalId = modalIdRef.current;
+        modalStack.push(modalId);
         previouslyFocusedRef.current = document.activeElement;
-        const previousOverflow = document.body.style.overflow;
+        if (modalStack.length === 1) originalBodyOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
 
         const focusTimer = window.setTimeout(() => {
@@ -34,6 +39,7 @@ export default function Modal({
         }, 0);
 
         function onKeyDown(event) {
+            if (modalStack.at(-1) !== modalId) return;
             if (event.key === 'Escape' && stateRef.current.closeOnEscape && !stateRef.current.busy) {
                 event.preventDefault();
                 stateRef.current.onClose?.();
@@ -49,7 +55,10 @@ export default function Modal({
             }
             const first = focusable[0];
             const last = focusable[focusable.length - 1];
-            if (event.shiftKey && document.activeElement === first) {
+            if (!panelRef.current.contains(document.activeElement)) {
+                event.preventDefault();
+                (event.shiftKey ? last : first).focus();
+            } else if (event.shiftKey && document.activeElement === first) {
                 event.preventDefault();
                 last.focus();
             } else if (!event.shiftKey && document.activeElement === last) {
@@ -62,8 +71,10 @@ export default function Modal({
         return () => {
             window.clearTimeout(focusTimer);
             document.removeEventListener('keydown', onKeyDown);
-            document.body.style.overflow = previousOverflow;
-            previouslyFocusedRef.current?.focus?.();
+            const stackIndex = modalStack.lastIndexOf(modalId);
+            if (stackIndex !== -1) modalStack.splice(stackIndex, 1);
+            if (modalStack.length === 0) document.body.style.overflow = originalBodyOverflow;
+            if (previouslyFocusedRef.current?.isConnected) previouslyFocusedRef.current.focus();
         };
     }, [open, initialFocusRef]);
 
@@ -87,22 +98,31 @@ export default function Modal({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={titleId}
-                aria-describedby={description ? descriptionId : undefined}
+                aria-describedby={ariaDescribedBy ?? (description ? descriptionId : undefined)}
                 aria-busy={busy || undefined}
                 tabIndex={-1}
                 className={`relative flex max-h-[min(90dvh,48rem)] w-full ${SIZE[size] ?? SIZE.md} flex-col overflow-hidden rounded-t-3xl border border-border bg-surface shadow-2xl outline-none sm:rounded-2xl`}
             >
-                <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-4 sm:px-5">
-                    <div className="min-w-0">
-                        <h2 id={titleId} className="break-words text-base font-bold tracking-tight text-text">{title}</h2>
-                        {description && <p id={descriptionId} className="mt-1 break-words text-sm leading-relaxed text-text-muted">{description}</p>}
-                    </div>
-                    <button type="button" onClick={requestClose} disabled={busy} aria-label="Tutup dialog" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-text-muted transition hover:bg-bg hover:text-text disabled:cursor-not-allowed disabled:opacity-40 sm:h-9 sm:w-9">
-                        <FiX className="h-5 w-5" />
-                    </button>
-                </div>
-                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">{children}</div>
-                {footer && <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border bg-surface px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:flex-wrap sm:justify-end sm:px-5">{footer}</div>}
+                {bare ? (
+                    <>
+                        <h2 id={titleId} className="sr-only">{title}</h2>
+                        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8 sm:px-8">{children}</div>
+                    </>
+                ) : (
+                    <>
+                        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-4 sm:px-5">
+                            <div className="min-w-0">
+                                <h2 id={titleId} className="break-words text-base font-bold tracking-tight text-text">{title}</h2>
+                                {description && <p id={descriptionId} className="mt-1 break-words text-sm leading-relaxed text-text-muted">{description}</p>}
+                            </div>
+                            <button type="button" onClick={requestClose} disabled={busy} aria-label="Tutup dialog" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-text-muted transition hover:bg-bg hover:text-text disabled:cursor-not-allowed disabled:opacity-40 sm:h-9 sm:w-9">
+                                <FiX className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">{children}</div>
+                        {footer && <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border bg-surface px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:flex-wrap sm:justify-end sm:px-5">{footer}</div>}
+                    </>
+                )}
             </div>
         </div>,
         document.body,

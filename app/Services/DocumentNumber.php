@@ -5,9 +5,11 @@ namespace App\Services;
 use App\Models\BastDraft;
 use App\Models\DeliveryNote;
 use App\Models\Invoice;
+use App\Models\ProcurementPayment;
 use App\Models\Quotation;
 use App\Models\SalesOrder;
 use App\Models\Sow;
+use App\Models\VendorServicePayment;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -64,7 +66,13 @@ class DocumentNumber
     /** Format: {urutan}/GS-PP/{MM}/{YYYY} — pengajuan pembayaran pengadaan project. */
     public function nextProcurementPaymentNumber(): string
     {
-        return $this->nextSlashSequential(\App\Models\ProcurementPayment::query(), 'GS-PP');
+        return $this->nextSlashSequential(ProcurementPayment::query(), 'GS-PP');
+    }
+
+    /** Format: {urutan}/GS-VP/{MM}/{YYYY} — pembayaran jasa vendor luar per project. */
+    public function nextVendorServicePaymentNumber(): string
+    {
+        return $this->nextSlashSequential(VendorServicePayment::query(), 'GS-VP');
     }
 
     /** Format: {urutan}/GS-DO/{MM}/{YYYY} — nomor urut reset tiap tahun. */
