@@ -10,8 +10,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Hr\ReviewSowContentRequest;
 use App\Http\Requests\Hr\VerifySowSignatureRequest;
 use App\Models\Sow;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -41,9 +43,27 @@ class SowController extends Controller
 
         return Inertia::render('Hr/Sows/Show', [
             'sow' => $this->sowDetail($sow),
+            'technicianKtp' => $this->technicianKtp($sow),
             'canReview' => request()->user()->can('reviewContentAsHr', $sow),
             'canVerifySignatures' => request()->user()->can('verifySignatureAsHr', $sow),
         ]);
+    }
+
+    /** NIK + tautan KTP teknisi pelaksana — khusus HR (data sensitif, tidak ikut payload SOW yang dipakai role lain). */
+    private function technicianKtp(Sow $sow): ?array
+    {
+        // Relasi $sow->technician di payload umum hanya memuat id/nama/telepon (tanpa NIK), jadi ambil sendiri.
+        $technician = $sow->technician_id ? User::find($sow->technician_id) : null;
+        if (! $technician) {
+            return null;
+        }
+
+        $document = $technician->ktpDocument();
+
+        return [
+            'nik' => $technician->nik,
+            'url' => $document ? Storage::disk('local')->temporaryUrl($document->file_path, now()->addHour()) : null,
+        ];
     }
 
     public function review(ReviewSowContentRequest $request, Sow $sow, ReviewSowContent $action): RedirectResponse

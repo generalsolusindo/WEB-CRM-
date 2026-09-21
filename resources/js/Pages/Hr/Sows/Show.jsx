@@ -4,7 +4,7 @@ import AppLayout from '../../../Layouts/AppLayout';
 import { feedback } from '../../../Components/feedback';
 import { PageHeader } from '../../../Components/ui';
 
-export default function Show({ sow, canReview, canVerifySignatures }) {
+export default function Show({ sow, technicianKtp, canReview, canVerifySignatures }) {
     const form = useForm({ approved: true, notes: '' });
     const [action, setAction] = useState(null);
     const reviewUrl = canVerifySignatures ? `/hr/sows/${sow.id}/verify-signatures` : `/hr/sows/${sow.id}/review`;
@@ -80,7 +80,18 @@ export default function Show({ sow, canReview, canVerifySignatures }) {
 
                 <Section title="PIC & Kontak">
                     <Info label="PIC Vendor" value={sow.vendor ? `${sow.vendor.contact_person || '—'} (${sow.vendor.phone || '—'})` : '—'} />
-                    <Info label="Teknisi Pelaksana" value={sow.technician ? `${sow.technician.name} (${sow.technician.phone || '—'})` : '—'} />
+                    <Info
+                        label="Teknisi Pelaksana"
+                        value={sow.technician ? (
+                            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span>{sow.technician.name} ({sow.technician.phone || '—'})</span>
+                                {technicianKtp?.url
+                                    ? <a href={technicianKtp.url} target="_blank" rel="noreferrer" className="rounded-lg border border-primary/30 bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary-strong hover:bg-primary hover:text-white">Lihat KTP</a>
+                                    : <span className="badge badge-warning">KTP belum diunggah</span>}
+                            </span>
+                        ) : '—'}
+                    />
+                    {technicianKtp?.nik && <Info label="NIK Teknisi" value={technicianKtp.nik} />}
                     {sow.technician_team_note && <Info label="Anggota Tim Lainnya" value={sow.technician_team_note} />}
                     <Info label="PIC Client" value={`${sow.client_pic_name || '—'} (${sow.client_pic_phone || '—'})`} />
                 </Section>

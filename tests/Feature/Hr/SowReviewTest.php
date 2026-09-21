@@ -9,6 +9,8 @@ use App\Models\Sow;
 use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class SowReviewTest extends TestCase
@@ -55,6 +57,38 @@ class SowReviewTest extends TestCase
         $sow = Sow::where('project_id', $project->id)->firstOrFail();
 
         return [$sow, $ops, $technician];
+    }
+
+    public function test_hr_sees_technician_nik_and_ktp_link_only_when_uploaded(): void
+    {
+        Storage::fake('local');
+        [$sow, $ops, $technician] = $this->pendingSow();
+        $hr = User::factory()->create(['role' => 'hr', 'is_active' => true]);
+        $technician->update(['nik' => '3201234567890001']);
+
+        $this->actingAs($hr)->get("/hr/sows/{$sow->id}")
+            ->assertInertia(fn ($page) => $page->where('technicianKtp.nik', '3201234567890001')->where('technicianKtp.url', null));
+
+        $technician->attachments()->create([
+            'category' => 'ktp_document',
+            'file_path' => UploadedFile::fake()->image('ktp.jpg')->store('ktp-documents'),
+            'uploaded_by' => $ops->id,
+        ]);
+
+        $this->actingAs($hr)->get("/hr/sows/{$sow->id}")
+            ->assertInertia(fn ($page) => $page->where('technicianKtp.nik', '3201234567890001')->whereType('technicianKtp.url', 'string'));
+    }
+
+    public function test_other_roles_do_not_receive_technician_ktp_data(): void
+    {
+        [$sow, , $technician] = $this->pendingSow();
+        $technician->update(['nik' => '3201234567890001']);
+        $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
+
+        $this->actingAs($management)->get("/management/sows/{$sow->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->missing('technicianKtp'));
+        $this->assertStringNotContainsString('3201234567890001', $this->actingAs($management)->get("/management/sows/{$sow->id}")->getContent());
     }
 
     public function test_hr_can_approve_sow_content_and_technician_is_notified(): void
