@@ -10,6 +10,7 @@ use App\Models\Quotation;
 use App\Models\User;
 use App\Services\Notifications\Notify;
 use App\Support\ProcurementScope;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -128,7 +129,7 @@ class RequestQuotationRecost
     }
 
     /** Hapus item langsung: PR tetap Ready, baris quotation terkait ikut dihapus, review di-reset. */
-    private function removeItemsOnly(Quotation $quotation, \Illuminate\Support\Collection $keptIds): Quotation
+    private function removeItemsOnly(Quotation $quotation, Collection $keptIds): Quotation
     {
         $quotation->procurementRequest->lines()->whereNotIn('id', $keptIds)->delete();
         $quotation->lines()->where(fn ($q) => $q->whereNull('procurement_request_line_id')->orWhereNotIn('procurement_request_line_id', $keptIds))->delete();

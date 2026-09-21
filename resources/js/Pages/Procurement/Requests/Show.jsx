@@ -30,6 +30,11 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
         router.post(`/procurement/procurement-requests/${pr.id}/${endpoint}`, {}, {
             preserveScroll: true,
             onSuccess: () => setConfirmation(null),
+            onError: (errs) => {
+                // Tutup dialog supaya alasan gagal tidak tertutup di belakangnya.
+                setConfirmation(null);
+                feedback.alert({ tone: 'error', title: 'Belum bisa ditandai Ready', text: errs.lines ?? errs.procurement_request ?? 'Periksa kembali isian sourcing.' });
+            },
             onFinish: () => setActionProcessing(false),
         });
     }
