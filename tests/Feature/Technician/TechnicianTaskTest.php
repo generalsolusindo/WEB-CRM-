@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Technician;
 
+use App\Models\Attachment;
 use App\Models\Bast;
 use App\Models\Contact;
 use App\Models\Invoice;
@@ -73,6 +74,90 @@ class TechnicianTaskTest extends TestCase
         $attachment = \App\Models\Attachment::where('category', 'task_before')->firstOrFail();
         $this->assertSame(ProjectTask::class, $attachment->attachable_type);
         Storage::disk('local')->assertExists($attachment->file_path);
+    }
+
+    public function test_photo_caption_is_optional_and_saved(): void
+    {
+        Storage::fake('local');
+        [$project, , $member] = $this->inProgressProject();
+        $this->checkIn($project, $member);
+        $task = $project->tasks()->first();
+
+        $this->actingAs($member)->post("/technician/tasks/{$task->id}/photos", [
+            'category' => 'task_before',
+            'caption' => '  Ruang server lt. 2  ',
+            'photos' => [UploadedFile::fake()->image('a.jpg')],
+        ])->assertSessionHas('success');
+        $this->actingAs($member)->post("/technician/tasks/{$task->id}/photos", [
+            'category' => 'task_after',
+            'photos' => [UploadedFile::fake()->image('b.jpg')],
+        ])->assertSessionHas('success');
+
+        $this->assertSame('Ruang server lt. 2', Attachment::where('category', 'task_before')->value('caption'));
+        $this->assertNull(Attachment::where('category', 'task_after')->value('caption'));
+    }
+
+    public function test_task_cannot_be_done_without_before_and_after_photos(): void
+    {
+        Storage::fake('local');
+        [$project, , $member] = $this->inProgressProject();
+        $this->checkIn($project, $member);
+        $task = $project->tasks()->first();
+
+        $this->actingAs($member)->post("/technician/tasks/{$task->id}/status", ['status' => 'done'])->assertSessionHas('error');
+        $this->assertNotSame('done', $task->fresh()->status);
+
+        $this->actingAs($member)->post("/technician/tasks/{$task->id}/photos", ['category' => 'task_before', 'photos' => [UploadedFile::fake()->image('a.jpg')]]);
+        $this->actingAs($member)->post("/technician/tasks/{$task->id}/status", ['status' => 'done'])->assertSessionHas('error');
+
+        $this->actingAs($member)->post("/technician/tasks/{$task->id}/photos", ['category' => 'task_after', 'photos' => [UploadedFile::fake()->image('b.jpg')]]);
+        $this->actingAs($member)->post("/technician/tasks/{$task->id}/status", ['status' => 'done'])->assertSessionHas('success');
+        $this->assertSame('done', $task->fresh()->status);
+    }
+
+    public function test_uploader_can_delete_photo_until_task_is_done(): void
+    {
+        Storage::fake('local');
+        [$project, $leader, $member] = $this->inProgressProject();
+        $this->checkIn($project, $member);
+        $task = $project->tasks()->first();
+
+        $this->actingAs($member)->post("/technician/tasks/{$task->id}/photos", ['category' => 'task_before', 'photos' => [UploadedFile::fake()->image('a.jpg'), UploadedFile::fake()->image('a2.jpg')]]);
+        $this->actingAs($member)->post("/technician/tasks/{$task->id}/photos", ['category' => 'task_after', 'photos' => [UploadedFile::fake()->image('b.jpg')]]);
+        [$first, $second] = Attachment::where('category', 'task_before')->get()->all();
+        $after = Attachment::where('category', 'task_after')->firstOrFail();
+
+        // Orang lain (bukan pengunggah) tidak boleh menghapus.
+        $this->checkIn($project, $leader);
+        $this->actingAs($leader)->delete("/technician/tasks/{$task->id}/photos/{$first->id}")->assertForbidden();
+
+        $this->actingAs($member)->delete("/technician/tasks/{$task->id}/photos/{$first->id}")->assertSessionHas('success');
+        $this->assertModelMissing($first);
+        Storage::disk('local')->assertMissing($first->file_path);
+
+        // Setelah Selesai, foto terkunci.
+        $this->actingAs($member)->post("/technician/tasks/{$task->id}/status", ['status' => 'done'])->assertSessionHas('success');
+        $this->actingAs($member)->delete("/technician/tasks/{$task->id}/photos/{$second->id}")->assertForbidden();
+        $this->assertModelExists($second);
+
+        // Dikembalikan ke Dikerjakan -> boleh hapus lagi.
+        $this->actingAs($member)->post("/technician/tasks/{$task->id}/status", ['status' => 'in_progress']);
+        $this->actingAs($member)->delete("/technician/tasks/{$task->id}/photos/{$after->id}")->assertSessionHas('success');
+    }
+
+    public function test_photo_of_another_task_cannot_be_deleted_through_this_task(): void
+    {
+        Storage::fake('local');
+        [$project, , $member] = $this->inProgressProject();
+        $this->checkIn($project, $member);
+        $task = $project->tasks()->first();
+        $other = $project->tasks()->create(['title' => 'Lain', 'status' => 'pending']);
+
+        $this->actingAs($member)->post("/technician/tasks/{$task->id}/photos", ['category' => 'task_before', 'photos' => [UploadedFile::fake()->image('a.jpg')]]);
+        $photo = Attachment::firstOrFail();
+
+        $this->actingAs($member)->delete("/technician/tasks/{$other->id}/photos/{$photo->id}")->assertForbidden();
+        $this->assertModelExists($photo);
     }
 
     public function test_only_leader_can_submit_bast_and_all_tasks_must_be_done(): void

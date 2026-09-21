@@ -16,6 +16,7 @@ class Attachment extends Model
         'attachable_id',
         'category',
         'file_path',
+        'caption',
         'uploaded_by',
     ];
 

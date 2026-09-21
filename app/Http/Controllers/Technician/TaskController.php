@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Technician\CheckInProjectRequest;
 use App\Http\Requests\Technician\CheckOutProjectRequest;
 use App\Http\Requests\Technician\UploadTaskPhotoRequest;
+use App\Models\Attachment;
 use App\Models\Project;
 use App\Models\ProjectTask;
 use Illuminate\Http\RedirectResponse;
@@ -64,7 +65,7 @@ class TaskController extends Controller
         $task->load([
             'project:id,status,sales_order_id',
             'project.salesOrder:id,number',
-            'attachments:id,attachable_type,attachable_id,category,file_path,created_at',
+            'attachments:id,attachable_type,attachable_id,category,file_path,caption,uploaded_by,created_at',
         ]);
 
         $photos = $task->attachments
@@ -72,6 +73,8 @@ class TaskController extends Controller
             ->map(fn ($a) => [
                 'id' => $a->id,
                 'category' => $a->category,
+                'caption' => $a->caption,
+                'can_delete' => $user->can('deletePhoto', [$task, $a]),
                 'url' => Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay()),
             ])
             ->values();
@@ -143,6 +146,10 @@ class TaskController extends Controller
         ]);
 
         // Hanya field status yang boleh diubah technician — title/description/scheduled_date diabaikan.
+        if ($data['status'] === TaskStatus::Done->value && ! $this->hasBeforeAndAfterPhotos($task)) {
+            return back()->with('error', 'Tugas belum bisa diselesaikan. Unggah minimal 1 foto Before dan 1 foto After terlebih dahulu.');
+        }
+
         $task->update(['status' => $data['status']]);
 
         return back()->with('success', 'Status task diperbarui.');
@@ -156,10 +163,28 @@ class TaskController extends Controller
             $task->attachments()->create([
                 'category' => $request->validated('category'),
                 'file_path' => $photo->store('task-photos'),
+                'caption' => filled($request->validated('caption')) ? trim($request->validated('caption')) : null,
                 'uploaded_by' => $request->user()->id,
             ]);
         }
 
         return back()->with('success', 'Foto tersimpan.');
+    }
+
+    public function deletePhoto(ProjectTask $task, Attachment $attachment): RedirectResponse
+    {
+        Gate::authorize('deletePhoto', [$task, $attachment]);
+
+        Storage::disk('local')->delete($attachment->file_path);
+        $attachment->delete();
+
+        return back()->with('success', 'Foto dihapus.');
+    }
+
+    private function hasBeforeAndAfterPhotos(ProjectTask $task): bool
+    {
+        $categories = $task->attachments()->whereIn('category', ['task_before', 'task_after'])->pluck('category');
+
+        return $categories->contains('task_before') && $categories->contains('task_after');
     }
 }

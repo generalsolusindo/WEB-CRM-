@@ -257,6 +257,7 @@ Route::middleware('auth')->group(function () {
         Route::get('tasks/{task}', [TechnicianTaskController::class, 'show'])->name('tasks.show');
         Route::post('tasks/{task}/status', [TechnicianTaskController::class, 'updateStatus'])->name('tasks.status');
         Route::post('tasks/{task}/photos', [TechnicianTaskController::class, 'uploadPhoto'])->name('tasks.photos');
+        Route::delete('tasks/{task}/photos/{attachment}', [TechnicianTaskController::class, 'deletePhoto'])->name('tasks.photos.destroy');
         Route::post('projects/{project}/checkin', [TechnicianTaskController::class, 'checkIn'])->name('projects.checkin');
         Route::post('projects/{project}/checkout', [TechnicianTaskController::class, 'checkOut'])->name('projects.checkout');
         Route::get('projects/{project}/bast/create', [TechnicianBastController::class, 'create'])->name('projects.bast.create');

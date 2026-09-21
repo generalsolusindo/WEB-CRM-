@@ -8,17 +8,26 @@ export default function Show({ task, project, photos, statusOptions, canWork, ch
     const before = photos.filter((p) => p.category === 'task_before');
     const after = photos.filter((p) => p.category === 'task_after');
 
-    const photoForm = useForm({ category: 'task_before', photos: [] });
+    const photoForm = useForm({ category: 'task_before', caption: '', photos: [] });
     const checkInForm = useForm({ photo: null });
     const checkOutForm = useForm({ photo: null });
 
     function setStatus(status) {
         router.post(`/technician/tasks/${task.id}/status`, { status }, { preserveScroll: true });
     }
+    async function removePhoto(photo) {
+        const ok = await feedback.confirm({
+            tone: 'danger',
+            title: 'Hapus foto ini?',
+            text: 'Foto akan dihapus permanen dan tidak bisa dikembalikan.',
+            confirmLabel: 'Hapus Foto',
+        });
+        if (ok) router.delete(`/technician/tasks/${task.id}/photos/${photo.id}`, { preserveScroll: true });
+    }
     function upload(e) {
         e.preventDefault();
         photoForm.post(`/technician/tasks/${task.id}/photos`, {
-            forceFormData: true, preserveScroll: true, onSuccess: () => photoForm.reset('photos'),
+            forceFormData: true, preserveScroll: true, onSuccess: () => photoForm.reset('photos', 'caption'),
         });
     }
     function checkIn(e) {
@@ -114,8 +123,8 @@ export default function Show({ task, project, photos, statusOptions, canWork, ch
                 <section className="card p-4 sm:p-6">
                     <h2 className="mb-3 font-semibold text-text">Foto Before / After</h2>
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <PhotoGrid title="Before" items={before} />
-                        <PhotoGrid title="After" items={after} />
+                        <PhotoGrid title="Before" items={before} onDelete={removePhoto} />
+                        <PhotoGrid title="After" items={after} onDelete={removePhoto} />
                     </div>
                     {canWork && (
                         <form onSubmit={upload} className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface-2 p-4">
@@ -124,9 +133,18 @@ export default function Show({ task, project, photos, statusOptions, canWork, ch
                                 <option value="task_after">After</option>
                             </select>
                             <input type="file" multiple accept=".jpg,.jpeg,.png" onChange={(e) => pickFiles(photoForm, 'photos', e.target.files, 5)} className="min-w-0 w-full sm:w-auto sm:flex-1 text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" />
+                            <input
+                                type="text"
+                                maxLength={255}
+                                value={photoForm.data.caption}
+                                onChange={(e) => photoForm.setData('caption', e.target.value)}
+                                placeholder="Keterangan foto (opsional), mis. Ruang server lt. 2"
+                                className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+                            />
                             <button disabled={photoForm.processing || photoForm.data.photos.length === 0} className="btn btn-primary">Upload</button>
                             <span className="w-full text-[11px] text-text-muted">bisa pilih beberapa foto sekaligus, maks 5 MB per foto</span>
                             {photoForm.errors.photos && <span className="w-full text-xs text-danger">{photoForm.errors.photos}</span>}
+                            {photoForm.errors.caption && <span className="w-full text-xs text-danger">{photoForm.errors.caption}</span>}
                         </form>
                     )}
                     {!canWork && <p className="mt-2 text-xs text-text-muted">{checkedIn ? 'Upload foto hanya bisa saat project berjalan.' : 'Absen dulu sebelum upload foto.'}</p>}
@@ -136,7 +154,7 @@ export default function Show({ task, project, photos, statusOptions, canWork, ch
     );
 }
 
-function PhotoGrid({ title, items }) {
+function PhotoGrid({ title, items, onDelete }) {
     return (
         <div>
             <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">{title}</div>
@@ -145,9 +163,15 @@ function PhotoGrid({ title, items }) {
             ) : (
                 <div className="grid grid-cols-2 gap-2">
                     {items.map((p) => (
-                        <a key={p.id} href={p.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-border">
-                            <img src={p.url} alt={title} className="h-24 w-full object-cover" />
-                        </a>
+                        <div key={p.id} className="overflow-hidden rounded-lg border border-border">
+                            <a href={p.url} target="_blank" rel="noreferrer" className="block">
+                                <img src={p.url} alt={p.caption || title} className="h-24 w-full object-cover" />
+                            </a>
+                            {p.caption && <p className="px-2 pt-1 text-xs text-text-muted">{p.caption}</p>}
+                            {p.can_delete && (
+                                <button type="button" onClick={() => onDelete(p)} className="m-1 text-xs font-semibold text-danger">Hapus</button>
+                            )}
+                        </div>
                     ))}
                 </div>
             )}

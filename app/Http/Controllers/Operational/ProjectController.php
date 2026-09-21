@@ -96,7 +96,7 @@ class ProjectController extends Controller
         $taskPhotos = $project->tasks->mapWithKeys(fn ($task) => [
             $task->id => $task->attachments
                 ->whereIn('category', ['task_before', 'task_after'])
-                ->map(fn ($a) => ['id' => $a->id, 'category' => $a->category, 'url' => Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay())])
+                ->map(fn ($a) => ['id' => $a->id, 'category' => $a->category, 'caption' => $a->caption, 'url' => Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay())])
                 ->values(),
         ]);
 

@@ -478,8 +478,14 @@ function Tasks({ project, photos = {}, editable }) {
                             <div className="font-medium text-text">{t.title}</div>
                             <div className="text-xs text-text-muted">{t.scheduled_date || 'Tanpa jadwal'} · status: {t.status}</div>
                             {(photos[t.id] || []).length > 0 && (
-                                <div className="mt-2 flex flex-wrap gap-1">
-                                    {photos[t.id].map((p) => <a key={p.id} href={p.url} target="_blank" rel="noreferrer" className="block h-12 w-12 overflow-hidden rounded border border-border"><img src={p.url} alt={p.category} className="h-full w-full object-cover" /></a>)}
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                    {photos[t.id].map((p) => (
+                                        <a key={p.id} href={p.url} target="_blank" rel="noreferrer" className="block w-24 overflow-hidden rounded border border-border">
+                                            <img src={p.url} alt={p.caption || p.category} className="h-16 w-full object-cover" />
+                                            <span className="block bg-surface-2 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-text-muted">{p.category === 'task_before' ? 'Before' : 'After'}</span>
+                                            {p.caption && <span className="block px-1.5 pb-1 text-[11px] leading-tight text-text">{p.caption}</span>}
+                                        </a>
+                                    ))}
                                 </div>
                             )}
                         </div>
