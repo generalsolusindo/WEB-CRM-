@@ -1165,6 +1165,19 @@ class QuotationLifecycleTest extends TestCase
         $this->assertDatabaseHas('notifications', ['user_id' => $procurement->id, 'type' => 'procurement_request.recost_requested']);
     }
 
+    public function test_recost_notifications_link_to_the_right_pages(): void
+    {
+        [$sales, $quotation] = $this->quotationWithTwoItems();
+        $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
+        $pr = $quotation->procurementRequest;
+
+        $recost = Notification::create(['user_id' => $procurement->id, 'type' => 'procurement_request.recost_requested', 'title' => 'x', 'message' => 'x', 'related_id' => $pr->id]);
+        $ready = Notification::create(['user_id' => $sales->id, 'type' => 'procurement_request.ready', 'title' => 'x', 'message' => 'x', 'related_id' => $pr->id]);
+
+        $this->actingAs($procurement)->post("/notifications/{$recost->id}/read")->assertRedirect("/procurement/procurement-requests/{$pr->id}");
+        $this->actingAs($sales)->post("/notifications/{$ready->id}/read")->assertRedirect("/sales/quotations/{$quotation->id}");
+    }
+
     public function test_scope_revision_without_any_change_is_rejected(): void
     {
         [$sales, $quotation, $kept, $extra] = $this->quotationWithTwoItems();

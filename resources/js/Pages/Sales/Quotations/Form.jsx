@@ -36,7 +36,8 @@ function initialLine(line, taxes, editing) {
         category: line.category ?? line.vendor_product?.category ?? 'material',
         sourcing_note: line.sourcing_note ?? '',
         cost_price: line.cost_price != null ? String(line.cost_price) : '',
-        selling_price: line.selling_price ?? suggestedPrice(line.cost_price),
+        // Baris baru hasil Revisi Kebutuhan datang dengan harga jual 0 — beri saran harga (cost + 30%).
+        selling_price: Number(line.selling_price) > 0 ? line.selling_price : suggestedPrice(line.cost_price),
         discount_mode: dp && dp > 0 ? 'percent' : (da > 0 ? 'amount' : 'percent'),
         discount_percent: dp && dp > 0 ? String(dp) : '',
         discount_amount: da > 0 ? String(da) : '',

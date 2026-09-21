@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Notification;
 use App\Models\ProcurementRequest;
+use App\Models\Quotation;
 use App\Models\Sow;
 use App\Models\VendorServicePayment;
 use Illuminate\Http\RedirectResponse;
@@ -38,7 +39,8 @@ class NotificationController extends Controller
             'vendor_service.dp_due',
             'vendor_service.final_due',
             'vendor_service.pay_after_bast' => $this->vendorServiceUrl($notification->related_id),
-            'procurement_request.ready',
+            'procurement_request.recost_requested' => "/procurement/procurement-requests/{$notification->related_id}",
+            'procurement_request.ready' => $this->quotationOrLeadUrlForProcurementRequest($notification->related_id),
             'procurement_request.rejected' => $this->leadUrlForProcurementRequest($notification->related_id),
             'quotation.pending_pm_review' => "/project-manager/quotations/{$notification->related_id}",
             'quotation.pending_manager_review' => "/management/quotations/{$notification->related_id}",
@@ -69,6 +71,14 @@ class NotificationController extends Controller
         $projectId = Sow::whereKey($sowId)->value('project_id');
 
         return $projectId ? "/operational/projects/{$projectId}/sow" : '/dashboard';
+    }
+
+    /** PR yang sudah punya quotation (mis. setelah costing ulang) -> langsung ke quotation-nya, bukan ke lead. */
+    private function quotationOrLeadUrlForProcurementRequest(?int $procurementRequestId): string
+    {
+        $quotationId = Quotation::where('procurement_request_id', $procurementRequestId)->latest('id')->value('id');
+
+        return $quotationId ? "/sales/quotations/{$quotationId}" : $this->leadUrlForProcurementRequest($procurementRequestId);
     }
 
     private function leadUrlForProcurementRequest(?int $procurementRequestId): string
