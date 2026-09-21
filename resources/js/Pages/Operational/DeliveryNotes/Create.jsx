@@ -1,6 +1,7 @@
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, CardHeader, Field, Input, Select, Textarea, FormActions } from '../../../Components/ui';
+import TableScroll from '../../../Components/ui/TableScroll';
 
 function Alert({ text }) {
     return <div className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">{text}</div>;
@@ -88,18 +89,18 @@ export default function Create({ salesOrder, defaultAddress, lines }) {
 
                     <Card padded={false}>
                         <CardHeader title="Barang yang Dikirim" subtitle="Hanya baris material yang masih punya sisa belum terkirim. Centang & isi qty untuk yang mau dikirim sekarang." />
-                        <div className="overflow-x-auto">
+                        <TableScroll>
                             <table className="w-full text-left text-sm">
                                 <thead>
                                     <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
-                                        <th className="w-10 px-3 py-3"></th><th className="px-3 py-3">Item</th><th className="px-3 py-3">Unit</th><th className="px-3 py-3 text-right">Sisa Belum Terkirim</th><th className="px-3 py-3 text-right">Qty Dikirim</th>
+                                        <th className="sticky left-0 z-[1] bg-surface-2 w-10 px-3 py-3"></th><th className="sticky left-10 z-[1] bg-surface-2 px-3 py-3">Item</th><th className="px-3 py-3">Unit</th><th className="px-3 py-3 text-right">Sisa Belum Terkirim</th><th className="px-3 py-3 text-right">Qty Dikirim</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                     {data.lines.map((line, i) => (
                                         <tr key={line.sales_order_line_id}>
-                                            <td className="px-3 py-3"><input type="checkbox" checked={line.checked} onChange={(e) => setLine(i, { checked: e.target.checked })} className="accent-navy" /></td>
-                                            <td className="px-3 py-3 font-medium text-text">{line.item_name}</td>
+                                            <td className="sticky left-0 z-[1] bg-surface px-3 py-3"><input type="checkbox" checked={line.checked} onChange={(e) => setLine(i, { checked: e.target.checked })} className="accent-navy" /></td>
+                                            <td className="sticky left-10 z-[1] min-w-36 bg-surface px-3 py-3 font-medium text-text">{line.item_name}</td>
                                             <td className="px-3 py-3 text-text-muted">{line.unit}</td>
                                             <td className="px-3 py-3 text-right tabular-nums text-text-muted">{line.qty_remaining}</td>
                                             <td className="px-3 py-3 text-right">
@@ -116,7 +117,7 @@ export default function Create({ salesOrder, defaultAddress, lines }) {
                                     {data.lines.length === 0 && <tr><td colSpan="5" className="px-3 py-8 text-center text-text-muted">Semua material sudah terkirim lengkap.</td></tr>}
                                 </tbody>
                             </table>
-                        </div>
+                        </TableScroll>
                     </Card>
 
                     <FormActions

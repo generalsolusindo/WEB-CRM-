@@ -1,6 +1,8 @@
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, CardHeader, Field, Input, Textarea, FormActions, CurrencyInput } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
+import TableScroll from '../../../Components/ui/TableScroll';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -30,6 +32,7 @@ export default function Edit({ invoice, linesEditable }) {
 
     function submit(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: 'Invoice diperbarui', style: 'popup' } });
         put(`/finance/invoices/${invoice.id}`);
     }
 
@@ -105,28 +108,38 @@ export default function Edit({ invoice, linesEditable }) {
 
                     <Card padded={false}>
                         <CardHeader title="Rincian Baris" />
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[820px] text-left text-sm">
+                        <TableScroll>
+                            <table className="w-full min-w-[680px] text-left text-sm">
                                 <thead>
                                     <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
-                                        <th className="px-4 py-3">Item</th>
-                                        <th className="px-4 py-3">Kategori</th>
+                                        <th className="sticky left-0 z-[1] bg-surface-2 px-4 py-3">Item</th>
+                                        <th className="hidden px-4 py-3 sm:table-cell">Kategori</th>
                                         <th className="px-4 py-3">Qty</th>
                                         <th className="px-4 py-3 text-right">Harga Satuan</th>
                                         <th className="px-4 py-3 text-right">Diskon</th>
                                         <th className="px-4 py-3">Pajak (%)</th>
                                         <th className="px-4 py-3 text-right">DPP</th>
-                                        <th className="px-4 py-3"></th>
+                                        <th className="hidden px-4 py-3 sm:table-cell"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                     {computed.map((l, i) => linesEditable ? (
                                         <tr key={i}>
-                                            <td className="px-4 py-2">
-                                                <input value={l.item_name} onChange={(e) => updateLine(i, 'item_name', e.target.value)} className="w-full min-w-[160px] rounded-lg border border-border px-2 py-1.5 outline-none focus:border-navy" />
+                                            <td className="sticky left-0 z-[1] w-44 min-w-44 bg-surface px-4 py-2 sm:w-auto">
+                                                <input value={l.item_name} onChange={(e) => updateLine(i, 'item_name', e.target.value)} className="w-full min-w-[140px] rounded-lg border border-border px-2 py-1.5 outline-none focus:border-navy" />
                                                 {errors[`lines.${i}.item_name`] && <span className="text-xs text-danger">{errors[`lines.${i}.item_name`]}</span>}
+                                                <div className="mt-1.5 flex items-center justify-between gap-2 sm:hidden">
+                                                    <select value={l.category} onChange={(e) => updateLine(i, 'category', e.target.value)} className="min-w-0 rounded-lg border border-border px-2 py-1.5 text-xs outline-none focus:border-navy">
+                                                        <option value="material">Material</option>
+                                                        <option value="service">Jasa</option>
+                                                        <option value="reimburse">Reimburse</option>
+                                                    </select>
+                                                    {data.lines.length > 1 && (
+                                                        <button type="button" onClick={() => removeLine(i)} className="shrink-0 rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-semibold text-danger">Hapus</button>
+                                                    )}
+                                                </div>
                                             </td>
-                                            <td className="px-4 py-2">
+                                            <td className="hidden px-4 py-2 sm:table-cell">
                                                 <select value={l.category} onChange={(e) => updateLine(i, 'category', e.target.value)} className="rounded-lg border border-border px-2 py-1.5 outline-none focus:border-navy">
                                                     <option value="material">Material</option>
                                                     <option value="service">Jasa</option>
@@ -146,7 +159,7 @@ export default function Edit({ invoice, linesEditable }) {
                                                 <input type="number" min="0" max="100" step="0.01" value={l.tax_rate} onChange={(e) => updateLine(i, 'tax_rate', e.target.value)} className="w-20 rounded-lg border border-border px-2 py-1.5 outline-none focus:border-navy" />
                                             </td>
                                             <td className="px-4 py-2 text-right font-medium tabular-nums text-text">{money(l.subtotal)}</td>
-                                            <td className="px-4 py-2 text-right">
+                                            <td className="hidden px-4 py-2 text-right sm:table-cell">
                                                 {data.lines.length > 1 && (
                                                     <button type="button" onClick={() => removeLine(i)} className="rounded-lg border border-danger/30 px-2 py-1 text-xs font-semibold text-danger">Hapus</button>
                                                 )}
@@ -154,14 +167,17 @@ export default function Edit({ invoice, linesEditable }) {
                                         </tr>
                                     ) : (
                                         <tr key={i} className="text-text-muted">
-                                            <td className="px-4 py-2 text-text">{l.item_name}</td>
-                                            <td className="px-4 py-2 capitalize">{l.category}</td>
+                                            <td className="sticky left-0 z-[1] w-36 min-w-36 bg-surface px-4 py-2 text-text sm:w-auto">
+                                                {l.item_name}
+                                                <div className="text-xs capitalize text-text-muted sm:hidden">{l.category}</div>
+                                            </td>
+                                            <td className="hidden px-4 py-2 capitalize sm:table-cell">{l.category}</td>
                                             <td className="px-4 py-2 tabular-nums">{Number(l.qty).toFixed(2)}</td>
                                             <td className="px-4 py-2 text-right tabular-nums">{money(l.unit_price)}</td>
                                             <td className="px-4 py-2 text-right tabular-nums">{money(l.discount_amount)}</td>
                                             <td className="px-4 py-2 tabular-nums">{Number(l.tax_rate).toFixed(2)}</td>
                                             <td className="px-4 py-2 text-right font-medium tabular-nums text-text">{money(l.subtotal)}</td>
-                                            <td className="px-4 py-2"></td>
+                                            <td className="hidden px-4 py-2 sm:table-cell"></td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -175,7 +191,7 @@ export default function Edit({ invoice, linesEditable }) {
                                     </tfoot>
                                 )}
                             </table>
-                        </div>
+                        </TableScroll>
                         {/* Ringkasan total di luar tabel supaya selalu terlihat penuh, tidak ikut
                             ter-scroll bersama tabel rincian baris yang lebar di layar sempit. */}
                         <div className="space-y-1.5 border-t border-border bg-surface-2 px-4 py-4 text-sm text-text">

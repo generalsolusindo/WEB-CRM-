@@ -4,6 +4,8 @@ import { FiSend, FiCheck } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, CardHeader, Button, ConfirmDialog, Info, InfoGrid, StatusBadge, CurrencyInput } from '../../../Components/ui';
 import VendorServicePanel from './VendorServicePanel';
+import { feedback } from '../../../Components/feedback';
+import TableScroll from '../../../Components/ui/TableScroll';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -93,12 +95,21 @@ export default function Show({ project, items, payment, editable, canConfirm, ca
             })),
         };
     }
-    function submit(e) {
+    async function submit(e) {
         e.preventDefault();
+        const ok = await feedback.confirm({
+            tone: 'question',
+            title: 'Ajukan pembayaran ke Project Manager?',
+            text: `Pengajuan pengadaan ${project.number} akan dikirim ke Project Manager untuk disetujui, lalu diteruskan ke Finance. Data sourcing terkunci selama diproses.`,
+            confirmLabel: 'Ya, ajukan',
+        });
+        if (!ok) return;
+        feedback.expect({ success: { title: 'Pengajuan terkirim', style: 'popup' }, error: { title: 'Pengajuan belum terkirim' } });
         post(`/procurement/project-procurements/${project.id}/submit`, { preserveScroll: true });
     }
     function confirmPayment() {
         setActionProcessing(true);
+        feedback.expect({ success: { title: 'Pembayaran dikonfirmasi', style: 'popup' } });
         router.post(`/procurement/project-procurements/${project.id}/confirm`, {}, {
             preserveScroll: true,
             onSuccess: () => setConfirmation(null),
@@ -110,6 +121,7 @@ export default function Show({ project, items, payment, editable, canConfirm, ca
     }
     function receiveAll() {
         setActionProcessing(true);
+        feedback.expect({ success: { title: 'Semua barang diterima', style: 'popup' } });
         router.post(`/procurement/project-procurements/${project.id}/receive-all`, {}, {
             preserveScroll: true,
             onSuccess: () => setConfirmation(null),
@@ -198,11 +210,11 @@ export default function Show({ project, items, payment, editable, canConfirm, ca
                         </div>
                     )}
 
-                    <div className="overflow-x-auto">
+                    <TableScroll>
                         <table className="w-full text-left text-sm">
                             <thead>
                                 <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
-                                    <th className="px-4 py-3">Item</th>
+                                    <th className="sticky left-0 z-[1] bg-surface-2 px-4 py-3">Item</th>
                                     <th className="px-4 py-3">Qty</th>
                                     <th className="px-4 py-3">Vendor</th>
                                     <th className="px-4 py-3 text-right">Harga Satuan</th>
@@ -216,7 +228,7 @@ export default function Show({ project, items, payment, editable, canConfirm, ca
                                     const rowEditable = editable && !it.row_locked;
                                     return (
                                         <tr key={it.id}>
-                                            <td className="px-4 py-3.5">
+                                            <td className="sticky left-0 z-[1] bg-surface w-40 min-w-40 px-4 py-3.5 sm:w-auto">
                                                 <div className="font-medium text-text">{it.item_name}{it.is_extra ? ' · ekstra' : ''}</div>
                                                 {rowEditable && (
                                                     <label className="mt-1 flex items-center gap-1.5 text-[11px] text-text-muted">
@@ -311,7 +323,7 @@ export default function Show({ project, items, payment, editable, canConfirm, ca
                                 </tfoot>
                             )}
                         </table>
-                    </div>
+                    </TableScroll>
 
                     {editable && isLump && (
                         <div className="grid gap-4 border-t border-border p-5 sm:grid-cols-2">

@@ -4,6 +4,8 @@ import { FiPlay, FiCheck, FiXCircle } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import CategoryBadge from '../../../Components/CategoryBadge';
 import { PageHeader, Card, Button, ConfirmDialog, Modal, StatusBadge, CurrencyInput } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
+import TableScroll from '../../../Components/ui/TableScroll';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -24,6 +26,7 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
         if (!confirmation) return;
         setActionProcessing(true);
         const endpoint = confirmation === 'ready' ? 'ready' : 'start';
+        feedback.expect({ success: { title: endpoint === 'ready' ? 'Harga siap dikirim ke Sales' : 'Sourcing dimulai', style: 'popup' } });
         router.post(`/procurement/procurement-requests/${pr.id}/${endpoint}`, {}, {
             preserveScroll: true,
             onSuccess: () => setConfirmation(null),
@@ -32,6 +35,7 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
     }
     function submitReject(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: 'Request ditolak', style: 'popup' } });
         rejectForm.post(`/procurement/procurement-requests/${pr.id}/reject`);
     }
 
@@ -118,11 +122,11 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
                             <h2 className="font-semibold text-text">Sourcing per Item</h2>
                             <p className="text-sm text-text-muted">Kebutuhan berasal dari Sales. Isi vendor, cost price, pajak, dan ketersediaan.</p>
                         </div>
-                        <div className="overflow-x-auto">
+                        <TableScroll>
                             <table className="w-full text-left text-sm">
                                 <thead>
                                     <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
-                                        <th className="px-3 py-3">Kebutuhan</th>
+                                        <th className="sticky left-0 z-[1] bg-surface-2 px-3 py-3">Kebutuhan</th>
                                         <th className="px-3 py-3">Qty</th>
                                         <th className="px-3 py-3">Vendor / Produk</th>
                                         <th className="px-3 py-3">Cost Price</th>
@@ -133,7 +137,7 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
                                 <tbody className="divide-y divide-border">
                                     {pr.lines.map((line, i) => (
                                         <tr key={line.id}>
-                                            <td className="px-3 py-3">
+                                            <td className="sticky left-0 z-[1] bg-surface w-48 min-w-48 px-3 py-3 sm:w-auto">
                                                 <div className="flex flex-wrap items-center gap-1.5 font-medium text-text">
                                                     {line.item_name}
                                                     <CategoryBadge category={data.lines[i].category} />
@@ -180,7 +184,7 @@ export default function Show({ procurementRequest: pr, editable, canStart, canFi
                                     ))}
                                 </tbody>
                             </table>
-                        </div>
+                        </TableScroll>
                         {editable && (
                             <div className="flex justify-end border-t border-border p-4">
                                 <Button type="submit" loading={processing}>Simpan</Button>

@@ -32,10 +32,10 @@ export default function Index({ opportunities, filters = {}, stageOptions = [], 
     const columns = [
         { key: 'code', label: 'Kode', render: (o) => <span className="font-medium text-text">{o.code}</span> },
         { key: 'customer', label: 'Customer', render: (o) => o.company || o.customer || '—' },
-        { key: 'sales', label: 'Sales', render: (o) => o.sales },
+        { key: 'sales', hideBelow: 'md', label: 'Sales', render: (o) => o.sales },
         { key: 'stage', label: 'Tahap', render: (o) => <StatusBadge status={o.stage} label={o.stage_label} /> },
         ...(isMgmt ? [{
-            key: 'delegated',
+            key: 'delegated', hideBelow: 'md',
             label: 'Didelegasikan ke',
             render: (o) => (o.delegated_to
                 ? <span className="text-text-muted">{o.delegated_to}</span>

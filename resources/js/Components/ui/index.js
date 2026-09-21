@@ -5,6 +5,8 @@ export { default as PillTabs } from './PillTabs';
 export { default as StatusBadge } from './StatusBadge';
 export { default as StageStepper } from './StageStepper';
 export { default as DataTable } from './DataTable';
+export { default as TableScroll } from './TableScroll';
+export { default as TotalsSummary } from './TotalsSummary';
 export { default as EmptyState } from './EmptyState';
 export { default as Modal } from './Modal';
 export { default as ConfirmDialog } from './ConfirmDialog';

@@ -7,6 +7,7 @@ import MeetingsPanel from './MeetingsPanel';
 import ProcurementStatusPanel from './ProcurementStatusPanel';
 import RequirementsPanel from './RequirementsPanel';
 import SurveyPanel from './SurveyPanel';
+import { feedback } from '../../../Components/feedback';
 
 export default function Show({
     lead, stageOptions, sourceOptions = [], procurementRequest, requirementsEditable, leadEditable, canDelete, canMarkLost = false,
@@ -25,6 +26,11 @@ export default function Show({
     function runAction() {
         if (!confirmation) return;
         setActionProcessing(true);
+        feedback.expect({
+            success: confirmation === 'convert'
+                ? { title: 'Lead menjadi Opportunity', style: 'popup' }
+                : { title: 'Lead dihapus', style: 'popup' },
+        });
         const options = {
             preserveScroll: true,
             onSuccess: () => setConfirmation(null),
@@ -35,6 +41,7 @@ export default function Show({
     }
     function markLost() {
         setMarkingLost(true);
+        feedback.expect({ success: { title: 'Lead ditandai gagal', style: 'popup' } });
         router.post(`/sales/leads/${lead.id}/mark-lost`, {}, {
             preserveScroll: true,
             onSuccess: () => setLostOpen(false),

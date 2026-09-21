@@ -45,13 +45,15 @@ class QuotationPolicy
             && ! $quotation->revisions()->exists();
     }
 
+    /**
+     * Tambah / ubah / hapus item quotation lewat "Revisi Kebutuhan". Syaratnya sama dengan edit
+     * biasa (belum jadi Sales Order, belum ada revisi lebih baru, bukan dibatalkan) — tidak
+     * perlu menunggu ditolak PM/Manager dulu. Harga beli item baru/berubah tetap datang dari
+     * Procurement (lihat RequestQuotationRecost), bukan diketik Sales.
+     */
     public function reviseScope(User $user, Quotation $quotation): bool
     {
-        return $this->owns($user, $quotation)
-            && $quotation->procurementRequest?->status === 'ready'
-            && ($quotation->pm_review_status === 'rejected' || $quotation->manager_review_status === 'rejected')
-            && ! $quotation->salesOrder()->exists()
-            && ! $quotation->revisions()->exists();
+        return $this->update($user, $quotation);
     }
 
     /** Ubah nomor quotation secara manual (mis. menyambung dari sistem lama) — bisa di status apa saja. */

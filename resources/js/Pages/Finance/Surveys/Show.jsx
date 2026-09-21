@@ -4,6 +4,7 @@ import { FiFileText } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { pickFile } from '../../../utils/fileValidation';
 import { PageHeader, Card, Button, ConfirmDialog, Field, Input, Select, Info, InfoGrid, StatusBadge, CurrencyInput } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -31,10 +32,19 @@ export default function Show({ survey, invoice, payments, taxes = [], canHandle,
         return Math.round(Number(survey.cost) * Number(t.rate)) / 100;
     })();
 
-    function issue(e) { e.preventDefault(); issueForm.post(`/finance/surveys/${survey.id}/invoice`); }
-    function clear(e) { e.preventDefault(); clearForm.post(`/finance/surveys/${survey.id}/clear`); }
+    function issue(e) {
+        e.preventDefault();
+        feedback.expect({ success: { title: 'Invoice survey diterbitkan', style: 'popup' } });
+        issueForm.post(`/finance/surveys/${survey.id}/invoice`);
+    }
+    function clear(e) {
+        e.preventDefault();
+        feedback.expect({ success: { title: 'Biaya survey dicatat', style: 'popup' } });
+        clearForm.post(`/finance/surveys/${survey.id}/clear`);
+    }
     function voidInvoice() {
         setVoiding(true);
+        feedback.expect({ success: { title: 'Invoice survey dibatalkan', style: 'popup' } });
         router.post(`/finance/invoices/${invoice.id}/cancel`, {}, {
             preserveScroll: true,
             onSuccess: () => setVoidOpen(false),
@@ -43,6 +53,7 @@ export default function Show({ survey, invoice, payments, taxes = [], canHandle,
     }
     function pay(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: 'Pembayaran tercatat', style: 'popup' } });
         payForm.post(`/finance/invoices/${invoice.id}/payments`, { forceFormData: true, preserveScroll: true, onSuccess: () => payForm.reset('notes', 'proof') });
     }
 

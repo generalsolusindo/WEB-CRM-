@@ -1,6 +1,7 @@
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 export default function Show({ opportunity, canDelegate, projectManagerOptions = [] }) {
     const delegateForm = useForm({ project_manager_id: opportunity.delegated_to?.id ?? '' });
@@ -8,6 +9,7 @@ export default function Show({ opportunity, canDelegate, projectManagerOptions =
 
     function submitDelegate(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: 'Delegasi opportunity diperbarui', style: 'popup' } });
         delegateForm.put(`/management/opportunities/${opportunity.id}/delegate`, { preserveScroll: true });
     }
 

@@ -2,6 +2,8 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Button, StatusBadge, PromptDialog } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
+import TableScroll from '../../../Components/ui/TableScroll';
 
 export default function Show({ survey, report, canBrief, canVerify, canCancel, canManageTeam, surveyorOptions = [], checkIns = [] }) {
     const currentTeam = survey.team ?? [];
@@ -20,11 +22,12 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
     const [cancelOpen, setCancelOpen] = useState(false);
     const [cancelling, setCancelling] = useState(false);
 
-    function submitBrief(e) { e.preventDefault(); briefForm.post(`/operational/surveys/${survey.id}/brief`); }
+    function submitBrief(e) { e.preventDefault(); feedback.expect({ success: { title: 'Briefing survey tersimpan', style: 'popup' } }); briefForm.post(`/operational/surveys/${survey.id}/brief`); }
     function submitTeam(e) { e.preventDefault(); teamForm.patch(`/operational/surveys/${survey.id}/team`, { preserveScroll: true }); }
-    function submitVerify(e) { e.preventDefault(); verifyForm.post(`/operational/surveys/${survey.id}/verify`); }
+    function submitVerify(e) { e.preventDefault(); feedback.expect({ success: { title: 'Laporan survey diverifikasi', style: 'popup' } }); verifyForm.post(`/operational/surveys/${survey.id}/verify`); }
     function cancelSurvey(reason) {
         setCancelling(true);
+        feedback.expect({ success: { title: 'Survey dibatalkan', style: 'popup' } });
         router.post(`/operational/surveys/${survey.id}/cancel`, { reason }, {
             onSuccess: () => setCancelOpen(false),
             onFinish: () => setCancelling(false),
@@ -136,7 +139,7 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
                             <p className="mt-1 whitespace-pre-line text-sm text-text">{report.summary || '—'}</p>
                         </div>
                         {report.items.length > 0 && (
-                            <div className="overflow-x-auto rounded-lg border border-border">
+                            <TableScroll className="rounded-lg border border-border">
                                 <table className="w-full text-left text-sm">
                                     <thead className="bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint"><tr><th className="px-3 py-2">Item Rekomendasi</th><th className="px-3 py-2">Qty</th><th className="px-3 py-2">Catatan</th></tr></thead>
                                     <tbody className="divide-y divide-border">
@@ -145,7 +148,7 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
                                         ))}
                                     </tbody>
                                 </table>
-                            </div>
+                            </TableScroll>
                         )}
                         {report.attachments.length > 0 && (
                             <div className="flex flex-wrap gap-2">

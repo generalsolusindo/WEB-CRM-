@@ -38,9 +38,9 @@ export default function Index({ surveys, filters, statusOptions }) {
                 </div>
             ),
         },
-        { key: 'site_region', label: 'Lokasi', render: (s) => s.site_region || '—' },
+        { key: 'site_region', hideBelow: 'md', label: 'Lokasi', render: (s) => s.site_region || '—' },
         { key: 'status', label: 'Status', render: (s) => <StatusBadge status={s.status} label={statusOptions.find((o) => o.value === s.status)?.label} /> },
-        { key: 'created_at', label: 'Tanggal', render: (s) => s.created_at },
+        { key: 'created_at', hideBelow: 'md', label: 'Tanggal', render: (s) => s.created_at },
     ];
 
     return (

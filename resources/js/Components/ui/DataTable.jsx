@@ -1,15 +1,30 @@
 import { router } from '@inertiajs/react';
 import { FiChevronRight } from 'react-icons/fi';
 import EmptyState from './EmptyState';
+import TableScroll from './TableScroll';
+
+/** Kelas literal (bukan template) supaya terbaca Tailwind. */
+const HIDE_BELOW = { sm: 'hidden sm:table-cell', md: 'hidden md:table-cell', lg: 'hidden lg:table-cell' };
 
 /**
- * columns: [{ key, label, align?: 'right', width?, render?: (row) => node, className? }]
+ * columns: [{ key, label, align?: 'right', width?, render?: (row) => node, className?,
+ *             hideBelow?: 'sm' | 'md' | 'lg'  → kolom kurang penting disembunyikan di layar lebih kecil,
+ *             sticky?: bool                   → kolom tetap terlihat di kiri saat digeser (pakai di kolom pertama),
+ *             nowrap?: bool }]
  * rows: array
  * rowKey: string | (row) => key
  * rowHref: (row) => url  → seluruh baris klik-able + kolom chevron otomatis
  * empty: node (default EmptyState)
  * footer: node (mis. <Pagination />)
  */
+function cellClass(column) {
+    return [
+        column.hideBelow ? HIDE_BELOW[column.hideBelow] : '',
+        column.sticky ? 'sticky left-0 z-[1]' : '',
+        column.nowrap ? 'whitespace-nowrap' : '',
+    ].filter(Boolean).join(' ');
+}
+
 export default function DataTable({
     columns, rows = [], rowKey = 'id', rowHref, empty, footer, dense = false, className = '',
     title, titleAction,
@@ -26,7 +41,7 @@ export default function DataTable({
                     {titleAction}
                 </div>
             )}
-            <div className="overflow-x-auto">
+            <TableScroll label={title ?? 'Tabel data'}>
                 <table className="w-full text-left text-sm">
                     <thead>
                         <tr className="border-b border-border bg-surface-2">
@@ -34,7 +49,7 @@ export default function DataTable({
                                 <th
                                     key={c.key}
                                     style={c.width ? { width: c.width } : undefined}
-                                    className={`px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-text-faint ${c.align === 'right' ? 'text-right' : ''}`}
+                                    className={`px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-text-faint ${c.align === 'right' ? 'text-right' : ''} ${cellClass(c)} ${c.sticky ? 'bg-surface-2' : ''}`}
                                 >
                                     {c.label ?? ''}
                                 </th>
@@ -55,10 +70,12 @@ export default function DataTable({
                                     <tr
                                         key={key}
                                         onClick={clickable ? () => router.visit(rowHref(row)) : undefined}
+                                        onKeyDown={clickable ? (event) => { if (event.key === 'Enter') router.visit(rowHref(row)); } : undefined}
+                                        tabIndex={clickable ? 0 : undefined}
                                         className={`border-b border-border transition last:border-0 ${clickable ? 'cursor-pointer hover:bg-bg' : 'hover:bg-surface-2'}`}
                                     >
                                         {cols.map((c) => (
-                                            <td key={c.key} className={`px-4 ${padY} align-middle ${c.align === 'right' ? 'text-right' : ''} ${c.className ?? ''}`}>
+                                            <td key={c.key} className={`px-4 ${padY} align-middle ${c.align === 'right' ? 'text-right' : ''} ${cellClass(c)} ${c.sticky ? 'bg-surface' : ''} ${c.className ?? ''}`}>
                                                 {c.render ? c.render(row) : row[c.key]}
                                             </td>
                                         ))}
@@ -68,7 +85,7 @@ export default function DataTable({
                         )}
                     </tbody>
                 </table>
-            </div>
+            </TableScroll>
             {footer && <div className="border-t border-border px-4 py-3">{footer}</div>}
         </div>
     );

@@ -2,6 +2,9 @@ import { Fragment, useState } from "react";
 import { Head, Link, useForm } from "@inertiajs/react";
 import { PageHeader, Button, ConfirmDialog, CurrencyInput } from "../../../Components/ui";
 import AppLayout from '../../../Layouts/AppLayout';
+import { feedback } from '../../../Components/feedback';
+import TableScroll from '../../../Components/ui/TableScroll';
+import TotalsSummary from '../../../Components/ui/TotalsSummary';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -43,7 +46,7 @@ function initialLine(line, taxes, editing) {
     };
 }
 
-export default function Form({ procurementRequest = null, quotation = null, taxes = [], defaultTerms = '', unitOptions = [] }) {
+export default function Form({ procurementRequest = null, quotation = null, taxes = [], defaultTerms = '', unitOptions = [], canReviseScope = false }) {
     const editing = Boolean(quotation);
     const sourceLines = editing ? quotation.lines : procurementRequest.lines;
     const customer = editing ? quotation.contact : procurementRequest.lead.contact;
@@ -160,6 +163,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
             : null;
 
     function save() {
+        feedback.expect({ success: { title: editing ? 'Quotation diperbarui' : 'Quotation dibuat', style: 'popup' } });
         editing
             ? put(`/sales/quotations/${quotation.id}`)
             : post(`/sales/procurement-requests/${procurementRequest.id}/quotations`);
@@ -238,6 +242,13 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                         </div>
                     </section>
 
+                    {editing && canReviseScope && (
+                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary-soft px-4 py-3 text-sm">
+                            <span className="text-primary-strong">Mau menambah atau menghapus item? Perubahan kebutuhan diproses lewat Revisi Kebutuhan — item baru dicarikan harganya oleh Procurement, item yang dihapus langsung berlaku.</span>
+                            <Button href={`/sales/quotations/${quotation.id}/scope-revision`} variant="outline">Revisi Kebutuhan</Button>
+                        </div>
+                    )}
+
                     <section className="card overflow-hidden p-0">
                         <div className="border-b border-border p-5">
                             <h2 className="font-semibold text-text">Line Items</h2>
@@ -245,13 +256,13 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                 Kebutuhan dan harga beli mengikuti hasil Procurement. Sales mengatur harga jual, diskon, serta pajak quotation.
                             </p>
                         </div>
-                        <div className="overflow-x-auto">
+                        <TableScroll>
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
                                     <tr>
-                                        <th className="px-3 py-3">Item</th>
-                                        <th className="px-3 py-3">Qty</th>
-                                        <th className="px-3 py-3 text-right">Cost</th>
+                                        <th className="sticky left-0 z-[1] bg-surface-2 px-3 py-3">Item</th>
+                                        <th className="hidden px-3 py-3 sm:table-cell">Qty</th>
+                                        <th className="hidden px-3 py-3 text-right sm:table-cell">Cost</th>
                                         <th className="px-3 py-3">Selling</th>
                                         <th className="px-3 py-3">Diskon</th>
                                         <th className="px-3 py-3">Pajak %</th>
@@ -269,12 +280,12 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                             {group !== prevGroup && (
                                                 <tr className="bg-surface-2">
                                                     <td colSpan="7" className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
-                                                        {group === 'material' ? 'Material' : 'Jasa'}
+                                                        <span className="sticky left-0 inline-block">{group === 'material' ? 'Material' : 'Jasa'}</span>
                                                     </td>
                                                 </tr>
                                             )}
                                             <tr>
-                                                <td className="px-3 py-3">
+                                                <td className="sticky left-0 z-[1] w-40 min-w-40 bg-surface px-3 py-3 sm:w-auto">
                                                     <input
                                                         type="text" value={data.lines[i].item_name}
                                                         disabled
@@ -286,21 +297,24 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                                         rows="2" value={data.lines[i].description}
                                                         disabled
                                                         placeholder="Deskripsi (opsional, bisa multi-baris)"
-                                                        className="mt-1 w-full rounded border border-border px-1.5 py-1 text-xs text-text-muted"
+                                                        className="mt-1 hidden w-full rounded sm:block border border-border px-1.5 py-1 text-xs text-text-muted"
                                                     />
-                                                    <select disabled value={data.lines[i].category} className="mt-1 rounded border border-border bg-bg px-1 py-0.5 text-[11px]">
+                                                    <select disabled value={data.lines[i].category} className="mt-1 hidden rounded sm:inline-block border border-border bg-bg px-1 py-0.5 text-[11px]">
                                                         <option value="material">Material</option>
                                                         <option value="service">Jasa</option>
                                                         <option value="reimburse">Biaya Reimburse</option>
                                                     </select>
-                                                    <textarea rows="2" disabled value={data.lines[i].sourcing_note} placeholder="Catatan sourcing dari Procurement" className="mt-1 w-full rounded border border-border bg-bg px-1.5 py-1 text-[11px]" />
+                                                    <textarea rows="2" disabled value={data.lines[i].sourcing_note} placeholder="Catatan sourcing dari Procurement" className="mt-1 hidden w-full rounded sm:block border border-border bg-bg px-1.5 py-1 text-[11px]" />
+                                                    <div className="mt-1 text-xs text-text-muted sm:hidden">
+                                                        {data.lines[i].qty} {data.lines[i].unit} · Cost {money(line.cost_price)}
+                                                    </div>
                                                     <div className="mt-1 text-xs">
                                                         <span className={c.markup != null && c.markup < 0 ? 'text-danger' : 'text-text-muted'}>Markup {c.markup == null ? '—' : `${c.markup.toFixed(1)}%`}</span>
                                                         {' · '}
                                                         <span className={c.margin != null && c.margin < 0 ? 'text-danger' : 'text-success'}>Margin efektif {c.margin == null ? '—' : `${c.margin.toFixed(1)}%`}</span>
                                                     </div>
                                                 </td>
-                                                <td className="min-w-24 px-3 py-3">
+                                                <td className="hidden min-w-24 px-3 py-3 sm:table-cell">
                                                     <input
                                                         type="number" min="0.01" step="0.01" value={data.lines[i].qty}
                                                         disabled
@@ -320,7 +334,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                                     {errors[`lines.${i}.qty`] && <span className="text-xs text-danger">{errors[`lines.${i}.qty`]}</span>}
                                                     {errors[`lines.${i}.unit`] && <span className="block text-xs text-danger">{errors[`lines.${i}.unit`]}</span>}
                                                 </td>
-                                                <td className="min-w-28 px-3 py-3 text-right">
+                                                <td className="hidden min-w-28 px-3 py-3 text-right sm:table-cell">
                                                     <span className="text-text-muted">{money(line.cost_price)}</span>
                                                 </td>
                                                 <td className="min-w-36 px-3 py-3">
@@ -357,20 +371,19 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                         );
                                     })}
                                 </tbody>
-                                <tfoot className="border-t border-border bg-surface-2 text-text">
-                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Subtotal Bruto</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.gross)}</td></tr>
-                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Total Diskon{discPct > 0 ? ` (${discPct}%)` : ''}</td><td className="px-3 py-1.5 text-right font-medium text-danger">−{money(totals.discount)}</td></tr>
-                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">DPP</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.dpp)}</td></tr>
-                                    <tr><td colSpan="6" className="px-3 py-1.5 text-right text-text-muted">Total PPN</td><td className="px-3 py-1.5 text-right font-medium">{money(totals.tax)}</td></tr>
-                                    <tr><td colSpan="6" className="px-3 py-3 text-right font-semibold">Grand Total</td><td className="px-3 py-3 text-right text-lg font-bold">{money(grand)}</td></tr>
-                                    {pph23Estimate > 0 && <>
-                                        <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi PPh 23 (2%) — jika customer memotong</td><td className="px-3 py-1.5 text-right text-xs font-medium text-warning">−{money(pph23Estimate)}</td></tr>
-                                        <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi diterima tunai</td><td className="px-3 py-1.5 text-right text-xs font-medium">{money(r2(grand - pph23Estimate))}</td></tr>
-                                    </>}
-                                    {marginPct != null && <tr><td colSpan="6" className="px-3 py-1.5 text-right text-xs text-text-muted">Estimasi margin keseluruhan</td><td className={`px-3 py-1.5 text-right text-xs font-medium ${marginPct < 0 ? 'text-danger' : 'text-success'}`}>{money(marginRp)} ({marginPct}%)</td></tr>}
-                                </tfoot>
                             </table>
-                        </div>
+                        </TableScroll>
+                        <TotalsSummary totals={{
+                            gross: totals.gross,
+                            discount: totals.discount,
+                            discount_percent: discPct,
+                            subtotal: totals.dpp,
+                            tax: totals.tax,
+                            grand_total: grand,
+                            pph23_estimate: pph23Estimate,
+                            margin_amount: marginRp,
+                            margin_percent: marginPct,
+                        }} />
                     </section>
 
                     <div className="flex justify-end gap-3">

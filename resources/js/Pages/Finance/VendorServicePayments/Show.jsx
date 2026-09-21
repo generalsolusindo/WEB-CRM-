@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, Button, Field, Input, Textarea, Modal, Info, InfoGrid, StatusBadge } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -12,8 +13,19 @@ const KIND_LABEL = { dp: 'DP', final: 'Pelunasan' };
 function PayForm({ payment, kind, amount }) {
     const form = useForm({ kind, paid_at: '', notes: '', proof: null });
 
-    function submit(e) {
+    async function submit(e) {
         e.preventDefault();
+        const ok = await feedback.confirm({
+            tone: 'question',
+            title: `Catat pembayaran ${KIND_LABEL[kind]}?`,
+            text: `${money(amount)} ke ${payment.bank_name} ${payment.account_number} a.n. ${payment.account_holder} akan dicatat sebagai sudah ditransfer.`,
+            confirmLabel: 'Ya, sudah ditransfer',
+        });
+        if (!ok) return;
+        feedback.expect({
+            success: { title: kind === 'dp' ? 'DP tercatat' : 'Pelunasan tercatat', style: 'popup' },
+            error: { title: 'Pembayaran belum tercatat' },
+        });
         form.post(`/finance/vendor-service-payments/${payment.id}/pay`, { forceFormData: true, preserveScroll: true });
     }
 
@@ -49,6 +61,7 @@ export default function Show({ payment, entries, cancelledEntries = [], canPayDp
 
     function cancel(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: 'Pembayaran vendor dibatalkan', style: 'popup' }, error: { title: 'Pembayaran gagal dibatalkan' } });
         cancelForm.post(`/finance/vendor-service-payments/${payment.id}/entries/${target.id}/cancel`, {
             preserveScroll: true,
             onSuccess: () => { setTarget(null); cancelForm.reset(); },

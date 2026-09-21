@@ -1,12 +1,14 @@
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../Layouts/AppLayout';
 import { PageHeader, Card, Field, Button } from '../../Components/ui';
+import { feedback } from '../../Components/feedback';
 
 export default function Signature({ signatureUrl }) {
     const form = useForm({ signature: null });
 
     function submit(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: 'Tanda tangan tersimpan', style: 'popup' } });
         form.post('/admin/signature', {
             forceFormData: true,
             preserveScroll: true,

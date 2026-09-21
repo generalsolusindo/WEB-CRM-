@@ -4,6 +4,7 @@ import { FiUserPlus, FiEdit2, FiTrash2, FiMessageCircle, FiGitMerge } from 'reac
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, CardHeader, Button, ConfirmDialog, Info, InfoGrid, StatusBadge, EmptyState, Modal, Select } from '../../../Components/ui';
 import { contactWhatsappLink } from '../../../Utils/whatsapp';
+import { feedback } from '../../../Components/feedback';
 
 export default function Show({ contact, leads, npwpDocumentUrl = null, otherContacts = [] }) {
     const salesName = usePage().props.auth?.user?.name;
@@ -16,6 +17,7 @@ export default function Show({ contact, leads, npwpDocumentUrl = null, otherCont
 
     function destroy() {
         setDeleting(true);
+        feedback.expect({ success: { title: 'Contact dihapus', style: 'popup' } });
         router.delete(`/sales/contacts/${contact.id}`, {
             preserveScroll: true,
             onSuccess: () => setDeleteOpen(false),
@@ -26,6 +28,7 @@ export default function Show({ contact, leads, npwpDocumentUrl = null, otherCont
     function submitMerge() {
         if (!duplicateId) return;
         setMerging(true);
+        feedback.expect({ success: { title: 'Contact digabungkan', style: 'popup' } });
         router.post(`/sales/contacts/${contact.id}/merge`, { duplicate_contact_id: duplicateId }, {
             onFinish: () => setMerging(false),
             onSuccess: () => setMergeOpen(false),

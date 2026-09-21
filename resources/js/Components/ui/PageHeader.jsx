@@ -6,7 +6,7 @@ export default function PageHeader({ title, subtitle, actions, back }) {
         <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="min-w-0 max-w-full break-words">
                 {back && (
-                    <Link href={back.href} className="mb-1.5 inline-flex items-center gap-1 text-sm font-medium text-primary transition hover:gap-1.5">
+                    <Link href={back.href} className="mb-0.5 inline-flex min-h-10 items-center gap-1 text-sm lg:mb-1.5 pointer-fine:min-h-0 font-medium text-primary transition hover:gap-1.5">
                         <FiChevronLeft className="h-4 w-4" />
                         {back.label ?? 'Kembali'}
                     </Link>

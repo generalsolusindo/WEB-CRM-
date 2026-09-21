@@ -56,7 +56,7 @@ export default function Index({ projects, summary, filters }) {
                 </div>
             ),
         },
-        { key: 'created_at', label: 'Mulai', render: (p) => p.created_at },
+        { key: 'created_at', hideBelow: 'md', label: 'Mulai', render: (p) => p.created_at },
         {
             key: 'hpp',
             label: 'HPP',

@@ -285,3 +285,48 @@
     cursor: not-allowed;
   }
 }
+
+/* ────────────── area sentuh (HP & tablet) ──────────────
+   Di bawah lg atau di layar sentuh (mis. tablet landscape), tombol, kolom isian, dan kotak centang diberi ukuran minimum yang
+   nyaman ditekan jari (~40px); di desktop tampilan padat tetap. */
+@media (max-width: 1023px), (pointer: coarse) {
+  .btn {
+    min-height: 2.5rem;
+  }
+
+  main input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']):not([type='hidden']),
+  main select {
+    min-height: 2.5rem;
+  }
+
+  main input[type='checkbox'],
+  main input[type='radio'] {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  /* Tombol bergaya tautan teks / chip kecil (Hapus, Batalkan, filter, panah urut, dll) */
+  main button:not(.btn) {
+    min-height: 2.25rem;
+    min-width: 2.25rem;
+  }
+
+  main a[class*='rounded-full'],
+  main a[class*='rounded-lg'],
+  main a[href^='tel:'],
+  main a[href*='wa.me'],
+  main a[target='_blank'] {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.25rem;
+  }
+
+  main input[type='file'] {
+    min-height: 2.5rem;
+  }
+
+  main input[type='file']::file-selector-button {
+    min-height: 2.25rem;
+  }
+}

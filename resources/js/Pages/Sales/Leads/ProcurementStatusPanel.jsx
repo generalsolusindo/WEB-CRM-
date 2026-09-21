@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { StatusBadge } from '../../../Components/ui';
+import TableScroll from '../../../Components/ui/TableScroll';
 
 const statusLabels = { draft: 'Draft', submitted: 'Baru Masuk', searching: 'Sedang Dicari', ready: 'Ready', rejected: 'Ditolak' };
 const availabilityLabels = { available: 'Tersedia', unavailable: 'Tidak Tersedia', searching: 'Masih Dicari' };
@@ -21,7 +22,7 @@ export default function ProcurementStatusPanel({ request }) {
                     <div className="mt-1 text-danger/80">Perbaiki requirement di atas, lalu kirim ulang ke Procurement.</div>
                 </div>
             )}
-            <div className="overflow-x-auto rounded-xl border border-border">
+            <TableScroll className="rounded-xl border border-border">
                 <table className="w-full text-left text-sm">
                     <thead className="bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
                         <tr><th className="px-3 py-2">Item</th><th className="px-3 py-2">Qty</th><th className="px-3 py-2">Availability</th><th className="px-3 py-2 text-right">Cost Price</th></tr>
@@ -37,7 +38,7 @@ export default function ProcurementStatusPanel({ request }) {
                         ))}
                     </tbody>
                 </table>
-            </div>
+            </TableScroll>
             <div className={`mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl p-4 text-sm ${ready ? 'bg-success-soft text-success' : 'bg-primary-soft text-primary-strong'}`}>
                 <span>{ready ? 'Procurement sudah Ready. Data dapat dilanjutkan menjadi Quotation.' : 'Procurement sedang memproses sourcing, availability, dan cost price.'}</span>
                 {ready && (request.quotation

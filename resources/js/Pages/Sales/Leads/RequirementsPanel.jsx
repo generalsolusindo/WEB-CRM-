@@ -2,6 +2,7 @@ import { router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import CategoryBadge from '../../../Components/CategoryBadge';
 import { ConfirmDialog } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 const emptyForm = { item_name: '', category: 'material', description: '', qty: '1', unit: '', notes: '' };
 
@@ -51,6 +52,7 @@ export default function RequirementsPanel({ leadId, requirements, editable, unit
     function submitToProcurement() {
         if (submittingBatch) return;
         setSubmittingBatch(true);
+        feedback.expect({ success: { title: 'Requirement dikirim ke Procurement', style: 'popup' } });
         router.post(`/sales/leads/${leadId}/submit-procurement`, {}, {
             preserveScroll: true,
             onSuccess: () => setConfirmation(null),
@@ -61,6 +63,7 @@ export default function RequirementsPanel({ leadId, requirements, editable, unit
     function submitAddendum() {
         if (submittingBatch) return;
         setSubmittingBatch(true);
+        feedback.expect({ success: { title: 'Tambahan dikirim ke Procurement', style: 'popup' } });
         router.post(`/sales/leads/${leadId}/submit-addendum`, {}, {
             preserveScroll: true,
             onSuccess: () => setConfirmation(null),

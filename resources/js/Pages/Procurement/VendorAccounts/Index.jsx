@@ -14,9 +14,9 @@ export default function Index({ accounts, filters }) {
 
     const columns = [
         { key: 'name', label: 'Nama', render: (a) => <span className="font-medium text-text">{a.name}</span> },
-        { key: 'username', label: 'Username', render: (a) => <span className="text-text-muted">{a.username}</span> },
-        { key: 'email', label: 'Email', render: (a) => <span className="text-text-muted">{a.email}</span> },
-        { key: 'phone', label: 'Telepon', render: (a) => a.phone || '—' },
+        { key: 'username', hideBelow: 'md', label: 'Username', render: (a) => <span className="text-text-muted">{a.username}</span> },
+        { key: 'email', hideBelow: 'md', label: 'Email', render: (a) => <span className="text-text-muted">{a.email}</span> },
+        { key: 'phone', hideBelow: 'sm', label: 'Telepon', render: (a) => a.phone || '—' },
         { key: 'vendor', label: 'Vendor', render: (a) => a.vendor || '—' },
         { key: 'functions', label: 'Fungsi', render: (a) => [a.can_technician && 'Teknisi', a.can_surveyor && 'Surveyor'].filter(Boolean).join(' · ') || 'PIC Vendor' },
         {

@@ -86,7 +86,7 @@ export default function Index({ quotations, filters, statusOptions, temperatureO
                 </span>
             ),
         },
-        { key: 'valid_until', label: 'Valid Until', render: (q) => <span className="text-text-muted">{q.valid_until || '—'}</span> },
+        { key: 'valid_until', hideBelow: 'md', label: 'Valid Until', render: (q) => <span className="text-text-muted">{q.valid_until || '—'}</span> },
         { key: 'total', label: 'Total', align: 'right', render: (q) => <span className="font-semibold tabular-nums text-text">{money(q.total_amount)}</span> },
     ];
 

@@ -43,10 +43,10 @@ export default function Index({ invoices, filters, statusOptions }) {
                 </div>
             ),
         },
-        { key: 'phase', label: 'Fase', render: (inv) => <span className="text-xs uppercase text-text-muted">{inv.phase}</span> },
+        { key: 'phase', hideBelow: 'md', label: 'Fase', render: (inv) => <span className="text-xs uppercase text-text-muted">{inv.phase}</span> },
         { key: 'status', label: 'Status', render: (inv) => <StatusBadge status={inv.status} label={statusOptions.find((s) => s.value === inv.status)?.label} /> },
         { key: 'grand_total', label: 'Total Tagihan', align: 'right', render: (inv) => <span className="tabular-nums">{money(inv.grand_total)}</span> },
-        { key: 'paid_total', label: 'Sudah Dibayar', align: 'right', render: (inv) => <span className="tabular-nums text-text-muted">{money(inv.paid_total)}</span> },
+        { key: 'paid_total', hideBelow: 'md', label: 'Sudah Dibayar', align: 'right', render: (inv) => <span className="tabular-nums text-text-muted">{money(inv.paid_total)}</span> },
         { key: 'due_date', label: 'Jatuh Tempo', render: (inv) => inv.due_date || '—' },
         {
             key: 'pdf',

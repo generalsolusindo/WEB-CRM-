@@ -2,6 +2,8 @@ import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Button, StatusBadge, CurrencyInput, ConfirmDialog } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
+import TableScroll from '../../../Components/ui/TableScroll';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -16,6 +18,7 @@ export default function Show({ project, approvalDocs = [], bastRecords, taskPhot
 
     function completeProject() {
         setCompleting(true);
+        feedback.expect({ success: { title: 'Project diselesaikan', style: 'popup' } });
         router.post(`/operational/projects/${project.id}/complete`, {}, {
             onSuccess: () => setCompleteOpen(false),
             onFinish: () => setCompleting(false),
@@ -32,8 +35,8 @@ export default function Show({ project, approvalDocs = [], bastRecords, taskPhot
                     back={{ href: '/operational/projects', label: 'Kembali' }}
                     actions={(
                         <>
-                            {permissions.markReady && <Button onClick={() => router.post(`/operational/projects/${project.id}/ready`)} className="bg-success text-white hover:bg-success">Tandai Siap</Button>}
-                            {permissions.start && <Button onClick={() => router.post(`/operational/projects/${project.id}/start`)}>Mulai Project</Button>}
+                            {permissions.markReady && <Button onClick={() => feedback.act({ url: `/operational/projects/${project.id}/ready`, preserveScroll: false, confirm: { tone: 'question', title: 'Tandai project siap?', text: 'Pastikan barang dan tim sudah lengkap. Setelah siap, project bisa dimulai.', confirmLabel: 'Ya, tandai siap' }, success: { title: 'Project siap dimulai', style: 'popup' } })} className="bg-success text-white hover:bg-success">Tandai Siap</Button>}
+                            {permissions.start && <Button onClick={() => feedback.act({ url: `/operational/projects/${project.id}/start`, confirm: { tone: 'question', title: 'Mulai project sekarang?', text: 'Status project berubah menjadi berjalan dan tim teknisi bisa mulai absen serta mengerjakan task.', confirmLabel: 'Ya, mulai' }, success: { title: 'Project dimulai', style: 'popup' } })}>Mulai Project</Button>}
                             {permissions.completeDirect && <Button onClick={() => setCompleteOpen(true)} className="bg-success text-white hover:bg-success">Selesaikan Project</Button>}
                         </>
                     )}
@@ -114,6 +117,7 @@ function BastSection({ project, records, canVerify }) {
 
     function approve(bastId) {
         setApproveProcessing(true);
+        feedback.expect({ success: { title: 'BAST disetujui', style: 'popup' } });
         router.put(`/operational/projects/${project.id}/bast/${bastId}`, { decision: 'approve' }, {
             preserveScroll: true,
             onSuccess: () => setApproving(null),
@@ -122,6 +126,7 @@ function BastSection({ project, records, canVerify }) {
     }
     function submitReject(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: 'BAST ditolak, dikembalikan ke tim', style: 'popup' } });
         form.transform(() => ({ decision: 'reject', notes: form.data.notes }));
         form.put(`/operational/projects/${project.id}/bast/${rejecting}`, { preserveScroll: true, onSuccess: () => { setRejecting(null); form.reset(); } });
     }
@@ -292,13 +297,13 @@ function ActualProcurement({ project, availabilityOptions, progress, editable })
                     Diterima {progress.received} / {progress.total}
                 </span>
             </div>
-            <div className="overflow-x-auto">
+            <TableScroll>
                 <table className="w-full text-left text-sm">
-                    <thead className="bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint"><tr><th className="px-4 py-3">Item</th><th className="px-4 py-3">Qty</th><th className="px-4 py-3 text-right">Cost</th><th className="px-4 py-3">Status</th>{editable && <th className="px-4 py-3 text-right">Aksi</th>}</tr></thead>
+                    <thead className="bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint"><tr><th className="sticky left-0 z-[1] bg-surface-2 px-4 py-3">Item</th><th className="px-4 py-3">Qty</th><th className="px-4 py-3 text-right">Cost</th><th className="px-4 py-3">Status</th>{editable && <th className="px-4 py-3 text-right">Aksi</th>}</tr></thead>
                     <tbody className="divide-y divide-border">
                         {project.actual_procurements.map((item) => (
                             <tr key={item.id}>
-                                <td className="px-4 py-3"><div className="font-medium text-text">{item.item_name}</div><div className="text-xs text-text-muted">{item.vendor?.name || 'Belum ada vendor'}{item.requested_by ? ' · ekstra' : ''}</div></td>
+                                <td className="sticky left-0 z-[1] bg-surface min-w-40 px-4 py-3"><div className="font-medium text-text">{item.item_name}</div><div className="text-xs text-text-muted">{item.vendor?.name || 'Belum ada vendor'}{item.requested_by ? ' · ekstra' : ''}</div></td>
                                 <td className="px-4 py-3 text-text-muted">{item.qty} {item.unit}</td>
                                 <td className="px-4 py-3 text-right text-text-muted">{money(item.cost_price)}</td>
                                 <td className="px-4 py-3"><span className={`badge ${item.status === 'received' ? 'badge-success' : item.status === 'purchased' ? 'badge-primary' : 'badge-warning'}`}>{availabilityOptions.find((o) => o.value === item.status)?.label ?? item.status}</span></td>
@@ -308,7 +313,7 @@ function ActualProcurement({ project, availabilityOptions, progress, editable })
                         {project.actual_procurements.length === 0 && <tr><td colSpan={editable ? 5 : 4} className="px-4 py-6 text-center text-text-muted">Tidak ada kebutuhan barang (murni jasa).</td></tr>}
                     </tbody>
                 </table>
-            </div>
+            </TableScroll>
             {editable && (
                 <form onSubmit={add} className="grid gap-3 border-t border-border p-4 md:grid-cols-5">
                     <input value={form.data.item_name} onChange={(e) => form.setData('item_name', e.target.value)} placeholder="Item ekstra tak terduga" className="rounded-lg border border-border px-2 py-2 text-sm md:col-span-2" />

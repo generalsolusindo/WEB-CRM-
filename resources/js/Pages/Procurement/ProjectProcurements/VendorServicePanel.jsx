@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from '@inertiajs/react';
 import { FiTruck } from 'react-icons/fi';
 import { Card, CardHeader, Button, Field, Input, Select, Textarea, CurrencyInput, Info, InfoGrid, StatusBadge } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -30,6 +31,10 @@ export default function VendorServicePanel({ project, vendorService, vendorOptio
 
     function submit(e) {
         e.preventDefault();
+        feedback.expect({
+            success: { title: data.terms === 'dp_final' ? 'Deal vendor tersimpan' : 'Deal vendor tersimpan, project dilepas', style: 'popup' },
+            error: { title: 'Deal vendor belum tersimpan' },
+        });
         put(`/procurement/project-procurements/${project.id}/vendor-service`, { preserveScroll: true });
     }
 

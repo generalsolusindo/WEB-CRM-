@@ -2,6 +2,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, ConfirmDialog } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 export default function Sow({ project, vendor, technicianOptions = [], sow, signatures, canEdit, canSignOperational, canRestartSignatures }) {
     const [signing, setSigning] = useState(false);
@@ -9,12 +10,22 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
     const [actionProcessing, setActionProcessing] = useState(false);
 
     function signOperational() {
-        setSigning(true);
-        router.post(`/operational/sows/${sow.id}/sign-operational`, {}, { onFinish: () => setSigning(false) });
+        feedback.act({
+            url: `/operational/sows/${sow.id}/sign-operational`,
+            confirm: {
+                tone: 'question',
+                title: 'Tanda tangani SOW ini?',
+                text: `Tanda tangan Operasional akan dibubuhkan pada SOW ${sow.number} lalu diteruskan ke Project Manager.`,
+                confirmLabel: 'Ya, tanda tangani',
+            },
+            success: { title: 'SOW ditandatangani', style: 'popup' },
+            visit: { onStart: () => setSigning(true), onFinish: () => setSigning(false), preserveScroll: false },
+        });
     }
 
     function restartSignatures() {
         setActionProcessing(true);
+        feedback.expect({ success: { title: 'Tanda tangan diulang', style: 'popup' } });
         router.post(`/operational/sows/${sow.id}/restart-signatures`, {}, {
             onSuccess: () => setConfirmation(null),
             onFinish: () => setActionProcessing(false),
@@ -89,6 +100,7 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
 
     function runConfirmedAction() {
         if (confirmation?.type === 'reset-process') {
+            feedback.expect({ success: { title: 'SOW direset ke Draft', style: 'popup' } });
             form.put(`/operational/projects/${project.id}/sow`, {
                 preserveScroll: true,
                 onSuccess: () => setConfirmation(null),
@@ -109,6 +121,7 @@ export default function Sow({ project, vendor, technicianOptions = [], sow, sign
         if (confirmation?.type === 'delete-main-image') {
             router.delete(`/operational/projects/${project.id}/sow/images/${confirmation.id}`, options);
         } else if (confirmation?.type === 'submit-hr') {
+            feedback.expect({ success: { title: 'SOW dikirim ke HR', style: 'popup' } });
             router.post(`/operational/projects/${project.id}/sow/submit`, {}, options);
         }
     }

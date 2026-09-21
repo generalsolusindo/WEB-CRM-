@@ -52,7 +52,7 @@ export default function ScopeRevision({ quotation, unitOptions = [] }) {
                 />
 
                 <div className="rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm text-warning">
-                    Isi kebutuhan customer saja. Procurement akan menentukan vendor atau stok, harga beli, pajak, dan ketersediaannya. Quotation tetap menggunakan data yang sama setelah costing selesai.
+                    Isi kebutuhan customer saja. Item yang <strong>ditambah atau diubah</strong> akan dicarikan vendor/stok, harga beli, pajak, dan ketersediaannya oleh Procurement — quotation menunggu costing selesai lalu Anda mengisi harga jualnya. Item yang hanya <strong>dihapus</strong> langsung berlaku tanpa menunggu Procurement. Review PM/Manager diulang setelah revisi.
                 </div>
 
                 {errors.quotation && <Alert text={errors.quotation} />}

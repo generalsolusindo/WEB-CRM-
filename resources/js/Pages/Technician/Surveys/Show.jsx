@@ -19,12 +19,14 @@ export default function Show({ survey, report, canWork, canSubmit, checkedIn, ca
 
     function checkIn(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: 'Absen kehadiran tersimpan', style: 'popup' } });
         checkInForm.post(`/technician/surveys/${survey.id}/checkin`, {
             forceFormData: true, preserveScroll: true, onSuccess: () => checkInForm.reset('photo'),
         });
     }
     function checkOut(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: 'Absen pulang tersimpan', style: 'popup' } });
         checkOutForm.post(`/technician/surveys/${survey.id}/checkout`, {
             forceFormData: true, preserveScroll: true, onSuccess: () => checkOutForm.reset('photo'),
         });
@@ -47,14 +49,24 @@ export default function Show({ survey, report, canWork, canSubmit, checkedIn, ca
             success: { title: 'Lampiran dihapus' },
         });
     }
-    function submitReport() {
+    async function submitReport() {
         setSubmitError(null);
+        const ok = await feedback.confirm({
+            tone: 'question',
+            title: 'Kirim laporan survey?',
+            text: 'Laporan dikirim ke Operasional untuk diverifikasi dan tidak bisa diubah setelah dikirim.',
+            confirmLabel: 'Ya, kirim laporan',
+        });
+        if (!ok) return;
         // Simpan draft terbaru dulu, baru kirim.
         put(`/technician/surveys/${survey.id}/report`, {
             preserveScroll: true,
-            onSuccess: () => router.post(`/technician/surveys/${survey.id}/report/submit`, {}, {
-                onError: (errs) => setSubmitError(Object.values(errs)[0] ?? 'Gagal mengirim laporan.'),
-            }),
+            onSuccess: () => {
+                feedback.expect({ success: { title: 'Laporan terkirim', style: 'popup' } });
+                router.post(`/technician/surveys/${survey.id}/report/submit`, {}, {
+                    onError: (errs) => setSubmitError(Object.values(errs)[0] ?? 'Gagal mengirim laporan.'),
+                });
+            },
         });
     }
 

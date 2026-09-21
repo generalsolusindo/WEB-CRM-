@@ -12,7 +12,7 @@ const CONTROL = 'rounded-lg border border-border-strong bg-surface py-2 text-sm 
 
 export function SearchInput({ value, onChange, placeholder = 'Cari…', className = '' }) {
     return (
-        <div className={`relative min-w-0 flex-1 ${className}`.trim()}>
+        <div className={`relative min-w-0 flex-1 basis-full sm:min-w-56 sm:basis-56 ${className}`.trim()}>
             <FiSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
             <input
                 value={value}

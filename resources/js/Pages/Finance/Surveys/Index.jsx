@@ -10,8 +10,8 @@ export default function Index({ surveys }) {
     const columns = [
         { key: 'code', label: 'Kode', render: (s) => <span className="font-semibold text-text">{s.code}</span> },
         { key: 'customer', label: 'Customer', render: (s) => s.customer || '—' },
-        { key: 'site_region', label: 'Lokasi' },
-        { key: 'billing', label: 'Penagihan', render: (s) => (s.billable ? 'Ditagih ke customer' : `Biaya internal (${s.delivery_mode})`) },
+        { key: 'site_region', hideBelow: 'md', label: 'Lokasi' },
+        { key: 'billing', hideBelow: 'md', label: 'Penagihan', render: (s) => (s.billable ? 'Ditagih ke customer' : `Biaya internal (${s.delivery_mode})`) },
         { key: 'cost', label: 'Biaya', align: 'right', render: (s) => <span className="tabular-nums">{money(s.cost)}</span> },
         { key: 'status', label: 'Status', render: (s) => <StatusBadge status={s.status} label={s.status_label} tone="warning" /> },
     ];

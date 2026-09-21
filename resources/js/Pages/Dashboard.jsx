@@ -820,7 +820,7 @@ function StatSection({ title, href, children }) {
             <div className="mb-3 flex items-center justify-between gap-3">
                 <h3 className="text-sm font-bold tracking-tight text-text">{title}</h3>
                 {href && (
-                    <Link href={href} className="flex items-center gap-1 text-xs font-semibold text-primary transition hover:underline">
+                    <Link href={href} className="flex min-h-9 items-center gap-1 text-xs font-semibold text-primary transition hover:underline">
                         Lihat semua <FiArrowRight className="h-3 w-3" />
                     </Link>
                 )}

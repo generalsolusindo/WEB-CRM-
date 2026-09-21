@@ -1,6 +1,7 @@
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, Field, Input, FormActions } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 export default function Form({ projectManager = null }) {
     const editing = Boolean(projectManager);
@@ -16,6 +17,7 @@ export default function Form({ projectManager = null }) {
 
     function submit(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: editing ? 'Akun Project Manager diperbarui' : 'Akun Project Manager dibuat', style: 'popup' } });
         editing ? put(`/management/project-managers/${projectManager.id}`) : post('/management/project-managers');
     }
 

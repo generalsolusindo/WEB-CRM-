@@ -2,6 +2,7 @@ import { Head, useForm } from '@inertiajs/react';
 import { FiFileText } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, CardHeader, Button, Info, InfoGrid } from '../../../Components/ui';
+import TableScroll from '../../../Components/ui/TableScroll';
 
 export default function Show({ deliveryNote: dn, canUploadReceivedProof }) {
     const complete = dn.lines.every((l) => l.qty_balance <= 0);
@@ -53,7 +54,7 @@ export default function Show({ deliveryNote: dn, canUploadReceivedProof }) {
 
                 <Card padded={false}>
                     <CardHeader title="Barang" />
-                    <div className="overflow-x-auto">
+                    <TableScroll>
                         <table className="w-full text-left text-sm">
                             <thead>
                                 <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
@@ -73,7 +74,7 @@ export default function Show({ deliveryNote: dn, canUploadReceivedProof }) {
                                 ))}
                             </tbody>
                         </table>
-                    </div>
+                    </TableScroll>
                 </Card>
             </div>
         </AppLayout>

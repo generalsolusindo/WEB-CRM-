@@ -1,6 +1,7 @@
 import { router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { ConfirmDialog, PromptDialog } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -34,6 +35,7 @@ export default function SurveyPanel({ leadId, surveys = [], requestable = false,
     function finalize() {
         if (!finalizeAction) return;
         setActionProcessing(true);
+        feedback.expect({ success: { title: 'Survey difinalisasi', style: 'popup' } });
         router.post(`/sales/leads/${leadId}/surveys/${finalizeAction.surveyId}/finalize`, { copy_items: finalizeAction.copyItems }, {
             preserveScroll: true,
             onSuccess: () => setFinalizeAction(null),
@@ -44,6 +46,7 @@ export default function SurveyPanel({ leadId, surveys = [], requestable = false,
     function cancelSurvey(reason) {
         if (!cancelSurveyId) return;
         setActionProcessing(true);
+        feedback.expect({ success: { title: 'Survey dibatalkan', style: 'popup' } });
         router.post(`/sales/leads/${leadId}/surveys/${cancelSurveyId}/cancel`, { reason }, {
             preserveScroll: true,
             onSuccess: () => setCancelSurveyId(null),

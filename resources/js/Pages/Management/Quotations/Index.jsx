@@ -47,9 +47,9 @@ export default function Index({ quotations, filters, statusOptions }) {
                 </div>
             ),
         },
-        { key: 'sales', label: 'Sales', render: (q) => q.sales || '—' },
+        { key: 'sales', hideBelow: 'md', label: 'Sales', render: (q) => q.sales || '—' },
         { key: 'status', label: 'Status', render: (q) => <StatusBadge status={q.status} label={statusOptions.find((s) => s.value === q.status)?.label} /> },
-        { key: 'created_at', label: 'Tanggal', render: (q) => q.created_at?.slice(0, 10) },
+        { key: 'created_at', hideBelow: 'md', label: 'Tanggal', render: (q) => q.created_at?.slice(0, 10) },
     ];
 
     return (

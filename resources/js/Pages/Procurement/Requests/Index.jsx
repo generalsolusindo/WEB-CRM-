@@ -20,9 +20,9 @@ export default function Index({ requests, filters, statusOptions }) {
                 </div>
             ),
         },
-        { key: 'lines_count', label: 'Line', align: 'right', render: (pr) => <span className="tabular-nums">{pr.lines_count}</span> },
+        { key: 'lines_count', hideBelow: 'md', label: 'Line', align: 'right', render: (pr) => <span className="tabular-nums">{pr.lines_count}</span> },
         { key: 'status', label: 'Status', render: (pr) => <StatusBadge status={pr.status} label={statusOptions.find((s) => s.value === pr.status)?.label} /> },
-        { key: 'created_at', label: 'Tanggal', render: (pr) => pr.created_at?.slice(0, 10) },
+        { key: 'created_at', hideBelow: 'md', label: 'Tanggal', render: (pr) => pr.created_at?.slice(0, 10) },
     ];
 
     return (

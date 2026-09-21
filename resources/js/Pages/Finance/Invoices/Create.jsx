@@ -2,6 +2,8 @@ import { Head, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, CardHeader, Field, Input, Select, Textarea, FormActions, CurrencyInput } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
+import TableScroll from '../../../Components/ui/TableScroll';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -34,6 +36,7 @@ export default function Create({
 
     function submit(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: 'Invoice dibuat', style: 'popup' } });
         post('/finance/invoices');
     }
 
@@ -206,27 +209,34 @@ export default function Create({
                                 ? <button type="button" onClick={disableManualLines} className="text-xs font-semibold text-primary hover:underline">Batalkan edit manual</button>
                                 : <button type="button" onClick={enableManualLines} className="text-xs font-semibold text-primary hover:underline">Edit item manual</button>}
                         />
-                        <div className="overflow-x-auto">
+                        <TableScroll>
                             <table className="w-full text-left text-sm">
                                 <thead>
                                     <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
-                                        <th className="px-4 py-3">Item</th>
-                                        {manualLines && <th className="px-4 py-3">Kategori</th>}
+                                        <th className="sticky left-0 z-[1] bg-surface-2 px-4 py-3">Item</th>
+                                        {manualLines && <th className="hidden px-4 py-3 sm:table-cell">Kategori</th>}
                                         <th className="px-4 py-3">Qty</th>
                                         {manualLines && <th className="px-4 py-3 text-right">Harga Satuan</th>}
                                         <th className="px-4 py-3 text-right">Diskon</th>
                                         <th className="px-4 py-3">Pajak (%)</th>
                                         <th className="px-4 py-3 text-right">DPP</th>
-                                        {manualLines && <th className="px-4 py-3"></th>}
+                                        {manualLines && <th className="hidden px-4 py-3 sm:table-cell"></th>}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                     {manualLines ? manualComputed.map((l, i) => (
                                         <tr key={i}>
-                                            <td className="px-4 py-2">
+                                            <td className="sticky left-0 z-[1] w-44 min-w-44 bg-surface px-4 py-2 sm:w-auto">
                                                 <input value={l.item_name} onChange={(e) => updateLine(i, 'item_name', e.target.value)} className="w-full rounded-lg border border-border px-2 py-1.5 outline-none focus:border-navy" />
+                                                <div className="mt-1.5 flex items-center justify-between gap-2 sm:hidden">
+                                                    <select value={l.category} onChange={(e) => updateLine(i, 'category', e.target.value)} className="min-w-0 rounded-lg border border-border px-2 py-1.5 text-xs outline-none focus:border-navy">
+                                                        <option value="material">Material</option>
+                                                        <option value="service">Jasa</option>
+                                                    </select>
+                                                    <button type="button" onClick={() => removeLine(i)} className="shrink-0 rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-semibold text-danger">Hapus</button>
+                                                </div>
                                             </td>
-                                            <td className="px-4 py-2">
+                                            <td className="hidden px-4 py-2 sm:table-cell">
                                                 <select value={l.category} onChange={(e) => updateLine(i, 'category', e.target.value)} className="rounded-lg border border-border px-2 py-1.5 outline-none focus:border-navy">
                                                     <option value="material">Material</option>
                                                     <option value="service">Jasa</option>
@@ -245,13 +255,13 @@ export default function Create({
                                                 <input type="number" min="0" max="100" step="0.01" value={l.tax_rate} onChange={(e) => updateLine(i, 'tax_rate', e.target.value)} className="w-20 rounded-lg border border-border px-2 py-1.5 outline-none focus:border-navy" />
                                             </td>
                                             <td className="px-4 py-2 text-right font-medium tabular-nums text-text">{money(l.invSubtotal)}</td>
-                                            <td className="px-4 py-2 text-right">
+                                            <td className="hidden px-4 py-2 text-right sm:table-cell">
                                                 <button type="button" onClick={() => removeLine(i)} className="rounded-lg border border-danger/30 px-2 py-1 text-xs font-semibold text-danger">Hapus</button>
                                             </td>
                                         </tr>
                                     )) : computedLines.map((l) => (
                                         <tr key={l.id}>
-                                            <td className="px-4 py-3.5 font-medium text-text">{l.item_name}{ratio < 1 ? ' (DP 50%)' : ''}</td>
+                                            <td className="sticky left-0 z-[1] min-w-40 bg-surface px-4 py-3.5 font-medium text-text">{l.item_name}{ratio < 1 ? ' (DP 50%)' : ''}</td>
                                             <td className="px-4 py-3.5 text-text-muted">{l.qty} {l.unit}</td>
                                             <td className="px-4 py-3.5 text-right tabular-nums text-text-muted">{l.invDiscount > 0 ? money(l.invDiscount) : '—'}</td>
                                             <td className="px-4 py-3.5 text-text-muted">{l.invRate > 0 ? `${l.invRate}%` : '—'}</td>
@@ -288,7 +298,7 @@ export default function Create({
                                     })()}
                                 </tfoot>
                             </table>
-                        </div>
+                        </TableScroll>
                     </Card>
 
                     <FormActions

@@ -16,7 +16,7 @@ export default function Index({ contacts, filters }) {
 
     const columns = [
         { key: 'name', label: 'Nama', render: (c) => <span className="font-semibold text-text">{c.name}</span> },
-        { key: 'company_name', label: 'Perusahaan', render: (c) => <span className="text-text-muted">{c.company_name || '—'}</span> },
+        { key: 'company_name', hideBelow: 'md', label: 'Perusahaan', render: (c) => <span className="text-text-muted">{c.company_name || '—'}</span> },
         {
             key: 'contact', label: 'Kontak',
             render: (c) => {
@@ -44,7 +44,7 @@ export default function Index({ contacts, filters }) {
                 );
             },
         },
-        { key: 'leads_count', label: 'Lead', align: 'right', render: (c) => <span className="tabular-nums text-text-muted">{c.leads_count}</span> },
+        { key: 'leads_count', hideBelow: 'md', label: 'Lead', align: 'right', render: (c) => <span className="tabular-nums text-text-muted">{c.leads_count}</span> },
     ];
 
     return (

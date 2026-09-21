@@ -1,9 +1,11 @@
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
-import { Totals } from './Show';
 import CategoryBadge from '../../../Components/CategoryBadge';
 import { pickFile } from '../../../utils/fileValidation';
 import { PageHeader, Card, CardHeader, Field, Input, FormActions } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
+import TableScroll from '../../../Components/ui/TableScroll';
+import TotalsSummary from '../../../Components/ui/TotalsSummary';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -14,7 +16,11 @@ export default function Confirm({ quotation, orderTypes, totals }) {
         order_type: '', signed_quotation: null, purchase_order: null, po_number: '', po_date: '',
     });
     const selected = orderTypes.find((t) => t.value === data.order_type);
-    function submit(e) { e.preventDefault(); post(`/sales/quotations/${quotation.id}/confirm`, { forceFormData: true }); }
+    function submit(e) {
+        e.preventDefault();
+        feedback.expect({ success: { title: 'Deal dikonfirmasi', style: 'popup' }, error: { title: 'Deal belum bisa dikonfirmasi' } });
+        post(`/sales/quotations/${quotation.id}/confirm`, { forceFormData: true });
+    }
 
     return (
         <AppLayout>
@@ -73,17 +79,17 @@ export default function Confirm({ quotation, orderTypes, totals }) {
                     </Card>
 
                     <Card padded={false}>
-                        <div className="overflow-x-auto">
+                        <TableScroll>
                             <table className="w-full text-left text-sm">
                                 <thead>
                                     <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
-                                        <th className="px-4 py-3">Item</th><th className="px-4 py-3">Qty</th><th className="px-4 py-3 text-right">Selling Price</th><th className="px-4 py-3 text-right">Diskon</th><th className="px-4 py-3 text-right">DPP</th>
+                                        <th className="sticky left-0 z-[1] bg-surface-2 px-4 py-3">Item</th><th className="px-4 py-3">Qty</th><th className="px-4 py-3 text-right">Selling Price</th><th className="px-4 py-3 text-right">Diskon</th><th className="px-4 py-3 text-right">DPP</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                     {quotation.lines.map((line) => (
                                         <tr key={line.id}>
-                                            <td className="px-4 py-3.5 font-medium text-text">{line.item_name}<CategoryBadge category={line.category} />{line.sourcing_note && <div className="mt-0.5 text-[11px] font-normal italic text-text-muted">Opsi: {line.sourcing_note}</div>}</td>
+                                            <td className="sticky left-0 z-[1] bg-surface min-w-40 px-4 py-3.5 font-medium text-text">{line.item_name}<CategoryBadge category={line.category} />{line.sourcing_note && <div className="mt-0.5 text-[11px] font-normal italic text-text-muted">Opsi: {line.sourcing_note}</div>}</td>
                                             <td className="px-4 py-3.5 text-text-muted">{line.qty} {line.unit}</td>
                                             <td className="px-4 py-3.5 text-right tabular-nums">{money(line.selling_price)}</td>
                                             <td className="px-4 py-3.5 text-right tabular-nums text-text-muted">{Number(line.discount_amount) > 0 ? `${money(line.discount_amount)} (${line.discount_percent ?? 0}%)` : '—'}</td>
@@ -91,9 +97,9 @@ export default function Confirm({ quotation, orderTypes, totals }) {
                                         </tr>
                                     ))}
                                 </tbody>
-                                <Totals totals={totals} span={4} />
                             </table>
-                        </div>
+                        </TableScroll>
+                        <TotalsSummary totals={totals} />
                     </Card>
 
                     <FormActions

@@ -3,8 +3,10 @@ import { useState } from 'react';
 import { FiFileText } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import CategoryBadge from '../../../Components/CategoryBadge';
-import { Totals } from '../../Sales/Quotations/Show';
 import { PageHeader, Button } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
+import TableScroll from '../../../Components/ui/TableScroll';
+import TotalsSummary from '../../../Components/ui/TotalsSummary';
 
 export default function Show({ quotation, canReview, role, backHref }) {
     const isMgmt = role === 'management';
@@ -12,7 +14,13 @@ export default function Show({ quotation, canReview, role, backHref }) {
     const form = useForm({ approved: true, notes: '' });
     const [action, setAction] = useState(null);
 
-    function submit(approved) {
+    async function submit(approved) {
+        const ok = await feedback.confirm(approved
+            ? { tone: 'question', title: 'Setujui quotation ini?', text: `Quotation ${quotation.number} akan ditandai disetujui${isMgmt ? ' dan siap dikirim Sales ke customer' : ' lalu diteruskan ke Manager'}.`, confirmLabel: 'Ya, setujui' }
+            : { tone: 'danger', title: 'Tolak quotation ini?', text: `Quotation ${quotation.number} akan dikembalikan ke Sales untuk diperbaiki. Pastikan catatan penolakan sudah diisi.`, confirmLabel: 'Ya, tolak' });
+        if (!ok) return;
+
+        feedback.expect({ success: { title: approved ? 'Quotation disetujui' : 'Quotation ditolak', style: 'popup' }, error: { title: 'Gagal memproses quotation' } });
         setAction(approved ? 'approve' : 'reject');
         form.transform((data) => ({ ...data, approved }));
         form.post(`${base}/${quotation.id}/review`, { preserveScroll: true });
@@ -40,11 +48,11 @@ export default function Show({ quotation, canReview, role, backHref }) {
                 </section>
 
                 <section className="card overflow-hidden p-0">
-                    <div className="overflow-x-auto">
+                    <TableScroll>
                         <table className="w-full text-left text-sm">
                             <thead className="bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
                                 <tr>
-                                    <th className="px-4 py-3">Item</th>
+                                    <th className="sticky left-0 z-[1] bg-surface-2 px-4 py-3">Item</th>
                                     <th className="px-4 py-3">Qty</th>
                                     {isMgmt && <th className="px-4 py-3 text-right">Harga Beli</th>}
                                     <th className="px-4 py-3 text-right">Harga Jual</th>
@@ -60,7 +68,7 @@ export default function Show({ quotation, canReview, role, backHref }) {
                                         : null;
                                     return (
                                         <tr key={line.id}>
-                                            <td className="px-4 py-3"><div className="font-medium text-text">{line.item_name}</div><CategoryBadge category={line.category} /></td>
+                                            <td className="sticky left-0 z-[1] bg-surface w-44 min-w-44 px-4 py-3 sm:w-auto"><div className="font-medium text-text">{line.item_name}</div><CategoryBadge category={line.category} /></td>
                                             <td className="px-4 py-3 text-text-muted">{line.qty} {line.unit}</td>
                                             {isMgmt && <td className="px-4 py-3 text-right text-text-muted">{money(line.cost_price)}</td>}
                                             <td className="px-4 py-3 text-right text-text">{money(line.selling_price)}</td>
@@ -75,9 +83,9 @@ export default function Show({ quotation, canReview, role, backHref }) {
                                     );
                                 })}
                             </tbody>
-                            <Totals totals={quotation.totals} span={isMgmt ? 5 : 3} />
                         </table>
-                    </div>
+                    </TableScroll>
+                    <TotalsSummary totals={quotation.totals} />
                 </section>
 
                 {canReview && (

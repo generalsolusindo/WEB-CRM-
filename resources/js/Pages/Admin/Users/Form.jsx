@@ -1,6 +1,7 @@
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, Field, Input, Select, FormActions } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 export default function Form({ targetUser = null, roleOptions, isSelf = false }) {
     const editing = Boolean(targetUser);
@@ -15,6 +16,7 @@ export default function Form({ targetUser = null, roleOptions, isSelf = false })
 
     function submit(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: editing ? 'User diperbarui' : 'User dibuat', style: 'popup' } });
         editing ? put(`/admin/users/${targetUser.id}`) : post('/admin/users');
     }
 

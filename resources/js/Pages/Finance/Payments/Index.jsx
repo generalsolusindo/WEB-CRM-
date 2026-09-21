@@ -28,7 +28,7 @@ export default function Index({ payments }) {
                 ? <span className="badge badge-success">{p.proof_count} bukti</span>
                 : <span className="badge badge-warning">Belum ada</span>),
         },
-        { key: 'recorder', label: 'Dicatat oleh', render: (p) => p.recorder?.name ?? '—' },
+        { key: 'recorder', hideBelow: 'md', label: 'Dicatat oleh', render: (p) => p.recorder?.name ?? '—' },
     ];
 
     return (

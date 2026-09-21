@@ -7,7 +7,7 @@ export default function Index({ sows }) {
         { key: 'number', label: 'Nomor', render: (s) => <span className="font-medium text-text">{s.number}</span> },
         { key: 'project_name', label: 'Nama Proyek' },
         { key: 'customer', label: 'Customer', render: (s) => s.customer || '—' },
-        { key: 'submitted_at', label: 'Dikirim', render: (s) => (s.submitted_at ? new Date(s.submitted_at).toLocaleString('id-ID') : '—') },
+        { key: 'submitted_at', hideBelow: 'md', label: 'Dikirim', render: (s) => (s.submitted_at ? new Date(s.submitted_at).toLocaleString('id-ID') : '—') },
     ];
 
     return (

@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, CardHeader, Button, ConfirmDialog, Info, InfoGrid } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
+import TableScroll from '../../../Components/ui/TableScroll';
 
 function money(value) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(value || 0));
@@ -16,6 +18,7 @@ export default function Show({ vendor }) {
 
     function destroyVendor() {
         setDeleting(true);
+        feedback.expect({ success: { title: 'Vendor dihapus', style: 'popup' } });
         router.delete(`/procurement/vendors/${vendor.id}`, {
             onSuccess: () => setDeleteTarget(null),
             onFinish: () => setDeleting(false),
@@ -75,7 +78,7 @@ export default function Show({ vendor }) {
                         title="Surveyor / Teknisi Vendor"
                         actions={<Button href="/procurement/technicians/create" variant="ghost" size="sm" icon={FiPlus}>Tambah akun</Button>}
                     />
-                    <div className="overflow-x-auto">
+                    <TableScroll>
                         <table className="w-full text-left text-sm">
                             <thead>
                                 <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
@@ -95,12 +98,12 @@ export default function Show({ vendor }) {
                                 {(vendor.technicians ?? []).length === 0 && <tr><td colSpan="5" className="px-4 py-8 text-center text-text-muted">Belum ada surveyor/teknisi terdaftar untuk vendor ini.</td></tr>}
                             </tbody>
                         </table>
-                    </div>
+                    </TableScroll>
                 </Card>
 
                 <Card padded={false}>
                     <CardHeader title="Katalog Produk / Jasa" />
-                    <div className="overflow-x-auto">
+                    <TableScroll>
                         <table className="w-full text-left text-sm">
                             <thead>
                                 <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
@@ -127,7 +130,7 @@ export default function Show({ vendor }) {
                                 {vendor.products.length === 0 && <tr><td colSpan="6" className="px-4 py-10 text-center text-text-muted">Belum ada produk.</td></tr>}
                             </tbody>
                         </table>
-                    </div>
+                    </TableScroll>
                 </Card>
             </div>
 

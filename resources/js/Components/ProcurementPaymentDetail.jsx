@@ -1,4 +1,5 @@
 import { Card, CardHeader, Info, InfoGrid } from './ui';
+import TableScroll from './ui/TableScroll';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -63,7 +64,7 @@ export default function ProcurementPaymentDetail({ payment, itemActions }) {
 
             <Card padded={false}>
                 <CardHeader title="Rincian Barang" />
-                <div className="overflow-x-auto">
+                <TableScroll>
                     <table className="w-full text-left text-sm">
                         <thead>
                             <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
@@ -104,7 +105,7 @@ export default function ProcurementPaymentDetail({ payment, itemActions }) {
                             )}
                         </tfoot>
                     </table>
-                </div>
+                </TableScroll>
             </Card>
 
             {payment.request_proofs.length > 0 && (

@@ -1090,6 +1090,102 @@ class QuotationLifecycleTest extends TestCase
         return [$sales, Quotation::with('lines')->firstOrFail()];
     }
 
+    /** Quotation dengan dua item (Router dari PR + Kabel tambahan), keduanya sudah punya harga dari Procurement. */
+    private function quotationWithTwoItems(): array
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $request = $quotation->procurementRequest;
+        $kept = $request->lines()->firstOrFail();
+        $kept->update(['category' => 'material', 'unit' => $kept->unit ?: 'unit']);
+        $extra = $request->lines()->create([
+            'item_name' => 'Kabel Tambahan', 'category' => 'material', 'qty' => 10, 'unit' => 'meter',
+            'cost_price' => 700000, 'availability_status' => 'available',
+        ]);
+        $quotation->lines()->create([
+            'procurement_request_line_id' => $extra->id, 'item_name' => 'Kabel Tambahan', 'category' => 'material',
+            'qty' => 10, 'unit' => 'meter', 'cost_price' => 700000, 'selling_price' => 900000,
+            'discount_percent' => 0, 'discount_amount' => 0, 'markup_percent' => 28.57, 'tax_rate' => 0, 'subtotal' => 9000000,
+        ]);
+
+        return [$sales, $quotation->fresh(), $kept, $extra];
+    }
+
+    private function scopeLine($line, array $override = []): array
+    {
+        return array_merge([
+            'procurement_request_line_id' => $line->id, 'item_name' => $line->item_name, 'description' => $line->description,
+            'qty' => $line->qty, 'unit' => $line->unit, 'category' => $line->category,
+        ], $override);
+    }
+
+    public function test_revisi_kebutuhan_is_available_for_a_draft_that_was_never_rejected(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+
+        $this->assertNull($quotation->pm_review_status);
+        $this->actingAs($sales)->get("/sales/quotations/{$quotation->id}/scope-revision")->assertOk();
+        $this->actingAs($sales)->get("/sales/quotations/{$quotation->id}/edit")
+            ->assertInertia(fn ($page) => $page->where('canReviseScope', true));
+    }
+
+    public function test_removing_only_items_applies_immediately_without_procurement(): void
+    {
+        [$sales, $quotation, $kept, $extra] = $this->quotationWithTwoItems();
+        $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
+        $quotation->update(['pm_review_status' => 'approved', 'manager_review_status' => 'approved', 'status' => 'sent']);
+
+        $this->actingAs($sales)->put("/sales/quotations/{$quotation->id}/scope-revision", [
+            'lines' => [$this->scopeLine($kept->fresh())],
+        ])->assertRedirect("/sales/quotations/{$quotation->id}")->assertSessionHas('success');
+
+        $quotation->refresh();
+        $this->assertSame('ready', $quotation->procurementRequest->status);
+        $this->assertSame('draft', $quotation->status);
+        $this->assertNull($quotation->pm_review_status);
+        $this->assertNull($quotation->manager_review_status);
+        $this->assertSame(1, $quotation->lines()->count());
+        $this->assertDatabaseMissing('procurement_request_lines', ['id' => $extra->id]);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $procurement->id, 'type' => 'procurement_request.recost_requested']);
+    }
+
+    public function test_adding_an_item_goes_to_procurement_for_costing(): void
+    {
+        [$sales, $quotation, $kept] = $this->quotationWithTwoItems();
+        $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
+
+        $this->actingAs($sales)->put("/sales/quotations/{$quotation->id}/scope-revision", [
+            'lines' => [
+                $this->scopeLine($kept->fresh()),
+                ['procurement_request_line_id' => null, 'item_name' => 'Jasa Instalasi', 'description' => null, 'qty' => 1, 'unit' => 'lot', 'category' => 'service'],
+            ],
+        ])->assertRedirect();
+
+        $this->assertSame('submitted', $quotation->procurementRequest->fresh()->status);
+        $this->assertDatabaseHas('procurement_request_lines', ['item_name' => 'Jasa Instalasi', 'cost_price' => 0, 'availability_status' => 'searching']);
+        $this->assertDatabaseHas('notifications', ['user_id' => $procurement->id, 'type' => 'procurement_request.recost_requested']);
+    }
+
+    public function test_scope_revision_without_any_change_is_rejected(): void
+    {
+        [$sales, $quotation, $kept, $extra] = $this->quotationWithTwoItems();
+
+        $this->actingAs($sales)->put("/sales/quotations/{$quotation->id}/scope-revision", [
+            'lines' => [$this->scopeLine($kept->fresh()), $this->scopeLine($extra->fresh())],
+        ])->assertSessionHasErrors('lines');
+    }
+
+    public function test_scope_revision_is_blocked_after_sales_order_and_for_other_sales(): void
+    {
+        [$sales, $quotation, $kept] = $this->quotationWithTwoItems();
+        $other = User::factory()->create(['role' => 'sales']);
+
+        $this->actingAs($other)->get("/sales/quotations/{$quotation->id}/scope-revision")->assertForbidden();
+
+        $quotation->update(['status' => 'sent']);
+        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload('material_only'));
+        $this->actingAs($sales)->get("/sales/quotations/{$quotation->id}/scope-revision")->assertForbidden();
+    }
+
     /** @return array{User, SalesOrder} */
     private function confirmedSalesOrder(string $orderType): array
     {

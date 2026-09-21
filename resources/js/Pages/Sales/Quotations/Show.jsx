@@ -4,6 +4,9 @@ import { FiPrinter, FiEdit2, FiSend, FiCheck, FiX, FiCopy, FiTrash2, FiHash, FiR
 import AppLayout from '../../../Layouts/AppLayout';
 import CategoryBadge from '../../../Components/CategoryBadge';
 import { PageHeader, Card, CardHeader, Button, ConfirmDialog, Field, Info, InfoGrid, Modal, PromptDialog, StatusBadge, Textarea } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
+import TableScroll from '../../../Components/ui/TableScroll';
+import TotalsSummary from '../../../Components/ui/TotalsSummary';
 
 export default function Show({ quotation, history, totals, permissions, customerHasWhatsapp = false }) {
     const number = quotation.number ?? `QT-${String(quotation.id).padStart(6, '0')} / R${quotation.revision_number}`;
@@ -45,6 +48,7 @@ export default function Show({ quotation, history, totals, permissions, customer
         if (!confirmation) return;
         setActionProcessing(true);
         const method = confirmation.method ?? 'post';
+        feedback.expect({ success: { style: 'popup', ...confirmation.success } });
         router[method](confirmation.path, confirmation.data ?? {}, {
             preserveScroll: true,
             onSuccess: () => setConfirmation(null),
@@ -60,6 +64,7 @@ export default function Show({ quotation, history, totals, permissions, customer
             tone: 'danger',
             method: 'delete',
             path: `/sales/quotations/${quotation.id}`,
+            success: { title: 'Draft quotation dihapus' },
         });
     }
 
@@ -82,6 +87,7 @@ export default function Show({ quotation, history, totals, permissions, customer
 
     function cancelTransaction(event) {
         event.preventDefault();
+        feedback.expect({ success: { title: 'Transaksi dibatalkan', style: 'popup' } });
         cancelForm.post(`/sales/quotations/${quotation.id}/cancel`, {
             preserveScroll: true,
             onSuccess: closeCancellation,
@@ -117,10 +123,10 @@ export default function Show({ quotation, history, totals, permissions, customer
                                     {quotation.whatsapp_sent_at ? 'Kirim Ulang via WhatsApp' : 'Kirim via WhatsApp'}
                                 </Button>
                             )}
-                            {permissions.send && <Button onClick={() => askAction({ title: 'Tandai quotation sebagai terkirim?', description: 'Status quotation akan diperbarui menjadi sudah dikirim ke customer.', confirmLabel: 'Tandai Terkirim', tone: 'info', path: `/sales/quotations/${quotation.id}/send` })} icon={FiSend}>Tandai Terkirim</Button>}
+                            {permissions.send && <Button onClick={() => askAction({ title: 'Tandai quotation sebagai terkirim?', description: 'Status quotation akan diperbarui menjadi sudah dikirim ke customer.', confirmLabel: 'Tandai Terkirim', tone: 'info', path: `/sales/quotations/${quotation.id}/send`, success: { title: 'Quotation ditandai terkirim' } })} icon={FiSend}>Tandai Terkirim</Button>}
                             {permissions.confirm && <Button href={`/sales/quotations/${quotation.id}/confirm`} icon={FiCheck}>Confirm Deal</Button>}
-                            {permissions.reject && <Button onClick={() => askAction({ title: 'Tandai quotation sebagai ditolak?', description: 'Status quotation akan berubah menjadi ditolak oleh customer.', confirmLabel: 'Tandai Ditolak', tone: 'danger', path: `/sales/quotations/${quotation.id}/reject` })} variant="ghost" icon={FiX} className="text-danger hover:bg-danger-soft hover:text-danger">Tandai Ditolak</Button>}
-                            {permissions.revise && <Button onClick={() => askAction({ title: 'Buat revisi quotation?', description: 'Sistem akan membuat revisi baru berdasarkan data quotation ini.', confirmLabel: 'Buat Revisi', tone: 'info', path: `/sales/quotations/${quotation.id}/revisions` })} variant="outline" icon={FiCopy}>Buat Revisi</Button>}
+                            {permissions.reject && <Button onClick={() => askAction({ title: 'Tandai quotation sebagai ditolak?', description: 'Status quotation akan berubah menjadi ditolak oleh customer.', confirmLabel: 'Tandai Ditolak', tone: 'danger', path: `/sales/quotations/${quotation.id}/reject`, success: { title: 'Quotation ditandai ditolak' } })} variant="ghost" icon={FiX} className="text-danger hover:bg-danger-soft hover:text-danger">Tandai Ditolak</Button>}
+                            {permissions.revise && <Button onClick={() => askAction({ title: 'Buat revisi quotation?', description: 'Sistem akan membuat revisi baru berdasarkan data quotation ini.', confirmLabel: 'Buat Revisi', tone: 'info', path: `/sales/quotations/${quotation.id}/revisions`, success: { title: 'Revisi quotation dibuat' } })} variant="outline" icon={FiCopy}>Buat Revisi</Button>}
                             {permissions.cancel && <Button onClick={() => setCancelOpen(true)} variant="ghost" icon={FiX} className="text-danger hover:bg-danger-soft hover:text-danger">Batalkan Transaksi</Button>}
                             {permissions.delete && <Button onClick={askDestroy} variant="ghost" icon={FiTrash2} className="text-danger hover:bg-danger-soft hover:text-danger">Hapus</Button>}
                         </>
@@ -226,11 +232,11 @@ export default function Show({ quotation, history, totals, permissions, customer
                 {quotation.status === 'draft' && <ReviewGate quotation={quotation} />}
 
                 <Card padded={false}>
-                    <div className="overflow-x-auto">
+                    <TableScroll>
                         <table className="w-full text-left text-sm">
                             <thead>
                                 <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
-                                    <th className="px-4 py-3">Item</th>
+                                    <th className="sticky left-0 z-[1] bg-surface-2 px-4 py-3">Item</th>
                                     <th className="px-4 py-3">Qty</th>
                                     <th className="px-4 py-3 text-right">Cost</th>
                                     <th className="px-4 py-3 text-right">Selling</th>
@@ -246,12 +252,12 @@ export default function Show({ quotation, history, totals, permissions, customer
                                     {(pos === 0 || (orderedLines[pos - 1].category === 'material') !== (line.category === 'material')) && (
                                         <tr className="bg-surface-2">
                                             <td colSpan="8" className="px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
-                                                {line.category === 'material' ? 'Material' : 'Jasa'}
+                                                <span className="sticky left-0 inline-block">{line.category === 'material' ? 'Material' : 'Jasa'}</span>
                                             </td>
                                         </tr>
                                     )}
                                     <tr>
-                                        <td className="px-4 py-3.5">
+                                        <td className="sticky left-0 z-[1] bg-surface w-44 min-w-44 px-4 py-3.5 sm:w-auto">
                                             <div className="font-medium text-text">{line.item_name}</div>
                                             <div className="whitespace-pre-line text-xs text-text-muted">{line.description || '—'}<CategoryBadge category={line.category} /></div>
                                             {line.sourcing_note && <div className="mt-0.5 text-[11px] italic text-text-muted">Opsi: {line.sourcing_note}</div>}
@@ -270,9 +276,9 @@ export default function Show({ quotation, history, totals, permissions, customer
                                   </Fragment>
                                 ))}
                             </tbody>
-                            <Totals totals={totals} span={7} />
                         </table>
-                    </div>
+                    </TableScroll>
+                    <TotalsSummary totals={totals} />
                 </Card>
 
                 <Card>
@@ -320,27 +326,6 @@ function ReviewGate({ quotation }) {
             : 'border-warning/25 bg-warning-soft text-warning';
 
     return <div className={`rounded-xl border p-4 text-sm font-medium ${tone}`}>{message}</div>;
-}
-
-export function Totals({ totals, span }) {
-    return (
-        <tfoot className="border-t border-border bg-surface-2 text-text">
-            <tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">Subtotal Bruto</td><td className="px-4 py-2 text-right font-medium tabular-nums">{money(totals.gross)}</td></tr>
-            <tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">Total Diskon{Number(totals.discount) > 0 ? ` (${totals.discount_percent}%)` : ''}</td><td className="px-4 py-2 text-right font-medium tabular-nums text-danger">{Number(totals.discount) > 0 ? `− ${money(totals.discount)}` : money(0)}</td></tr>
-            <tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">DPP</td><td className="px-4 py-2 text-right font-medium tabular-nums">{money(totals.subtotal)}</td></tr>
-            <tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">Total PPN</td><td className="px-4 py-2 text-right font-medium tabular-nums">{money(totals.tax)}</td></tr>
-            <tr><td colSpan={span} className="px-4 py-4 text-right font-semibold">Grand Total</td><td className="px-4 py-4 text-right text-lg font-bold tabular-nums">{money(totals.grand_total)}</td></tr>
-            {Number(totals.pph23_estimate) > 0 && (
-                <>
-                    <tr><td colSpan={span} className="px-4 py-1.5 text-right text-xs text-text-muted">Estimasi PPh 23 (2%) — jika customer memotong</td><td className="px-4 py-1.5 text-right text-xs font-medium tabular-nums text-warning">− {money(totals.pph23_estimate)}</td></tr>
-                    <tr><td colSpan={span} className="px-4 py-1.5 text-right text-xs text-text-muted">Estimasi diterima tunai</td><td className="px-4 py-1.5 text-right text-xs font-medium tabular-nums">{money(Number(totals.grand_total) - Number(totals.pph23_estimate))}</td></tr>
-                </>
-            )}
-            {totals.margin_percent != null && (
-                <tr><td colSpan={span} className="px-4 py-2 text-right text-text-muted">Estimasi margin keseluruhan</td><td className={`px-4 py-2 text-right font-medium tabular-nums ${Number(totals.margin_percent) < 0 ? 'text-danger' : 'text-success'}`}>{money(totals.margin_amount)} ({totals.margin_percent}%)</td></tr>
-            )}
-        </tfoot>
-    );
 }
 
 export function money(value) {

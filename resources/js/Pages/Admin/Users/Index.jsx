@@ -27,7 +27,7 @@ export default function Index({ users, filters, roleOptions }) {
                 </span>
             ),
         },
-        { key: 'username', label: 'Username', render: (u) => <span className="text-text-muted">{u.username}</span> },
+        { key: 'username', hideBelow: 'md', label: 'Username', render: (u) => <span className="text-text-muted">{u.username}</span> },
         { key: 'role', label: 'Role', render: (u) => <span className="badge badge-neutral">{u.role_label}</span> },
         {
             key: 'status',

@@ -2,6 +2,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { pickFile, pickFiles } from '../../../utils/fileValidation';
 import { PageHeader } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 export default function Show({ task, project, photos, statusOptions, canWork, checkedIn, canCheckIn, selfieUrl, checkedOut, canCheckOut, checkoutSelfieUrl }) {
     const before = photos.filter((p) => p.category === 'task_before');
@@ -22,12 +23,14 @@ export default function Show({ task, project, photos, statusOptions, canWork, ch
     }
     function checkIn(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: 'Absen kehadiran tersimpan', style: 'popup' } });
         checkInForm.post(`/technician/projects/${project.id}/checkin`, {
             forceFormData: true, preserveScroll: true, onSuccess: () => checkInForm.reset('photo'),
         });
     }
     function checkOut(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: 'Absen pulang tersimpan', style: 'popup' } });
         checkOutForm.post(`/technician/projects/${project.id}/checkout`, {
             forceFormData: true, preserveScroll: true, onSuccess: () => checkOutForm.reset('photo'),
         });

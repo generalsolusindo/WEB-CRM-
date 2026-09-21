@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { FiFileText } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, PillTabs, Toolbar, FilterSelect, DataTable, StatusBadge, Pagination, EmptyState, Button, ConfirmDialog } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -23,6 +24,7 @@ export default function Index({ needsInvoice, readyForFinal = [], invoices, filt
     function createFinal() {
         if (!finalTarget) return;
         setCreatingFinal(true);
+        feedback.expect({ success: { title: 'Invoice pelunasan dibuat', style: 'popup' } });
         router.post(`/finance/sales-orders/${finalTarget.id}/final-invoice`, {}, {
             onSuccess: () => setFinalTarget(null),
             onFinish: () => setCreatingFinal(false),
@@ -37,7 +39,7 @@ export default function Index({ needsInvoice, readyForFinal = [], invoices, filt
     const needsCols = [
         { key: 'number', label: 'Sales Order', render: (so) => <span className="font-semibold text-text">{so.number}</span> },
         { key: 'customer', label: 'Customer', render: (so) => <span className="text-text-muted">{so.customer}</span> },
-        { key: 'order_type', label: 'Tipe', render: (so) => <span className="text-text-muted capitalize">{String(so.order_type).replace('_', ' ')}</span> },
+        { key: 'order_type', hideBelow: 'md', label: 'Tipe', render: (so) => <span className="text-text-muted capitalize">{String(so.order_type).replace('_', ' ')}</span> },
         { key: 'total', label: 'Nilai SO', align: 'right', render: (so) => <span className="tabular-nums text-text-muted">{money(so.total)}</span> },
         { key: 'act', label: '', align: 'right', render: (so) => <Button size="sm" variant="outline" href={`/finance/sales-orders/${so.id}/invoices/create`}>Buat Invoice</Button> },
     ];
@@ -52,7 +54,7 @@ export default function Index({ needsInvoice, readyForFinal = [], invoices, filt
             ),
         },
         { key: 'customer', label: 'Customer', render: (inv) => <span className="text-text-muted">{inv.sales_order.contact?.name ?? '—'}</span> },
-        { key: 'phase', label: 'Fase', render: (inv) => <span className="uppercase text-text-muted">{inv.invoice_phase}</span> },
+        { key: 'phase', hideBelow: 'md', label: 'Fase', render: (inv) => <span className="uppercase text-text-muted">{inv.invoice_phase}</span> },
         {
             key: 'status', label: 'Status',
             render: (inv) => <StatusBadge status={inv.status} label={statusOptions.find((s) => s.value === inv.status)?.label} />,

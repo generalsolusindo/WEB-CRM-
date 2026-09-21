@@ -49,7 +49,7 @@ export default function Index({ projects, filters, statusOptions, role }) {
                 ? <span className={`badge ${p.material_status.is_complete ? 'badge-success' : 'badge-warning'}`}>{p.material_status.complete}/{p.material_status.total} lengkap</span>
                 : '—'),
         },
-        ...(isMgmt ? [{ key: 'delegated', label: 'Didelegasikan ke', render: (p) => p.delegated_to || '—' }] : []),
+        ...(isMgmt ? [{ key: 'delegated', hideBelow: 'md', label: 'Didelegasikan ke', render: (p) => p.delegated_to || '—' }] : []),
     ];
 
     return (

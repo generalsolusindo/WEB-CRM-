@@ -29,8 +29,8 @@ export default function Index({ leads, filters, stageOptions, sourceOptions = []
         },
         { key: 'type', label: 'Tipe', render: (l) => <StatusBadge status={l.type} /> },
         { key: 'stage', label: 'Stage', render: (l) => <span className="text-text-muted">{stageOptions.find((s) => s.value === l.stage)?.label ?? l.stage}</span> },
-        { key: 'source', label: 'Source', render: (l) => <span className="text-text-muted">{sourceOptions.find((s) => s.value === l.source)?.label ?? (l.source || '—')}</span> },
-        { key: 'requirements_count', label: 'Requirement', align: 'right', render: (l) => <span className="tabular-nums text-text-muted">{l.requirements_count}</span> },
+        { key: 'source', hideBelow: 'md', label: 'Source', render: (l) => <span className="text-text-muted">{sourceOptions.find((s) => s.value === l.source)?.label ?? (l.source || '—')}</span> },
+        { key: 'requirements_count', hideBelow: 'md', label: 'Requirement', align: 'right', render: (l) => <span className="tabular-nums text-text-muted">{l.requirements_count}</span> },
     ];
 
     return (

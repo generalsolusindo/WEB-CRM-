@@ -1,6 +1,6 @@
 import { Head } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader } from '../../../Components/ui';
+import { PageHeader, TableScroll } from '../../../Components/ui';
 import { feedback } from '../../../Components/feedback';
 
 export default function Show({ deliveryNote: dn, canReceive }) {
@@ -34,17 +34,19 @@ export default function Show({ deliveryNote: dn, canReceive }) {
 
                 <section className="card overflow-hidden p-0">
                     <div className="border-b border-border p-5"><h2 className="font-semibold text-text">Barang Dikirim</h2></div>
-                    <table className="w-full table-fixed text-left text-sm">
+                    <TableScroll label="Barang dikirim">
+                    <table className="w-full text-left text-sm">
                         <thead className="bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint"><tr><th className="px-4 py-3">Item</th><th className="px-4 py-3 text-right">Qty Dikirim</th></tr></thead>
                         <tbody className="divide-y divide-border">
                             {dn.lines.map((l, i) => (
                                 <tr key={i}>
-                                    <td className="px-4 py-3 text-text">{l.item_name}</td>
-                                    <td className="px-4 py-3 text-right text-text">{l.qty_delivered} {l.unit}</td>
+                                    <td className="min-w-40 break-words px-4 py-3 text-text">{l.item_name}</td>
+                                    <td className="whitespace-nowrap px-4 py-3 text-right text-text">{l.qty_delivered} {l.unit}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+                    </TableScroll>
                 </section>
 
                 {dn.status === 'received' ? (

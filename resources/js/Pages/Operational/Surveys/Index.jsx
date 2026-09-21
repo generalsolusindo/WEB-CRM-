@@ -6,7 +6,7 @@ export default function Index({ surveys }) {
     const columns = [
         { key: 'code', label: 'Kode', render: (s) => <span className="font-medium text-text">{s.code}{s.revision > 1 ? ` · rev.${s.revision}` : ''}</span> },
         { key: 'customer', label: 'Customer', render: (s) => s.customer || '—' },
-        { key: 'site_region', label: 'Lokasi' },
+        { key: 'site_region', hideBelow: 'md', label: 'Lokasi' },
         { key: 'surveyor', label: 'Surveyor', render: (s) => s.surveyor || '—' },
         { key: 'status', label: 'Status', render: (s) => <StatusBadge status={s.status} label={s.status_label} /> },
     ];

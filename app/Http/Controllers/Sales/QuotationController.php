@@ -206,6 +206,7 @@ class QuotationController extends Controller
             'quotation' => $quotation,
             'taxes' => $this->activeTaxes(),
             'unitOptions' => Requirement::UNITS,
+            'canReviseScope' => request()->user()->can('reviseScope', $quotation),
         ]);
     }
 
@@ -228,10 +229,13 @@ class QuotationController extends Controller
         Quotation $quotation,
         RequestQuotationRecost $action,
     ): RedirectResponse {
-        $action->handle($quotation, $request->validated('lines'));
+        $updated = $action->handle($quotation, $request->validated('lines'));
+        $sentToProcurement = $updated->procurementRequest()->value('status') !== 'ready';
 
         return redirect()->route('sales.quotations.show', $quotation)
-            ->with('success', 'Revisi kebutuhan dikirim ke Procurement untuk costing ulang.');
+            ->with('success', $sentToProcurement
+                ? 'Revisi kebutuhan dikirim ke Procurement untuk costing ulang.'
+                : 'Item dihapus dari quotation. Review PM/Manager perlu diulang.');
     }
 
     /** @return Collection<int, Tax> */

@@ -3,13 +3,20 @@ import { useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
 import ProcurementPaymentDetail from '../../../Components/ProcurementPaymentDetail';
 import { PageHeader, Card, Button, StatusBadge } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 export default function Show({ payment, canReview }) {
     const form = useForm({ approved: true, notes: '' });
     const [action, setAction] = useState(null);
 
-    function submit(approved) {
+    async function submit(approved) {
+        const ok = await feedback.confirm(approved
+            ? { tone: 'question', title: 'Setujui pengajuan pembayaran?', text: `${payment.number} akan diteruskan ke Finance untuk dibayar.`, confirmLabel: 'Ya, setujui' }
+            : { tone: 'danger', title: 'Tolak pengajuan pembayaran?', text: `${payment.number} akan dikembalikan ke Procurement untuk diperbaiki. Pastikan catatan penolakan sudah diisi.`, confirmLabel: 'Ya, tolak' });
+        if (!ok) return;
+
         setAction(approved ? 'approve' : 'reject');
+        feedback.expect({ success: { title: approved ? 'Pengajuan disetujui' : 'Pengajuan ditolak', style: 'popup' }, error: { title: 'Gagal memproses pengajuan' } });
         form.transform((data) => ({ ...data, approved }));
         form.post(`/project-manager/procurement-payments/${payment.id}/review`, { preserveScroll: true });
     }

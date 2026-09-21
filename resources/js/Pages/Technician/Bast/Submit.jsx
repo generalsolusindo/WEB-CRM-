@@ -2,13 +2,22 @@ import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { pickFiles } from '../../../utils/fileValidation';
 import { PageHeader } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 export default function Submit({ project }) {
     const allDone = project.tasks.length > 0 && project.tasks.every((t) => t.status === 'done');
     const form = useForm({ notes: '', documents: [] });
 
-    function submit(e) {
+    async function submit(e) {
         e.preventDefault();
+        const ok = await feedback.confirm({
+            tone: 'question',
+            title: 'Kirim BAST?',
+            text: 'BAST dikirim ke Operasional untuk diverifikasi. Setelah dikirim, isinya tidak bisa diubah lagi.',
+            confirmLabel: 'Ya, kirim BAST',
+        });
+        if (!ok) return;
+        feedback.expect({ success: { title: 'BAST terkirim', style: 'popup' }, error: { title: 'BAST belum terkirim' } });
         form.post(`/technician/projects/${project.id}/bast`, { forceFormData: true });
     }
 

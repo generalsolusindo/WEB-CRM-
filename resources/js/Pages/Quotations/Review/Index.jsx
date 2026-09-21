@@ -32,7 +32,7 @@ export default function Index({ quotations, role, filters = {} }) {
             ),
         },
         { key: 'customer', label: 'Customer', render: (q) => q.company || q.customer || '—' },
-        { key: 'sales', label: 'Sales', render: (q) => q.sales },
+        { key: 'sales', hideBelow: 'md', label: 'Sales', render: (q) => q.sales },
         { key: 'status', label: 'Status', render: (q) => <ReviewBadge status={isMgmt ? q.manager_review_status : q.pm_review_status} /> },
     ];
 

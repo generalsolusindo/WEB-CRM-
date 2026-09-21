@@ -12,7 +12,7 @@ export default function Index({ surveys, filters, statusOptions }) {
     const columns = [
         { key: 'code', label: 'Kode', render: (s) => <span className="font-medium text-text">{s.code}</span> },
         { key: 'customer', label: 'Customer', render: (s) => s.customer || '—' },
-        { key: 'site_region', label: 'Lokasi' },
+        { key: 'site_region', hideBelow: 'md', label: 'Lokasi' },
         { key: 'delivery', label: 'Pelaksana', render: (s) => `${s.delivery_mode}${s.billable ? ' · ditagih' : ''}` },
         { key: 'team', label: 'Vendor / Tim', render: (s) => s.vendor || (s.team_count ? `${s.team_count} surveyor` : '—') },
         { key: 'status', label: 'Status', render: (s) => <StatusBadge status={s.status} label={s.status_label} /> },

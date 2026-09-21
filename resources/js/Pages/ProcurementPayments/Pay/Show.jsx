@@ -3,6 +3,7 @@ import AppLayout from '../../../Layouts/AppLayout';
 import ProcurementPaymentDetail from '../../../Components/ProcurementPaymentDetail';
 import { pickFile } from '../../../utils/fileValidation';
 import { PageHeader, Card, Button, StatusBadge } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -38,8 +39,18 @@ function VendorPaySection({ payment, group }) {
         ? form.data.item_ids.filter((x) => x !== id)
         : [...form.data.item_ids, id]);
 
-    function submit(e) {
+    async function submit(e) {
         e.preventDefault();
+        if (form.data.item_ids.length > 0) {
+            const ok = await feedback.confirm({
+                tone: 'question',
+                title: 'Catat pembayaran ke vendor?',
+                text: `${form.data.item_ids.length} item senilai ${money(total)} akan dicatat sebagai sudah ditransfer.`,
+                confirmLabel: 'Ya, sudah ditransfer',
+            });
+            if (!ok) return;
+        }
+        feedback.expect({ success: { title: 'Pembayaran vendor tercatat', style: 'popup' }, error: { title: 'Pembayaran belum tercatat' } });
         form.post(`/finance/procurement-payments/${payment.id}/pay`, {
             forceFormData: true,
             preserveScroll: true,

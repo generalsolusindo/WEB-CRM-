@@ -2,9 +2,11 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { FiFileText, FiSend, FiXCircle, FiHash, FiEdit2 } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
-import { Totals } from '../../Sales/Quotations/Show';
 import { pickFile } from '../../../utils/fileValidation';
 import { PageHeader, Card, CardHeader, Button, ConfirmDialog, Field, Input, Info, InfoGrid, StatusBadge, CurrencyInput, Modal, PromptDialog } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
+import TableScroll from '../../../Components/ui/TableScroll';
+import TotalsSummary from '../../../Components/ui/TotalsSummary';
 
 function money(v) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
@@ -26,6 +28,7 @@ export default function Show({ invoice, payments, cancelledPayments = [], totals
     }
     function cancelPayment(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: 'Pembayaran dibatalkan', style: 'popup' }, error: { title: 'Pembayaran gagal dibatalkan' } });
         cancelForm.post(`/finance/invoices/${invoice.id}/payments/${cancelTarget.id}/cancel`, {
             preserveScroll: true,
             onSuccess: () => {
@@ -67,6 +70,11 @@ export default function Show({ invoice, payments, cancelledPayments = [], totals
 
     function runAction() {
         if (!confirmation) return;
+        feedback.expect({
+            success: confirmation.type === 'cancel'
+                ? { title: 'Invoice dibatalkan', style: 'popup' }
+                : { title: 'Invoice ditandai terkirim', style: 'popup' },
+        });
         setActionProcessing(true);
         router.post(confirmation.url, {}, {
             preserveScroll: true,
@@ -90,8 +98,18 @@ export default function Show({ invoice, payments, cancelledPayments = [], totals
         });
     }
 
-    function submitPayment(e) {
+    async function submitPayment(e) {
         e.preventDefault();
+        if (payForm.data.amount_paid) {
+            const ok = await feedback.confirm({
+                tone: 'question',
+                title: 'Catat pembayaran ini?',
+                text: `${money(payForm.data.amount_paid)} akan dicatat sebagai pembayaran untuk invoice ${invoice.number}.`,
+                confirmLabel: 'Ya, catat pembayaran',
+            });
+            if (!ok) return;
+        }
+        feedback.expect({ success: { title: 'Pembayaran tercatat', style: 'popup' }, error: { title: 'Pembayaran belum tercatat' } });
         payForm.post(`/finance/invoices/${invoice.id}/payments`, {
             forceFormData: true,
             preserveScroll: true,
@@ -216,11 +234,11 @@ export default function Show({ invoice, payments, cancelledPayments = [], totals
                 )}
 
                 <Card padded={false}>
-                    <div className="overflow-x-auto">
+                    <TableScroll>
                         <table className="w-full text-left text-sm">
                             <thead>
                                 <tr className="border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-text-faint">
-                                    <th className="px-4 py-3">Item</th>
+                                    <th className="sticky left-0 z-[1] bg-surface-2 px-4 py-3">Item</th>
                                     <th className="px-4 py-3">Qty</th>
                                     <th className="px-4 py-3 text-right">Harga</th>
                                     <th className="px-4 py-3 text-right">Diskon</th>
@@ -231,7 +249,7 @@ export default function Show({ invoice, payments, cancelledPayments = [], totals
                             <tbody className="divide-y divide-border">
                                 {invoice.lines.map((l) => (
                                     <tr key={l.id}>
-                                        <td className="px-4 py-3.5 font-medium text-text">{l.item_name}</td>
+                                        <td className="sticky left-0 z-[1] bg-surface w-40 min-w-40 px-4 py-3.5 font-medium text-text sm:w-auto">{l.item_name}</td>
                                         <td className="px-4 py-3.5 text-text-muted">{l.qty}</td>
                                         <td className="px-4 py-3.5 text-right tabular-nums text-text-muted">{money(l.unit_price)}</td>
                                         <td className="px-4 py-3.5 text-right tabular-nums text-text-muted">{Number(l.discount_amount) > 0 ? money(l.discount_amount) : '—'}</td>
@@ -240,9 +258,9 @@ export default function Show({ invoice, payments, cancelledPayments = [], totals
                                     </tr>
                                 ))}
                             </tbody>
-                            <Totals totals={totals} span={5} />
                         </table>
-                    </div>
+                    </TableScroll>
+                    <TotalsSummary totals={totals} />
                 </Card>
 
                 <Card>

@@ -1,12 +1,14 @@
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, StatusBadge, StageStepper } from '../../../Components/ui';
+import { feedback } from '../../../Components/feedback';
 
 export default function Show({ project, canDelegate, projectManagerOptions = [] }) {
     const delegateForm = useForm({ project_manager_id: project.delegated_to?.id ?? '' });
 
     function submitDelegate(e) {
         e.preventDefault();
+        feedback.expect({ success: { title: 'Delegasi project diperbarui', style: 'popup' } });
         delegateForm.put(`/management/projects/${project.id}/delegate`, { preserveScroll: true });
     }
 
