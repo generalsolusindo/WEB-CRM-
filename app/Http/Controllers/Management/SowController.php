@@ -3,11 +3,12 @@
 namespace App\Http\Controllers\Management;
 
 use App\Actions\Sow\SignSow;
+use App\Enums\SowStatus;
 use App\Http\Controllers\Concerns\BuildsSowReview;
 use App\Http\Controllers\Concerns\NormalizesDateRangeFilter;
 use App\Http\Controllers\Controller;
 use App\Models\Sow;
-use App\Services\AdministratorSignature;
+use App\Services\UserSignature;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -30,7 +31,7 @@ class SowController extends Controller
         ]));
 
         $sows = Sow::query()
-            ->where('status', \App\Enums\SowStatus::PendingDirectorSignature->value)
+            ->where('status', SowStatus::PendingDirectorSignature->value)
             ->whereHas('project', fn ($q) => $q->whereNull('delegated_to'))
             ->with('project.salesOrder.contact:id,name')
             ->when($filters['from'] ?? null, fn ($query, $from) => $query->whereDate('created_at', '>=', $from))
@@ -61,11 +62,11 @@ class SowController extends Controller
         ]);
     }
 
-    public function sign(Sow $sow, SignSow $action, AdministratorSignature $administratorSignature): RedirectResponse
+    public function sign(Sow $sow, SignSow $action, UserSignature $userSignature): RedirectResponse
     {
         Gate::authorize('signAsDirector', $sow);
 
-        $action->handle($sow, request()->user(), 'director', $administratorSignature->dataUrl());
+        $action->handle($sow, request()->user(), 'director', $userSignature->dataUrl(request()->user()));
 
         return redirect()->route('management.sows.index')->with('success', 'SOW berhasil ditanda tangani — dokumen selesai.');
     }

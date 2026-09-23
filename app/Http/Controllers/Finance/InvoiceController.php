@@ -8,6 +8,7 @@ use App\Actions\Finance\UpdateInvoice;
 use App\Enums\InvoicePhase;
 use App\Enums\InvoiceStatus;
 use App\Enums\OrderType;
+use App\Enums\SurveyStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Finance\StoreInvoiceRequest;
 use App\Http\Requests\Finance\UpdateInvoiceNumberRequest;
@@ -15,8 +16,12 @@ use App\Http\Requests\Finance\UpdateInvoiceRequest;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\SalesOrder;
+use App\Services\Sales\CustomerApprovalDocs;
+use App\Services\Sales\DocumentTotals;
 use App\Services\Sales\SalesOrderSettlement;
+use App\Services\Sales\SalesOrderWinNotifier;
 use App\Services\Whatsapp\WhatsappGateway;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -25,6 +30,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -95,9 +101,11 @@ class InvoiceController extends Controller
 
         $salesOrder->load(['contact:id,name,company_name,email,phone,address,npwp', 'lines.tax:id,name,rate']);
 
-        $allowedPhase = $salesOrder->order_type === OrderType::MaterialOnly->value
-            ? InvoicePhase::Full
-            : InvoicePhase::Dp;
+        // Material Only cuma boleh Full. Order jasa/campuran boleh DP atau Full — Finance yang
+        // pilih manual sesuai kondisi riil (lihat catatan di CreateInvoice::handle).
+        $allowedPhases = $salesOrder->order_type === OrderType::MaterialOnly->value
+            ? [InvoicePhase::Full]
+            : [InvoicePhase::Dp, InvoicePhase::Full];
 
         $alreadyInvoiced = $salesOrder->invoices()
             ->whereIn('invoice_phase', [InvoicePhase::Dp->value, InvoicePhase::Full->value])
@@ -108,15 +116,15 @@ class InvoiceController extends Controller
 
         return Inertia::render('Finance/Invoices/Create', [
             'salesOrder' => $salesOrder,
-            'allowedPhase' => ['value' => $allowedPhase->value, 'label' => $allowedPhase->label()],
-            'isDp' => $allowedPhase === InvoicePhase::Dp,
+            'allowedPhases' => array_map(fn (InvoicePhase $p) => ['value' => $p->value, 'label' => $p->label()], $allowedPhases),
+            'defaultPhase' => $allowedPhases[0]->value,
             'defaultDpPercent' => 50,
             'agreedDpp' => $salesOrder->agreed_dpp !== null ? (float) $salesOrder->agreed_dpp : null,
             'currentPpnRate' => $lineRates->count() === 1 ? $lineRates->first() : null,
             'hasServiceLine' => $salesOrder->lines->contains('category', 'service'),
             'defaultPph23Rate' => 2,
             'alreadyInvoiced' => $alreadyInvoiced,
-            'approvalDocs' => \App\Services\Sales\CustomerApprovalDocs::of($salesOrder),
+            'approvalDocs' => CustomerApprovalDocs::of($salesOrder),
         ]);
     }
 
@@ -228,7 +236,7 @@ class InvoiceController extends Controller
                     'reason' => $payment->cancellation_reason,
                 ]),
             'totals' => [
-                ...\App\Services\Sales\DocumentTotals::of($invoice->lines),
+                ...DocumentTotals::of($invoice->lines),
                 'grand_total' => $invoice->grandTotal(),
                 'subtotal' => (float) $invoice->amount,
                 'tax' => (float) $invoice->tax_amount,
@@ -269,7 +277,7 @@ class InvoiceController extends Controller
         ]);
     }
 
-    public function print(Invoice $invoice): \Illuminate\View\View
+    public function print(Invoice $invoice): View
     {
         Gate::authorize('view', $invoice);
 
@@ -281,14 +289,14 @@ class InvoiceController extends Controller
     {
         Gate::authorize('view', $invoice);
 
-        return \Barryvdh\DomPDF\Facade\Pdf::loadView('finance.invoices.print', $this->printData($invoice, forPdf: true))
+        return Pdf::loadView('finance.invoices.print', $this->printData($invoice, forPdf: true))
             ->stream($this->pdfFilename($invoice));
     }
 
     /** Unduhan publik lewat tautan bertanda tangan (dipakai di pesan WhatsApp ke customer). */
     public function downloadPdf(Invoice $invoice): \Illuminate\Http\Response
     {
-        return \Barryvdh\DomPDF\Facade\Pdf::loadView('finance.invoices.print', $this->printData($invoice, forPdf: true))
+        return Pdf::loadView('finance.invoices.print', $this->printData($invoice, forPdf: true))
             ->stream($this->pdfFilename($invoice));
     }
 
@@ -343,7 +351,7 @@ class InvoiceController extends Controller
             'reference' => $reference,
             'forPdf' => $forPdf,
             'totals' => [
-                ...\App\Services\Sales\DocumentTotals::of($invoice->lines),
+                ...DocumentTotals::of($invoice->lines),
                 'grand_total' => $invoice->grandTotal(),
                 'subtotal' => (float) $invoice->amount,
                 'tax' => (float) $invoice->tax_amount,
@@ -468,7 +476,7 @@ class InvoiceController extends Controller
         return back()->with('whatsappUrl', $whatsapp->link($number, $message));
     }
 
-    public function updatePph23(Request $request, Invoice $invoice, \App\Services\Sales\SalesOrderWinNotifier $winNotifier): RedirectResponse
+    public function updatePph23(Request $request, Invoice $invoice, SalesOrderWinNotifier $winNotifier): RedirectResponse
     {
         Gate::authorize('managePph23', $invoice);
 
@@ -566,7 +574,7 @@ class InvoiceController extends Controller
             // Invoice survey dibatalkan -> kembalikan survey agar Finance bisa terbitkan ulang / catat biaya.
             if ($invoice->isSurvey()) {
                 $invoice->loadMissing('survey');
-                $invoice->survey?->update(['status' => \App\Enums\SurveyStatus::FinanceReview->value]);
+                $invoice->survey?->update(['status' => SurveyStatus::FinanceReview->value]);
             }
         });
 

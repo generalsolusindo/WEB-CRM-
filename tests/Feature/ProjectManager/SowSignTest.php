@@ -25,12 +25,8 @@ class SowSignTest extends TestCase
     private function pendingDirectorSignatureSow(?User $pm = null): Sow
     {
         Storage::fake('local');
-        User::factory()->create([
-            'role' => 'administrator', 'is_active' => true,
-            'signature_path' => UploadedFile::fake()->image('sig.png')->store('administrator-signatures'),
-        ]);
 
-        $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
+        $ops = User::factory()->create(['role' => 'operational', 'is_active' => true, 'signature_path' => UploadedFile::fake()->image('sig-ops.png')->store('user-signatures')]);
         $sales = User::factory()->create(['role' => 'sales']);
         $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
         $lead = Lead::create(['contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified']);
@@ -84,6 +80,8 @@ class SowSignTest extends TestCase
         $pm = User::factory()->create(['role' => 'project_manager', 'is_active' => true]);
         $otherPm = User::factory()->create(['role' => 'project_manager', 'is_active' => true]);
         $sow = $this->pendingDirectorSignatureSow($pm);
+        // Diisi setelah helper (yang mem-fake storage) berjalan, supaya file tidak ikut terhapus oleh Storage::fake() di dalamnya.
+        $pm->update(['signature_path' => UploadedFile::fake()->image('sig-pm.png')->store('user-signatures')]);
 
         $this->assertSame('pending_director_signature', $sow->status);
 
@@ -106,6 +104,7 @@ class SowSignTest extends TestCase
         $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
         $pm = User::factory()->create(['role' => 'project_manager', 'is_active' => true]);
         $sow = $this->pendingDirectorSignatureSow(null);
+        $management->update(['signature_path' => UploadedFile::fake()->image('sig-mgmt.png')->store('user-signatures')]);
 
         $this->actingAs($pm)->post("/project-manager/sows/{$sow->id}/sign")->assertForbidden();
 

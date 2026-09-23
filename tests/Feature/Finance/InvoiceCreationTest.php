@@ -62,10 +62,41 @@ class InvoiceCreationTest extends TestCase
         $this->assertSame('143000.00', $invoice->tax_amount);
     }
 
+    /**
+     * Order jasa/campuran biasanya DP (pekerjaan baru mau dimulai), tapi Finance boleh pilih
+     * Full manual kalau pekerjaan sudah dieksekusi/selesai duluan sebelum sempat ditagih
+     * (mis. addendum yang langsung dikerjakan tanpa lewat penawaran).
+     */
+    public function test_full_invoice_can_be_chosen_manually_for_mixed_order(): void
+    {
+        $finance = $this->finance();
+        $so = $this->confirmedSalesOrder('mixed');
+
+        $this->actingAs($finance)->get("/finance/sales-orders/{$so->id}/invoices/create")
+            ->assertInertia(fn ($page) => $page
+                ->where('allowedPhases', [['value' => 'dp', 'label' => 'DP 50%'], ['value' => 'full', 'label' => 'Full 100%']])
+                ->where('defaultPhase', 'dp'));
+
+        $this->actingAs($finance)->post('/finance/invoices', [
+            'sales_order_id' => $so->id,
+            'phase' => 'full',
+        ])->assertRedirect();
+
+        $invoice = Invoice::with('lines')->firstOrFail();
+        $this->assertSame('full', $invoice->invoice_phase);
+        $this->assertSame('2600000.00', $invoice->amount);
+        $this->assertSame('2600000.00', $invoice->lines->first()->subtotal);
+        $this->assertStringNotContainsString('DP', $invoice->lines->first()->item_name);
+        $this->assertNull($so->fresh()->dp_percent);
+    }
+
     public function test_wrong_phase_for_order_type_is_rejected(): void
     {
         $finance = $this->finance();
         $so = $this->confirmedSalesOrder('material_only');
+
+        $this->actingAs($finance)->get("/finance/sales-orders/{$so->id}/invoices/create")
+            ->assertInertia(fn ($page) => $page->where('allowedPhases', [['value' => 'full', 'label' => 'Full 100%']]));
 
         $this->actingAs($finance)->post('/finance/invoices', [
             'sales_order_id' => $so->id,

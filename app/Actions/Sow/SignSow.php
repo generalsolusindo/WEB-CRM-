@@ -14,9 +14,10 @@ use Illuminate\Validation\ValidationException;
  * Menangani keempat tahap tanda tangan digital SOW: Teknisi, PIC Vendor,
  * Operasional (slot "admin"), dan Project Manager (slot "director") — satu
  * action generik supaya urutan status & notifikasi konsisten di satu tempat.
- * Dua slot internal terakhir memakai TTD tersimpan milik Administrator
- * (lihat App\Services\AdministratorSignature), bukan gambar tanda tangan
- * langsung dari penandatangan.
+ * Dua slot internal terakhir memakai TTD tersimpan milik penandatangan sendiri
+ * (lihat App\Services\UserSignature, diupload oleh Administrator atas nama
+ * yang bersangkutan), bukan gambar tanda tangan digambar langsung seperti
+ * Teknisi/PIC Vendor.
  */
 class SignSow
 {

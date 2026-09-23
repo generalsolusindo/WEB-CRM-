@@ -11,6 +11,7 @@ use App\Models\SalesOrder;
 use App\Models\User;
 use App\Services\DocumentNumber;
 use App\Services\Notifications\Notify;
+use App\Services\Sales\AgreedDpp;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -24,9 +25,9 @@ class CreateInvoice
      * @param  float|null  $ppnRate  Override tarif PPN untuk seluruh baris Sales Order (0/11/12).
      * @param  bool  $pph23Enabled  Customer memotong PPh 23 atas baris jasa.
      * @param  array<int, array{sales_order_line_id?: int|null, item_name: string, category: string, qty: float, unit_price: float, discount_amount?: float|null, tax_rate?: float|null}>|null  $lines
-     *         Baris invoice yang di-edit/ditambah/dihapus manual oleh Finance — kalau diisi, menggantikan
-     *         perhitungan otomatis dari baris Sales Order (dan mengabaikan $agreedDpp/$ppnRate). Hanya
-     *         berlaku untuk invoice ini, tidak menimpa data Sales Order/Quotation aslinya.
+     *                                                                                                                                                                                                  Baris invoice yang di-edit/ditambah/dihapus manual oleh Finance — kalau diisi, menggantikan
+     *                                                                                                                                                                                                  perhitungan otomatis dari baris Sales Order (dan mengabaikan $agreedDpp/$ppnRate). Hanya
+     *                                                                                                                                                                                                  berlaku untuk invoice ini, tidak menimpa data Sales Order/Quotation aslinya.
      * @param  string|null  $notes  Catatan Finance menjelaskan alasan perubahan (opsional).
      */
     public function handle(
@@ -49,9 +50,13 @@ class CreateInvoice
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $allowedPhase = $order->order_type === OrderType::MaterialOnly->value
-                ? InvoicePhase::Full
-                : InvoicePhase::Dp;
+            // Material Only selalu Full (barang ditagih penuh saat dikirim, tidak ada konsep uang muka).
+            // Order jasa/campuran bebas dipilih Finance: DP (default, pekerjaan baru mau dikerjakan) atau
+            // Full (mis. addendum yang sudah dieksekusi/selesai duluan sebelum sempat ditagih) — Finance
+            // yang paling tahu kondisi riil di lapangan, sistem tidak memaksakan satu aturan baku.
+            $allowedPhases = $order->order_type === OrderType::MaterialOnly->value
+                ? [InvoicePhase::Full]
+                : [InvoicePhase::Dp, InvoicePhase::Full];
 
             if ($order->status === SalesOrderStatus::Cancelled->value) {
                 throw ValidationException::withMessages([
@@ -59,9 +64,10 @@ class CreateInvoice
                 ]);
             }
 
-            if ($phase !== $allowedPhase) {
+            if (! in_array($phase, $allowedPhases, true)) {
+                $labels = implode(' / ', array_map(fn (InvoicePhase $p) => $p->label(), $allowedPhases));
                 throw ValidationException::withMessages([
-                    'phase' => "Order type ini hanya boleh invoice muka berjenis {$allowedPhase->label()}.",
+                    'phase' => "Order type ini hanya boleh invoice muka berjenis {$labels}.",
                 ]);
             }
 
@@ -89,7 +95,7 @@ class CreateInvoice
             // Tidak berlaku kalau Finance sudah mengedit baris invoice secara manual —
             // baris manual sudah final apa adanya, tidak perlu difinalisasi ulang.
             if (! $hasManualLines && $agreedDpp !== null) {
-                \App\Services\Sales\AgreedDpp::distribute($order->lines, $agreedDpp);
+                AgreedDpp::distribute($order->lines, $agreedDpp);
                 $order->update(['agreed_dpp' => $agreedDpp]);
                 $order->load('lines.tax');
             }

@@ -1,8 +1,8 @@
 <?php
 
-use App\Http\Controllers\Admin\SignatureController;
 use App\Http\Controllers\Admin\TaxController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\UserSignatureController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Finance\InvoiceController;
@@ -85,8 +85,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('users', UserController::class)
             ->except(['show', 'destroy']);
         Route::resource('taxes', TaxController::class)->except('show');
-        Route::get('signature', [SignatureController::class, 'edit'])->name('signature.edit');
-        Route::post('signature', [SignatureController::class, 'update'])->name('signature.update');
+        Route::get('user-signatures', [UserSignatureController::class, 'index'])->name('user-signatures.index');
+        Route::post('user-signatures/{user}', [UserSignatureController::class, 'update'])->name('user-signatures.update');
     });
 
     Route::prefix('management')->name('management.')->middleware('role:management')->group(function () {

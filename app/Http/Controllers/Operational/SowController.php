@@ -21,7 +21,7 @@ use App\Models\Project;
 use App\Models\Sow;
 use App\Models\SowScopeSection;
 use App\Models\User;
-use App\Services\AdministratorSignature;
+use App\Services\UserSignature;
 use App\Support\SowDefaults;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
@@ -183,7 +183,7 @@ class SowController extends Controller
     public function destroyImage(Project $project, Attachment $image): RedirectResponse
     {
         Gate::authorize('manageSowAssets', $project);
-        abort_unless($image->attachable_type === \App\Models\Sow::class && $image->attachable_id === $project->sow?->id, 404);
+        abort_unless($image->attachable_type === Sow::class && $image->attachable_id === $project->sow?->id, 404);
 
         Storage::disk('local')->delete($image->file_path);
         $image->delete();
@@ -304,11 +304,11 @@ class SowController extends Controller
         ]);
     }
 
-    public function signOperational(Sow $sow, SignSow $action, AdministratorSignature $administratorSignature): RedirectResponse
+    public function signOperational(Sow $sow, SignSow $action, UserSignature $userSignature): RedirectResponse
     {
         Gate::authorize('signAsAdmin', $sow);
 
-        $action->handle($sow, request()->user(), 'admin', $administratorSignature->dataUrl());
+        $action->handle($sow, request()->user(), 'admin', $userSignature->dataUrl(request()->user()));
 
         return redirect()->route('operational.projects.show', $sow->project_id)
             ->with('success', 'SOW berhasil ditanda tangani — diteruskan ke Project Manager.');

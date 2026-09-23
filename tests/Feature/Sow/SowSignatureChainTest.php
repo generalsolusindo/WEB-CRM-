@@ -18,21 +18,10 @@ class SowSignatureChainTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function administratorWithSignature(): User
-    {
-        Storage::fake('local');
-
-        return User::factory()->create([
-            'role' => 'administrator',
-            'is_active' => true,
-            'signature_path' => UploadedFile::fake()->image('sig.png')->store('administrator-signatures'),
-        ]);
-    }
-
     private function readyForSignature(): array
     {
-        $this->administratorWithSignature();
-        $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
+        Storage::fake('local');
+        $ops = User::factory()->create(['role' => 'operational', 'is_active' => true, 'signature_path' => UploadedFile::fake()->image('sig-ops.png')->store('user-signatures')]);
         $sales = User::factory()->create(['role' => 'sales']);
         $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
         $lead = Lead::create(['contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified']);
@@ -63,7 +52,7 @@ class SowSignatureChainTest extends TestCase
         $technician = User::factory()->create(['role' => 'technician', 'vendor_id' => $vendor->id, 'is_active' => true]);
         $vendorUser = User::factory()->create(['role' => 'vendor', 'vendor_id' => $vendor->id, 'is_active' => true]);
         $hr = User::factory()->create(['role' => 'hr', 'is_active' => true]);
-        $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
+        $management = User::factory()->create(['role' => 'management', 'is_active' => true, 'signature_path' => UploadedFile::fake()->image('sig-mgmt.png')->store('user-signatures')]);
 
         $this->actingAs($ops)->put("/operational/projects/{$project->id}/sow", [
             'number' => 'SOW-001', 'project_name' => 'Jasa X', 'technician_id' => $technician->id,
@@ -116,6 +105,37 @@ class SowSignatureChainTest extends TestCase
         $sow->refresh();
         $this->assertSame('completed', $sow->status);
         $this->assertNotNull($sow->director_signature);
+    }
+
+    public function test_operational_without_stored_signature_gets_a_clear_error(): void
+    {
+        ['sow' => $sow, 'ops' => $ops, 'technician' => $technician, 'vendorUser' => $vendorUser, 'hr' => $hr] = $this->readyForSignature();
+        $ops->update(['signature_path' => null]);
+
+        $this->actingAs($technician)->post("/technician/sows/{$sow->id}/sign", ['signature' => $this->fakeSignature()]);
+        $this->actingAs($vendorUser)->post("/vendor/sows/{$sow->id}/sign", ['signature' => $this->fakeSignature()]);
+        $this->actingAs($hr)->post("/hr/sows/{$sow->id}/verify-signatures", ['approved' => true]);
+
+        $this->actingAs($ops)->post("/operational/sows/{$sow->id}/sign-operational")
+            ->assertSessionHasErrors('signature');
+
+        $this->assertSame('pending_admin_signature', $sow->fresh()->status);
+    }
+
+    public function test_management_without_stored_signature_gets_a_clear_error(): void
+    {
+        ['sow' => $sow, 'ops' => $ops, 'technician' => $technician, 'vendorUser' => $vendorUser, 'hr' => $hr, 'management' => $management] = $this->readyForSignature();
+        $management->update(['signature_path' => null]);
+
+        $this->actingAs($technician)->post("/technician/sows/{$sow->id}/sign", ['signature' => $this->fakeSignature()]);
+        $this->actingAs($vendorUser)->post("/vendor/sows/{$sow->id}/sign", ['signature' => $this->fakeSignature()]);
+        $this->actingAs($hr)->post("/hr/sows/{$sow->id}/verify-signatures", ['approved' => true]);
+        $this->actingAs($ops)->post("/operational/sows/{$sow->id}/sign-operational");
+
+        $this->actingAs($management)->post("/management/sows/{$sow->id}/sign")
+            ->assertSessionHasErrors('signature');
+
+        $this->assertSame('pending_director_signature', $sow->fresh()->status);
     }
 
     public function test_bell_notifications_auto_clear_as_each_signer_acts_even_without_being_clicked(): void

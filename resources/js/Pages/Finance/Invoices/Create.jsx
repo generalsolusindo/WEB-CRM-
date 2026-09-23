@@ -16,15 +16,15 @@ function Alert({ text }) {
 }
 
 export default function Create({
-    salesOrder, allowedPhase, isDp = false, defaultDpPercent = 50,
+    salesOrder, allowedPhases, defaultPhase, defaultDpPercent = 50,
     agreedDpp = null, currentPpnRate = null, hasServiceLine = false, defaultPph23Rate = 2,
     alreadyInvoiced, approvalDocs = [],
 }) {
     const { data, setData, post, processing, errors } = useForm({
         sales_order_id: salesOrder.id,
-        phase: allowedPhase.value,
+        phase: defaultPhase,
         due_date: '',
-        dp_percent: isDp ? String(defaultDpPercent) : '',
+        dp_percent: defaultPhase === 'dp' ? String(defaultDpPercent) : '',
         agreed_dpp: agreedDpp != null ? String(agreedDpp) : '',
         ppn_rate: currentPpnRate != null ? String(currentPpnRate) : '',
         pph23_enabled: false,
@@ -40,6 +40,7 @@ export default function Create({
         post('/finance/invoices');
     }
 
+    const isDp = data.phase === 'dp';
     const pct = isDp ? Math.min(99, Math.max(1, Number(data.dp_percent) || defaultDpPercent)) : 100;
     const ratio = pct / 100;
 
@@ -143,11 +144,25 @@ export default function Create({
                 <form onSubmit={submit} className="space-y-5">
                     <Card>
                         <div className="grid gap-4 sm:grid-cols-3">
-                            <div>
-                                <div className="text-[11px] font-bold uppercase tracking-wider text-text-faint">Jenis Invoice</div>
-                                <div className="mt-1 font-medium text-text">{allowedPhase.label}</div>
-                                <p className="text-xs text-text-muted">Ditentukan otomatis dari Order Type.</p>
-                            </div>
+                            {allowedPhases.length > 1 ? (
+                                <Field label="Jenis Invoice" hint="Pilih Full kalau pekerjaan sudah dieksekusi/selesai duluan (mis. addendum) dan tidak perlu DP lagi." error={errors.phase}>
+                                    <Select
+                                        value={data.phase}
+                                        onChange={(e) => {
+                                            const phase = e.target.value;
+                                            setData((d) => ({ ...d, phase, dp_percent: phase === 'dp' ? String(defaultDpPercent) : '' }));
+                                        }}
+                                    >
+                                        {allowedPhases.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                                    </Select>
+                                </Field>
+                            ) : (
+                                <div>
+                                    <div className="text-[11px] font-bold uppercase tracking-wider text-text-faint">Jenis Invoice</div>
+                                    <div className="mt-1 font-medium text-text">{allowedPhases[0].label}</div>
+                                    <p className="text-xs text-text-muted">Ditentukan otomatis dari Order Type.</p>
+                                </div>
+                            )}
                             {isDp && (
                                 <Field label="Persentase DP (%)" hint="Default 50%. Sisanya ditagih di invoice pelunasan." error={errors.dp_percent}>
                                     <Input type="number" min="1" max="99" step="0.01" value={data.dp_percent} onChange={(e) => setData('dp_percent', e.target.value)} disabled={manualLines} />

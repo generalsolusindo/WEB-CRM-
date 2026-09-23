@@ -7,7 +7,7 @@ use App\Enums\SowStatus;
 use App\Http\Controllers\Concerns\BuildsSowReview;
 use App\Http\Controllers\Controller;
 use App\Models\Sow;
-use App\Services\AdministratorSignature;
+use App\Services\UserSignature;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -48,11 +48,11 @@ class SowController extends Controller
         ]);
     }
 
-    public function sign(Sow $sow, SignSow $action, AdministratorSignature $administratorSignature): RedirectResponse
+    public function sign(Sow $sow, SignSow $action, UserSignature $userSignature): RedirectResponse
     {
         Gate::authorize('signAsDirector', $sow);
 
-        $action->handle($sow, request()->user(), 'director', $administratorSignature->dataUrl());
+        $action->handle($sow, request()->user(), 'director', $userSignature->dataUrl(request()->user()));
 
         return redirect()->route('project-manager.sows.index')->with('success', 'SOW berhasil ditanda tangani — dokumen selesai.');
     }
