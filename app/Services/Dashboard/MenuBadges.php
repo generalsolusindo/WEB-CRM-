@@ -170,8 +170,13 @@ class MenuBadges
                 ->where('pm_review_status', 'approved')
                 ->whereNull('manager_review_status')
                 ->count(),
+            // Sama seperti Management\SowController::index() — SOW yang project-nya sudah
+            // didelegasikan ke Project Manager bukan lagi jatah Management, jangan ikut dihitung
+            // (sebelumnya badge menghitung semua PendingDirectorSignature tanpa syarat ini, jadi
+            // bisa menampilkan angka padahal daftarnya kosong).
             '/management/sows' => Sow::query()
                 ->where('status', SowStatus::PendingDirectorSignature->value)
+                ->whereHas('project', fn ($q) => $q->whereNull('delegated_to'))
                 ->count(),
         ];
     }
