@@ -92,6 +92,17 @@ class RequestQuotationRecost
             $keptIds->isEmpty()
                 ? $request->lines()->delete()
                 : $request->lines()->whereNotIn('id', $keptIds)->delete();
+
+            // Baris quotation yang menunjuk ke PR line yang baru saja dihapus di atas jadi yatim
+            // piatu (FK-nya di-null-kan otomatis oleh database, lihat migrasi quotation_lines).
+            // Bersihkan SEKARANG juga, jangan cuma mengandalkan MarkProcurementRequestReady nanti
+            // (yang baru jalan setelah Procurement selesai costing) — kalau siklus berikutnya
+            // entah kenapa tidak pernah sampai Ready lagi (mis. PR ditolak, atau ada quotation
+            // lain yang lebih baru untuk PR yang sama), baris sampah ini akan nyangkut permanen
+            // dan membuat quotation ini TIDAK BISA diedit sama sekali lewat form biasa — selalu
+            // ditolak seolah-olah susunan kebutuhan berubah, padahal Sales cuma mau ubah harga.
+            $locked->lines()->where(fn ($q) => $q->whereNull('procurement_request_line_id')->orWhereNotIn('procurement_request_line_id', $keptIds))->delete();
+
             $request->update([
                 'status' => ProcurementRequestStatus::Submitted->value,
                 'rejection_reason' => null,

@@ -1165,6 +1165,30 @@ class QuotationLifecycleTest extends TestCase
         $this->assertDatabaseHas('notifications', ['user_id' => $procurement->id, 'type' => 'procurement_request.recost_requested']);
     }
 
+    /**
+     * Regresi bug produksi: menambah item baru sambil TIDAK menyertakan item lama (dianggap
+     * dihapus) memicu jalur "needs costing", bukan removeItemsOnly(). Item lama yang tidak
+     * dipertahankan harus langsung hilang dari quotation saat itu juga — bukan cuma PR line-nya
+     * yang terhapus lalu baris quotation-nya nyangkut dengan procurement_request_line_id NULL.
+     * Kalau nyangkut, quotation itu jadi TIDAK BISA diedit sama sekali lewat form biasa (selalu
+     * ditolak dengan pesan "susunan kebutuhan tidak dapat diubah"), walau Sales cuma ganti harga.
+     */
+    public function test_dropped_item_line_is_removed_immediately_even_when_another_item_also_needs_costing(): void
+    {
+        [$sales, $quotation, $kept, $extra] = $this->quotationWithTwoItems();
+
+        $this->actingAs($sales)->put("/sales/quotations/{$quotation->id}/scope-revision", [
+            'lines' => [
+                $this->scopeLine($kept->fresh()),
+                ['procurement_request_line_id' => null, 'item_name' => 'Jasa Instalasi', 'description' => null, 'qty' => 1, 'unit' => 'lot', 'category' => 'service'],
+            ],
+        ])->assertRedirect();
+
+        $this->assertDatabaseMissing('procurement_request_lines', ['id' => $extra->id]);
+        $this->assertDatabaseMissing('quotation_lines', ['quotation_id' => $quotation->id, 'procurement_request_line_id' => $extra->id]);
+        $this->assertDatabaseMissing('quotation_lines', ['quotation_id' => $quotation->id, 'procurement_request_line_id' => null]);
+    }
+
     public function test_recost_notifications_link_to_the_right_pages(): void
     {
         [$sales, $quotation] = $this->quotationWithTwoItems();
