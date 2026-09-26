@@ -130,6 +130,24 @@ class QuotationLifecycleTest extends TestCase
         $this->assertDatabaseCount('quotations', 0);
     }
 
+    public function test_opening_create_page_again_redirects_to_the_latest_existing_quotation(): void
+    {
+        [$sales, $quotation] = $this->draftQuotation();
+        $quotation->update(['status' => 'sent']);
+        $this->actingAs($sales)
+            ->post("/sales/quotations/{$quotation->id}/revisions")
+            ->assertRedirect();
+        $revision = $quotation->revisions()->firstOrFail();
+        $quotation->procurementRequest->update(['status' => 'searching']);
+
+        $this->actingAs($sales)
+            ->get("/sales/procurement-requests/{$quotation->procurement_request_id}/quotations/create")
+            ->assertRedirect("/sales/quotations/{$revision->id}")
+            ->assertSessionHas('success', 'Quotation untuk Procurement Request ini sudah tersedia.');
+
+        $this->assertDatabaseCount('quotations', 2);
+    }
+
     public function test_quotation_lines_must_match_procurement_request_exactly(): void
     {
         [$sales, $pr] = $this->readyProcurementRequest();

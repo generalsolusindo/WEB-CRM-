@@ -109,13 +109,22 @@ class QuotationController extends Controller
         ]);
     }
 
-    public function create(ProcurementRequest $procurementRequest): Response
+    public function create(ProcurementRequest $procurementRequest): Response|RedirectResponse
     {
-        Gate::authorize('create', [Quotation::class, $procurementRequest]);
+        $existingQuotation = $procurementRequest->quotations()
+            ->where('sales_id', request()->user()->id)
+            ->latest('revision_number')
+            ->latest('id')
+            ->first();
 
-        if ($procurementRequest->quotations()->exists()) {
-            abort(409, 'Quotation untuk Procurement Request ini sudah tersedia.');
+        if ($existingQuotation) {
+            Gate::authorize('view', $existingQuotation);
+
+            return redirect()->route('sales.quotations.show', $existingQuotation)
+                ->with('success', 'Quotation untuk Procurement Request ini sudah tersedia.');
         }
+
+        Gate::authorize('create', [Quotation::class, $procurementRequest]);
 
         $procurementRequest->load([
             'lead.contact:id,name,company_name,email,phone,address,npwp',
