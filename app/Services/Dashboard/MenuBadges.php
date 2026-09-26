@@ -99,15 +99,26 @@ class MenuBadges
             ->distinct('project_id')
             ->count('project_id');
 
+        // Baru boleh disourcing (assign vendor/surveyor) selagi masih 'requested' — lihat
+        // SourceSurvey::handle(). Sama dengan yang dianggap "baru masuk" di halaman index.
+        $surveyInbox = Survey::query()->where('status', SurveyStatus::Requested->value)->count();
+
         return [
             '/procurement/procurement-requests' => $inbox,
             '/procurement/project-procurements' => $projectProcurement,
+            '/procurement/surveys' => $surveyInbox,
         ];
     }
 
     /** @return array<string, int> */
     private function finance(): array
     {
+        // Sama persis dengan filter Finance\SurveyController::index() — supaya badge tidak
+        // pernah menunjukkan angka sementara daftarnya kosong.
+        $surveyInbox = Survey::query()
+            ->whereIn('status', [SurveyStatus::FinanceReview->value, SurveyStatus::AwaitingPayment->value])
+            ->count();
+
         $saleInvoices = fn () => Invoice::query()->where('invoice_type', 'sale');
 
         $needsUpfrontInvoice = SalesOrder::query()
@@ -138,6 +149,7 @@ class MenuBadges
 
         return [
             '/finance/invoices' => $needsUpfrontInvoice + $draft + $unpaidSent + $overdue + $readyForFinal,
+            '/finance/surveys' => $surveyInbox,
             '/finance/vendor-service-payments' => $vendorService,
         ];
     }
@@ -155,10 +167,22 @@ class MenuBadges
         $waitingResource = Project::query()->where('status', 'waiting_resource')->count();
         $bastToVerify = Bast::query()->where('status', 'submitted')->count();
 
+        // Sama persis dengan filter Operational\SurveyController::index() — Operational
+        // baru punya "tugas" begitu perlu kasih arahan, survey sedang jalan, atau
+        // laporannya perlu diverifikasi.
+        $surveyInbox = Survey::query()
+            ->whereIn('status', [
+                SurveyStatus::AwaitingBriefing->value,
+                SurveyStatus::InProgress->value,
+                SurveyStatus::ReportReview->value,
+            ])
+            ->count();
+
         return [
             '/operational/projects' => $needsProject + $planning,
             '/operational/projects?status=waiting_resource' => $waitingResource,
             '/operational/projects?status=verification' => $bastToVerify,
+            '/operational/surveys' => $surveyInbox,
         ];
     }
 
@@ -185,21 +209,31 @@ class MenuBadges
     private function technician(User $user): array
     {
         return [
-            '/technician/tasks' => ProjectTask::query()
-                ->where('status', '!=', 'done')
-                ->whereHas('project', fn ($q) => $q
-                    ->where('status', ProjectStatus::InProgress->value)
-                    ->whereHas('technicians', fn ($t) => $t->where('technician_id', $user->id)))
-                ->count(),
-            '/technician/surveys' => Survey::query()
-                ->where('status', SurveyStatus::InProgress->value)
-                ->whereHas('surveyorAssignments', fn ($q) => $q->where('technician_id', $user->id))
-                ->count(),
+            '/technician/tasks' => $this->technicianTaskCount($user),
+            '/technician/surveys' => $this->technicianSurveyCount($user),
             '/technician/sows' => Sow::query()
                 ->where('technician_id', $user->id)
                 ->where('status', SowStatus::PendingTechnicianSignature->value)
                 ->count(),
         ];
+    }
+
+    private function technicianTaskCount(User $user): int
+    {
+        return ProjectTask::query()
+            ->where('status', '!=', 'done')
+            ->whereHas('project', fn ($q) => $q
+                ->where('status', ProjectStatus::InProgress->value)
+                ->whereHas('technicians', fn ($t) => $t->where('technician_id', $user->id)))
+            ->count();
+    }
+
+    private function technicianSurveyCount(User $user): int
+    {
+        return Survey::query()
+            ->where('status', SurveyStatus::InProgress->value)
+            ->whereHas('surveyorAssignments', fn ($q) => $q->where('technician_id', $user->id))
+            ->count();
     }
 
     /** @return array<string, int> */
@@ -224,18 +258,35 @@ class MenuBadges
                 ->whereHas('project', fn ($q) => $q->where('delegated_to', $user->id))
                 ->where('status', ProcurementPaymentStatus::PendingPm->value)
                 ->count(),
+            // Sama persis dengan filter ProjectManager\SowController::index().
+            '/project-manager/sows' => Sow::query()
+                ->where('status', SowStatus::PendingDirectorSignature->value)
+                ->whereHas('project', fn ($q) => $q->where('delegated_to', $user->id))
+                ->count(),
         ];
     }
 
     /** @return array<string, int> */
     private function vendor(User $user): array
     {
-        return [
+        $badges = [
             '/vendor/sows' => Sow::query()
                 ->whereHas('project', fn ($q) => $q->where('vendor_id', $user->vendor_id))
                 ->where('status', SowStatus::PendingVendorSignature->value)
                 ->count(),
         ];
+
+        // Akun vendor yang PIC-nya juga merangkap teknisi/surveyor (lihat getMenuForUser()
+        // di menuConfig.js) dapat menu tambahan "Tugas Teknisi"/"Survey" — badge-nya harus
+        // ikut muncul juga, bukan cuma untuk role 'technician' murni.
+        if ($user->canWorkAsTechnician()) {
+            $badges['/technician/tasks'] = $this->technicianTaskCount($user);
+        }
+        if ($user->canWorkAsSurveyor()) {
+            $badges['/technician/surveys'] = $this->technicianSurveyCount($user);
+        }
+
+        return $badges;
     }
 
     /** @return array<string, int> */

@@ -1,10 +1,10 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import {
     FiFilePlus, FiEdit3, FiClock, FiAward, FiArrowRight, FiCheckCircle,
     FiUserPlus, FiFileText, FiShoppingCart, FiBarChart2, FiUserCheck,
     FiAlertCircle, FiCreditCard, FiTruck, FiClipboard, FiPackage, FiTool,
-    FiCalendar, FiCheckSquare,
+    FiCalendar, FiCheckSquare, FiTrendingUp, FiTrendingDown, FiUsers,
 } from 'react-icons/fi';
 import AppLayout from '../Layouts/AppLayout';
 import { getMenuForUser } from '../config/menuConfig';
@@ -587,8 +587,8 @@ function Kpi({ icon: Icon, tone, label, value, href }) {
             <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${TONE[tone]}`}>
                 <Icon className="h-5 w-5" />
             </span>
-            <span className="min-w-0">
-                <span className="block text-2xl font-bold leading-none tracking-tight text-text">{value}</span>
+            <span className="min-w-0 flex-1">
+                <span className="block truncate text-xl font-bold leading-tight tracking-tight text-text sm:text-2xl">{value}</span>
                 <span className="mt-1 block truncate text-xs font-medium text-text-muted">{label}</span>
             </span>
         </Link>
@@ -710,10 +710,23 @@ function GenericDashboard({ auth, menuBadges = {} }) {
     );
 }
 
-/* ───────────────────── Management overview (tak diubah) ───────────────────── */
+/* ───────────────────── Management overview ───────────────────── */
 
 function ManagementOverview({ data, menuBadges = {} }) {
     const total = (menuBadges['/management/quotations'] || 0) + (menuBadges['/management/sows'] || 0);
+    const [range, setRange] = useState({ from: data.period.from, to: data.period.to });
+    const [applying, setApplying] = useState(false);
+
+    function applyRange(e) {
+        e.preventDefault();
+        setApplying(true);
+        router.get('/dashboard', range, {
+            preserveScroll: true,
+            preserveState: true,
+            only: ['managementOverview'],
+            onFinish: () => setApplying(false),
+        });
+    }
 
     return (
         <div className="space-y-6">
@@ -741,125 +754,222 @@ function ManagementOverview({ data, menuBadges = {} }) {
                 )}
             </section>
 
-            <RevenueSection data={data.revenue} />
+            <PeriodFilter range={range} onChange={setRange} onSubmit={applyRange} applying={applying} label={data.period.label} />
 
-            <StatSection title="Sales" href="/management/opportunities">
-                <StatGrid items={data.sales.leads_by_stage} hrefFor={(item) => `/management/opportunities?stage=${item.value}`} />
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <Stat label="Quotation Terbuka (Draft/Sent)" value={data.sales.open_quotations} href="/management/quotations" />
-                    <Stat label="Nilai Pipeline (Quotation Terbuka)" value={money(data.sales.pipeline_value)} href="/management/quotations" />
-                </div>
+            <RevenueSection data={data.revenue} periodLabel={data.period.label} />
+
+            <ActivitySection data={data.activity} />
+
+            <StatSection title="Sales" href="/management/opportunities" icon={FiUsers}>
+                {data.sales.leads_by_stage.map((item) => (
+                    <KpiCard
+                        key={item.value} icon={FiUsers} tone={STAGE_TONE[item.value] ?? 'slate'}
+                        label={item.label} value={item.count} href={`/management/opportunities?stage=${item.value}`}
+                    />
+                ))}
+                <KpiCard icon={FiFileText} tone="blue" label="Quotation Terbuka (Draft/Sent)" value={data.sales.open_quotations} href="/management/quotations" />
+                <KpiCard icon={FiBarChart2} tone="blue" label="Nilai Pipeline (Quotation Terbuka)" value={money(data.sales.pipeline_value)} href="/management/quotations" />
             </StatSection>
 
-            <StatSection title="Procurement" href="/management/procurement-requests">
-                <StatGrid items={data.procurement.by_status} hrefFor={(item) => `/management/procurement-requests?status=${item.value}`} />
+            <StatSection title="Procurement" href="/management/procurement-requests" icon={FiShoppingCart}>
+                {data.procurement.by_status.map((item) => (
+                    <KpiCard
+                        key={item.value} icon={FiShoppingCart} tone={STAGE_TONE[item.value] ?? 'slate'}
+                        label={item.label} value={item.count} href={`/management/procurement-requests?status=${item.value}`}
+                    />
+                ))}
             </StatSection>
 
-            <StatSection title="Finance" href="/management/invoices">
-                <div className="grid gap-3 sm:grid-cols-2">
-                    <Stat label="Total Piutang Belum Lunas" value={money(data.finance.outstanding_total)} warn={data.finance.outstanding_total > 0} href="/management/invoices" />
-                    <Stat label="Invoice Jatuh Tempo" value={data.finance.overdue_count} warn={data.finance.overdue_count > 0} href="/management/invoices?status=overdue" />
-                </div>
+            <StatSection title="Finance" href="/management/invoices" icon={FiCreditCard}>
+                <KpiCard icon={FiCreditCard} tone="slate" warn={data.finance.outstanding_total > 0} label="Total Piutang Belum Lunas" value={money(data.finance.outstanding_total)} href="/management/invoices" />
+                <KpiCard icon={FiAlertCircle} tone="rose" warn={data.finance.overdue_count > 0} label="Invoice Jatuh Tempo" value={data.finance.overdue_count} href="/management/invoices?status=overdue" />
             </StatSection>
 
-            <StatSection title="Operational — Project" href="/management/projects">
-                <StatGrid items={data.operational.projects_by_status} hrefFor={(item) => `/management/projects?status=${item.value}`} />
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <Stat label="Task Telat (belum selesai, lewat jadwal)" value={data.operational.tasks_overdue} warn={data.operational.tasks_overdue > 0} href="/management/projects" />
-                    <Stat label="BAST Menunggu Verifikasi" value={data.operational.bast_pending} warn={data.operational.bast_pending > 0} href="/management/projects" />
-                </div>
+            <StatSection title="Operational — Project" href="/management/projects" icon={FiCalendar}>
+                {data.operational.projects_by_status.map((item) => (
+                    <KpiCard
+                        key={item.value} icon={FiCalendar} tone={STAGE_TONE[item.value] ?? 'slate'}
+                        label={item.label} value={item.count} href={`/management/projects?status=${item.value}`}
+                    />
+                ))}
+                <KpiCard icon={FiClock} tone="rose" warn={data.operational.tasks_overdue > 0} label="Task Telat (belum selesai, lewat jadwal)" value={data.operational.tasks_overdue} href="/management/projects" />
+                <KpiCard icon={FiCheckSquare} tone="amber" warn={data.operational.bast_pending > 0} label="BAST Menunggu Verifikasi" value={data.operational.bast_pending} href="/management/projects" />
             </StatSection>
 
-            <StatSection title="Survey" href="/management/surveys">
-                <StatGrid items={data.survey.by_status} hrefFor={(item) => `/management/surveys?status=${item.value}`} />
+            <StatSection title="Survey" href="/management/surveys" icon={FiClipboard}>
+                {data.survey.by_status.map((item) => (
+                    <KpiCard
+                        key={item.value} icon={FiClipboard} tone={STAGE_TONE[item.value] ?? 'slate'}
+                        label={item.label} value={item.count} href={`/management/surveys?status=${item.value}`}
+                    />
+                ))}
             </StatSection>
         </div>
     );
 }
 
-/** Ringkasan pendapatan & profit bulan berjalan — angka finansial yang paling ingin
- * langsung dilihat Manager begitu buka Dashboard, dihitung dari project yang Won
- * (rumus sama persis dengan laporan "Profit Project"). Diletakkan paling atas,
- * sebelum ringkasan operasional lain, karena ini yang paling sering dicari duluan. */
-function RevenueSection({ data }) {
-    const isProfitNegative = Number(data.profit_this_month) < 0;
-
+/** Filter periode bebas untuk Pendapatan/Profit & Aktivitas — backlog/status di bagian
+ * lain Dashboard SENGAJA tidak ikut filter ini (lihat catatan di DashboardController). */
+function PeriodFilter({ range, onChange, onSubmit, applying, label }) {
     return (
-        <Link href={data.href} className="block">
-            <div className="card p-5 transition hover:shadow-md">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-bold tracking-tight text-text">Pendapatan &amp; Profit — {data.month_label}</h3>
-                    <span className="flex items-center gap-1 text-xs font-semibold text-primary">
-                        Lihat rincian per project <FiArrowRight className="h-3 w-3" />
-                    </span>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-xl bg-bg px-4 py-3">
-                        <div className="text-2xl font-bold tracking-tight text-text">{money(data.revenue_this_month)}</div>
-                        <div className="mt-0.5 text-xs text-text-muted">Pendapatan (Harga Jual, project Won)</div>
-                    </div>
-                    <div className="rounded-xl bg-bg px-4 py-3">
-                        <div className={`text-2xl font-bold tracking-tight ${isProfitNegative ? 'text-danger' : 'text-success'}`}>{money(data.profit_this_month)}</div>
-                        <div className="mt-0.5 text-xs text-text-muted">
-                            Profit {data.margin_percent != null ? `(${data.margin_percent}% dari HPP)` : ''}
-                        </div>
-                    </div>
-                    <div className="rounded-xl bg-bg px-4 py-3">
-                        <div className="text-2xl font-bold tracking-tight text-text">{data.won_count_this_month}</div>
-                        <div className="mt-0.5 text-xs text-text-muted">Project Won bulan ini</div>
-                    </div>
-                </div>
+        <form onSubmit={onSubmit} className="card flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="flex items-center gap-3 sm:contents">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong sm:mb-1">
+                    <FiCalendar className="h-4 w-4" />
+                </span>
+                <span className="text-xs font-semibold text-text sm:hidden">Filter Periode</span>
             </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                <div className="w-full sm:w-auto">
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-text-faint">Dari</label>
+                    <input
+                        type="date" value={range.from} max={range.to}
+                        onChange={(e) => onChange((r) => ({ ...r, from: e.target.value }))}
+                        className="w-full rounded-lg border border-border px-3 py-1.5 text-sm sm:w-auto"
+                    />
+                </div>
+                <div className="w-full sm:w-auto">
+                    <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-text-faint">Sampai</label>
+                    <input
+                        type="date" value={range.to} min={range.from}
+                        onChange={(e) => onChange((r) => ({ ...r, to: e.target.value }))}
+                        className="w-full rounded-lg border border-border px-3 py-1.5 text-sm sm:w-auto"
+                    />
+                </div>
+                <button type="submit" disabled={applying} className="btn btn-primary w-full sm:w-auto">
+                    {applying ? 'Menerapkan…' : 'Terapkan Periode'}
+                </button>
+            </div>
+            <span className="text-xs text-text-muted sm:ml-auto">Menampilkan aktivitas: <span className="font-semibold text-text">{label}</span></span>
+        </form>
+    );
+}
+
+/** Naik/turun dibanding periode sebelumnya dengan panjang yang sama. */
+function DeltaBadge({ percent, invert = false }) {
+    if (percent == null) return null;
+    const isUp = percent > 0;
+    const good = invert ? !isUp : isUp;
+    if (percent === 0) return <span className="text-xs font-semibold text-text-muted">Sama seperti periode lalu</span>;
+    const Icon = isUp ? FiTrendingUp : FiTrendingDown;
+    return (
+        <span className={`inline-flex items-center gap-1 text-xs font-semibold ${good ? 'text-success' : 'text-danger'}`}>
+            <Icon className="h-3 w-3" /> {Math.abs(percent)}% dari periode lalu
+        </span>
+    );
+}
+
+/**
+ * Sama persis dengan tone yang dipakai Kpi/TONE/DOT di dashboard Sales, Finance, dst
+ * (lihat const TONE di atas) — sengaja dipakai ulang, bukan skema warna baru, supaya
+ * Dashboard Management terasa satu web yang sama dengan dashboard role lain. `value`
+ * di sini adalah status mentah (mis. 'won', 'ready', 'rejected'), bukan label terjemahan.
+ */
+const STAGE_TONE = {
+    new: 'blue', qualified: 'blue', requirement: 'blue', procurement: 'amber', quotation: 'amber', negotiation: 'amber', won: 'green', lost: 'rose',
+    submitted: 'amber', searching: 'blue', ready: 'green', rejected: 'rose',
+    draft: 'slate', planning: 'blue', waiting_resource: 'amber', in_progress: 'blue', verification: 'amber', completed: 'green',
+    scheduled: 'blue', finance_review: 'amber', awaiting_payment: 'amber', verified: 'green', closed: 'slate',
+};
+
+/** Kartu KPI generik dipakai ulang persis seperti Kpi di dashboard Sales/Finance
+ * (icon di kiri, angka besar + label) — cuma ditambah baris "delta" opsional untuk
+ * angka yang ikut filter periode (Pendapatan, Profit, Aktivitas). */
+function KpiCard({ icon: Icon, tone, label, value, href, delta, warn = false }) {
+    const effectiveTone = warn ? 'rose' : tone;
+    return (
+        <Link href={href} className="card group flex items-center gap-4 p-5 transition hover:-translate-y-0.5 hover:shadow-md">
+            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${TONE[effectiveTone]}`}>
+                <Icon className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+                <span className="block truncate text-xl font-bold leading-tight tracking-tight text-text sm:text-2xl">{value}</span>
+                <span className="mt-1 block truncate text-xs font-medium text-text-muted">{label}</span>
+                {delta !== undefined && <span className="mt-1.5 block">{delta}</span>}
+            </span>
         </Link>
     );
 }
 
-function StatSection({ title, href, children }) {
+/** Ringkasan pendapatan & profit periode terpilih — angka finansial yang paling ingin
+ * langsung dilihat Manager begitu buka Dashboard, dihitung dari project yang Won
+ * (rumus sama persis dengan laporan "Profit Project"). Diletakkan paling atas,
+ * sebelum ringkasan operasional lain, karena ini yang paling sering dicari duluan. */
+function RevenueSection({ data, periodLabel }) {
+    const isProfitNegative = Number(data.profit) < 0;
+
     return (
-        <div className="card p-5">
+        <div>
             <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="text-sm font-bold tracking-tight text-text">{title}</h3>
+                <h3 className="text-sm font-bold tracking-tight text-text">Pendapatan &amp; Profit — {periodLabel}</h3>
+                <Link href={data.href} className="flex items-center gap-1 text-xs font-semibold text-primary transition hover:underline">
+                    Lihat rincian per project <FiArrowRight className="h-3 w-3" />
+                </Link>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+                <KpiCard
+                    icon={FiTrendingUp} tone="blue" label="Pendapatan (Harga Jual, project Won)" value={money(data.revenue)} href={data.href}
+                    delta={<DeltaBadge percent={data.revenue_delta_percent} />}
+                />
+                <KpiCard
+                    icon={FiAward} tone={isProfitNegative ? 'rose' : 'green'}
+                    label={`Profit ${data.margin_percent != null ? `(${data.margin_percent}% dari HPP)` : ''}`} value={money(data.profit)} href={data.href}
+                    delta={<DeltaBadge percent={data.profit_delta_percent} />}
+                />
+                <KpiCard
+                    icon={FiCheckCircle} tone="green" label="Project Won periode ini" value={data.won_count} href={data.href}
+                    delta={<DeltaBadge percent={data.won_count_delta_percent} />}
+                />
+            </div>
+        </div>
+    );
+}
+
+/** Aktivitas lintas-departemen dalam periode terpilih — pelengkap kartu backlog di
+ * bawah (yang selalu menampilkan kondisi sekarang, tidak ikut filter periode). */
+function ActivitySection({ data }) {
+    const items = [
+        { icon: FiUsers, tone: 'blue', label: 'Lead Baru', value: data.leads_created, delta: data.leads_created_delta_percent, href: '/management/opportunities' },
+        { icon: FiFileText, tone: 'amber', label: 'Quotation Dibuat', value: data.quotations_created, delta: data.quotations_created_delta_percent, href: '/management/quotations' },
+        { icon: FiShoppingCart, tone: 'blue', label: 'Procurement Request Baru', value: data.procurement_requests_created, delta: data.procurement_requests_created_delta_percent, href: '/management/procurement-requests' },
+        { icon: FiCreditCard, tone: 'green', label: `Invoice Diterbitkan (${data.invoiced_count})`, value: money(data.invoiced_total), delta: data.invoiced_total_delta_percent, href: '/management/invoices' },
+        { icon: FiTool, tone: 'slate', label: 'Survey Baru', value: data.surveys_created, delta: data.surveys_created_delta_percent, href: '/management/surveys' },
+    ];
+
+    return (
+        <div>
+            <h3 className="mb-3 text-sm font-bold tracking-tight text-text">Aktivitas Periode Ini</h3>
+            {/* Maksimal 4 kolom (bukan 5) — halaman ini dibatasi max-w-6xl, dan salah satu
+                kartu berisi nilai rupiah yang jauh lebih panjang dari angka biasa; di lebar
+                berapa pun, 5 kolom dalam max-w-6xl selalu membuat "Rp ..." terpotong. */}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {items.map((item) => (
+                    <KpiCard key={item.label} icon={item.icon} tone={item.tone} label={item.label} value={item.value} href={item.href} delta={<DeltaBadge percent={item.delta} />} />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function StatSection({ title, href, icon: Icon, children }) {
+    return (
+        <div>
+            <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                    {Icon && (
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-strong">
+                            <Icon className="h-4 w-4" />
+                        </span>
+                    )}
+                    <h3 className="text-sm font-bold tracking-tight text-text">{title}</h3>
+                </div>
                 {href && (
                     <Link href={href} className="flex min-h-9 items-center gap-1 text-xs font-semibold text-primary transition hover:underline">
                         Lihat semua <FiArrowRight className="h-3 w-3" />
                     </Link>
                 )}
             </div>
-            {children}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{children}</div>
         </div>
-    );
-}
-
-function StatGrid({ items, hrefFor }) {
-    return (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {items.map((item, i) => {
-                const href = hrefFor ? hrefFor(item) : null;
-                const Tag = href ? Link : 'div';
-                return (
-                    <Tag
-                        key={i}
-                        {...(href ? { href } : {})}
-                        className={`rounded-xl bg-bg px-3 py-2.5 ${href ? 'block transition hover:bg-primary-soft hover:shadow-sm' : ''}`}
-                    >
-                        <div className="text-lg font-bold text-text">{item.count}</div>
-                        <div className="text-xs text-text-muted">{item.label}</div>
-                    </Tag>
-                );
-            })}
-        </div>
-    );
-}
-
-function Stat({ label, value, warn = false, href }) {
-    const Tag = href ? Link : 'div';
-    return (
-        <Tag
-            {...(href ? { href } : {})}
-            className={`rounded-xl bg-bg px-3 py-2.5 ${href ? 'block transition hover:bg-primary-soft hover:shadow-sm' : ''}`}
-        >
-            <div className={`text-lg font-bold ${warn ? 'text-danger' : 'text-text'}`}>{value}</div>
-            <div className="text-xs text-text-muted">{label}</div>
-        </Tag>
     );
 }

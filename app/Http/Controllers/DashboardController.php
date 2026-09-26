@@ -11,6 +11,8 @@ use App\Enums\ProjectStatus;
 use App\Enums\QuotationStatus;
 use App\Enums\SurveyStatus;
 use App\Http\Controllers\Concerns\BuildsProjectOverview;
+use App\Http\Controllers\Concerns\NormalizesDateRangeFilter;
+use App\Models\ActualProcurement;
 use App\Models\Bast;
 use App\Models\Invoice;
 use App\Models\Lead;
@@ -20,16 +22,19 @@ use App\Models\ProjectTask;
 use App\Models\Quotation;
 use App\Models\SalesOrder;
 use App\Models\Survey;
+use App\Models\User;
 use App\Services\Management\ProjectProfitCalculator;
 use App\Services\Sales\DocumentTotals;
 use App\Services\Sales\SalesOrderSettlement;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
     use BuildsProjectOverview;
+    use NormalizesDateRangeFilter;
 
     public function __invoke(Request $request, SalesOrderSettlement $settlement): Response
     {
@@ -49,7 +54,7 @@ class DashboardController extends Controller
                 ? $this->operationalActions($settlement)
                 : null,
             'managementOverview' => $user->role === 'management'
-                ? $this->managementOverview()
+                ? $this->managementOverview($request)
                 : null,
             'projectManagerOverview' => $user->role === 'project_manager'
                 ? $this->projectManagerOverview($user)
@@ -64,7 +69,7 @@ class DashboardController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function projectManagerOverview(\App\Models\User $user): array
+    private function projectManagerOverview(User $user): array
     {
         $projects = Project::query()
             ->where('delegated_to', $user->id)
@@ -102,8 +107,30 @@ class DashboardController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function managementOverview(): array
+    private function managementOverview(Request $request): array
     {
+        // Backlog/status count (leadsByStage, prByStatus, outstandingTotal, projectsByStatus,
+        // surveysByStatus, dst di bawah) SENGAJA TIDAK ikut filter periode — itu kondisi
+        // "sekarang", butuh tindakan hari ini. Kalau ikut difilter, barang lama yang nyangkut
+        // dari periode sebelumnya bisa hilang dari pandangan Manajemen. Yang ikut periode
+        // hanya angka "aktivitas" (apa yang terjadi dalam rentang tanggal ini) — lihat
+        // $revenue dan $activity di bawah.
+        $filters = $this->normalizeDateRange($request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+        ]));
+        $from = $filters['from'] ?? now()->startOfMonth()->toDateString();
+        $to = $filters['to'] ?? now()->endOfMonth()->toDateString();
+
+        // Periode pembanding: rentang sepanjang periode terpilih, persis sebelum tanggal mulai.
+        $periodDays = Carbon::parse($from)->diffInDays(Carbon::parse($to)) + 1;
+        $prevTo = Carbon::parse($from)->subDay()->toDateString();
+        $prevFrom = Carbon::parse($prevTo)->subDays($periodDays - 1)->toDateString();
+
+        $deltaPercent = fn (float $current, float $previous): ?float => $previous > 0
+            ? round(($current - $previous) / $previous * 100, 1)
+            : null;
+
         $countByStatus = fn (string $model, string $column = 'status') => $model::query()
             ->selectRaw("{$column}, count(*) as total")
             ->groupBy($column)
@@ -139,7 +166,7 @@ class DashboardController extends Controller
             0,
         ));
         $overdueCount = $saleInvoices->filter(fn ($inv) => $inv->due_date
-            && \Illuminate\Support\Carbon::parse($inv->due_date)->isPast())->count();
+            && Carbon::parse($inv->due_date)->isPast())->count();
 
         $projectCounts = $countByStatus(Project::class);
         $projectsByStatus = collect(ProjectStatus::options())->map(fn ($o) => [
@@ -156,18 +183,46 @@ class DashboardController extends Controller
 
         $bastPending = Bast::query()->where('status', 'submitted')->count();
 
-        $monthStart = now()->startOfMonth()->toDateString();
-        $monthEnd = now()->endOfMonth()->toDateString();
-        $wonThisMonth = Project::query()
+        $wonInRange = fn (string $rangeFrom, string $rangeTo) => Project::query()
             ->whereHas('salesOrder', fn ($q) => $q->where('status', 'won'))
-            ->whereDate('created_at', '>=', $monthStart)
-            ->whereDate('created_at', '<=', $monthEnd)
+            ->whereDate('created_at', '>=', $rangeFrom)
+            ->whereDate('created_at', '<=', $rangeTo)
             ->with(ProjectProfitCalculator::eagerLoads())
             ->get()
             ->map(fn (Project $project) => ProjectProfitCalculator::rowFor($project));
-        $revenueThisMonth = round((float) $wonThisMonth->sum('harga_jual'), 2);
-        $profitThisMonth = round((float) $wonThisMonth->sum('profit'), 2);
-        $hppThisMonth = round((float) $wonThisMonth->sum('hpp'), 2);
+
+        $wonThisPeriod = $wonInRange($from, $to);
+        $revenueThisPeriod = round((float) $wonThisPeriod->sum('harga_jual'), 2);
+        $profitThisPeriod = round((float) $wonThisPeriod->sum('profit'), 2);
+        $hppThisPeriod = round((float) $wonThisPeriod->sum('hpp'), 2);
+
+        $wonPrevPeriod = $wonInRange($prevFrom, $prevTo);
+        $revenuePrevPeriod = round((float) $wonPrevPeriod->sum('harga_jual'), 2);
+        $profitPrevPeriod = round((float) $wonPrevPeriod->sum('profit'), 2);
+
+        $countCreatedInRange = fn (string $model, string $rangeFrom, string $rangeTo) => $model::query()
+            ->whereDate('created_at', '>=', $rangeFrom)
+            ->whereDate('created_at', '<=', $rangeTo)
+            ->count();
+
+        $invoicesInRange = fn (string $rangeFrom, string $rangeTo) => Invoice::query()
+            ->where('invoice_type', 'sale')
+            ->whereDate('created_at', '>=', $rangeFrom)
+            ->whereDate('created_at', '<=', $rangeTo)
+            ->get(['id', 'amount', 'tax_amount']);
+        $invoicesThisPeriod = $invoicesInRange($from, $to);
+        $invoicesPrevPeriod = $invoicesInRange($prevFrom, $prevTo);
+        $invoicedTotalThisPeriod = round((float) $invoicesThisPeriod->sum(fn ($i) => (float) $i->amount + (float) $i->tax_amount), 2);
+        $invoicedTotalPrevPeriod = round((float) $invoicesPrevPeriod->sum(fn ($i) => (float) $i->amount + (float) $i->tax_amount), 2);
+
+        $leadsThisPeriod = $countCreatedInRange(Lead::class, $from, $to);
+        $leadsPrevPeriod = $countCreatedInRange(Lead::class, $prevFrom, $prevTo);
+        $quotationsThisPeriod = $countCreatedInRange(Quotation::class, $from, $to);
+        $quotationsPrevPeriod = $countCreatedInRange(Quotation::class, $prevFrom, $prevTo);
+        $prThisPeriod = $countCreatedInRange(ProcurementRequest::class, $from, $to);
+        $prPrevPeriod = $countCreatedInRange(ProcurementRequest::class, $prevFrom, $prevTo);
+        $surveysThisPeriod = $countCreatedInRange(Survey::class, $from, $to);
+        $surveysPrevPeriod = $countCreatedInRange(Survey::class, $prevFrom, $prevTo);
 
         $surveyCounts = $countByStatus(Survey::class);
         $surveysByStatus = collect(SurveyStatus::options())
@@ -179,13 +234,33 @@ class DashboardController extends Controller
             ])->values();
 
         return [
+            'period' => [
+                'from' => $from,
+                'to' => $to,
+                'label' => Carbon::parse($from)->translatedFormat('d M Y').' – '.Carbon::parse($to)->translatedFormat('d M Y'),
+            ],
             'revenue' => [
-                'month_label' => now()->translatedFormat('F Y'),
-                'revenue_this_month' => $revenueThisMonth,
-                'profit_this_month' => $profitThisMonth,
-                'margin_percent' => $hppThisMonth > 0 ? round($profitThisMonth / $hppThisMonth * 100, 2) : null,
-                'won_count_this_month' => $wonThisMonth->count(),
-                'href' => "/management/project-profit?scope=won&from={$monthStart}&to={$monthEnd}",
+                'revenue' => $revenueThisPeriod,
+                'revenue_delta_percent' => $deltaPercent($revenueThisPeriod, $revenuePrevPeriod),
+                'profit' => $profitThisPeriod,
+                'profit_delta_percent' => $deltaPercent($profitThisPeriod, $profitPrevPeriod),
+                'margin_percent' => $hppThisPeriod > 0 ? round($profitThisPeriod / $hppThisPeriod * 100, 2) : null,
+                'won_count' => $wonThisPeriod->count(),
+                'won_count_delta_percent' => $deltaPercent($wonThisPeriod->count(), $wonPrevPeriod->count()),
+                'href' => "/management/project-profit?scope=won&from={$from}&to={$to}",
+            ],
+            'activity' => [
+                'leads_created' => $leadsThisPeriod,
+                'leads_created_delta_percent' => $deltaPercent($leadsThisPeriod, $leadsPrevPeriod),
+                'quotations_created' => $quotationsThisPeriod,
+                'quotations_created_delta_percent' => $deltaPercent($quotationsThisPeriod, $quotationsPrevPeriod),
+                'procurement_requests_created' => $prThisPeriod,
+                'procurement_requests_created_delta_percent' => $deltaPercent($prThisPeriod, $prPrevPeriod),
+                'invoiced_total' => $invoicedTotalThisPeriod,
+                'invoiced_total_delta_percent' => $deltaPercent($invoicedTotalThisPeriod, $invoicedTotalPrevPeriod),
+                'invoiced_count' => $invoicesThisPeriod->count(),
+                'surveys_created' => $surveysThisPeriod,
+                'surveys_created_delta_percent' => $deltaPercent($surveysThisPeriod, $surveysPrevPeriod),
             ],
             'sales' => [
                 'leads_by_stage' => $leadsByStage,
@@ -322,7 +397,7 @@ class DashboardController extends Controller
             ->get()
             ->map($map);
 
-        $projectProcurement = \App\Models\ActualProcurement::query()
+        $projectProcurement = ActualProcurement::query()
             ->whereIn('status', ['pending', 'purchased'])
             ->whereHas('project', fn ($q) => $q->where('status', '!=', 'completed'))
             ->with('project.salesOrder.contact:id,name')
@@ -404,5 +479,4 @@ class DashboardController extends Controller
             'ready_to_win' => $readyToWin,
         ];
     }
-
 }

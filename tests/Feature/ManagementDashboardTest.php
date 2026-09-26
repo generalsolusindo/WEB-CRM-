@@ -6,7 +6,6 @@ use App\Models\Contact;
 use App\Models\Lead;
 use App\Models\ProcurementRequest;
 use App\Models\Quotation;
-use App\Models\SalesOrder;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -15,8 +14,8 @@ use Tests\TestCase;
 
 class ManagementDashboardTest extends TestCase
 {
-    use RefreshDatabase;
     use BuildsProcurementProject;
+    use RefreshDatabase;
 
     public function test_management_sees_overview_other_roles_do_not(): void
     {
@@ -83,10 +82,77 @@ class ManagementDashboardTest extends TestCase
 
         // Router qty 2 x cost 1.000.000 (belum disourcing, masih estimasi) = HPP 2.000.000.
         // Selling price = cost x 1.3 = 1.300.000 x 2 = harga jual 2.600.000. Profit 600.000.
-        $this->assertSame(2600000.0, $revenue['revenue_this_month']);
-        $this->assertSame(600000.0, $revenue['profit_this_month']);
-        $this->assertSame(1, $revenue['won_count_this_month']);
+        $this->assertSame(2600000.0, $revenue['revenue']);
+        $this->assertSame(600000.0, $revenue['profit']);
+        $this->assertSame(1, $revenue['won_count']);
         $this->assertSame(30.0, $revenue['margin_percent']);
+    }
+
+    /**
+     * Periode boleh dipilih bebas lewat query string, dan hasilnya tidak boleh
+     * ikut menghitung project Won di luar rentang tanggal yang diminta.
+     */
+    public function test_revenue_can_be_filtered_to_a_custom_date_range(): void
+    {
+        $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
+        $project = $this->materialProject();
+        $project->salesOrder->update(['status' => 'won']);
+        $project->forceFill(['created_at' => '2026-01-15'])->save();
+
+        $res = $this->actingAs($management)->get('/dashboard?from=2026-01-01&to=2026-01-31');
+        $overview = $res->viewData('page')['props']['managementOverview'];
+
+        $this->assertSame('2026-01-01', $overview['period']['from']);
+        $this->assertSame('2026-01-31', $overview['period']['to']);
+        $this->assertSame(2600000.0, $overview['revenue']['revenue']);
+
+        // Di luar rentang tanggal itu, project ini tidak boleh ikut terhitung.
+        $res2 = $this->actingAs($management)->get('/dashboard?from=2026-02-01&to=2026-02-28');
+        $this->assertSame(0.0, $res2->viewData('page')['props']['managementOverview']['revenue']['revenue']);
+    }
+
+    /**
+     * Backlog/status (mis. jumlah lead per stage) adalah kondisi SEKARANG dan harus tetap
+     * utuh berapa pun periode yang dipilih — cuma angka "aktivitas" yang boleh berubah.
+     */
+    public function test_backlog_counts_are_not_affected_by_the_period_filter(): void
+    {
+        $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Cust', 'created_by' => $sales->id]);
+        Lead::create(['contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified'])->forceFill(['created_at' => '2020-01-01'])->save();
+
+        $unfiltered = $this->actingAs($management)->get('/dashboard')
+            ->viewData('page')['props']['managementOverview'];
+        $filtered = $this->actingAs($management)->get('/dashboard?from=2026-01-01&to=2026-01-02')
+            ->viewData('page')['props']['managementOverview'];
+
+        $stageBefore = collect($unfiltered['sales']['leads_by_stage'])->firstWhere('label', 'Terkualifikasi')['count'];
+        $stageAfter = collect($filtered['sales']['leads_by_stage'])->firstWhere('label', 'Terkualifikasi')['count'];
+        $this->assertSame($stageBefore, $stageAfter);
+        $this->assertGreaterThan(0, $stageAfter);
+    }
+
+    /**
+     * "Aktivitas Periode Ini" (lead baru, quotation dibuat, dst) dihitung dari created_at
+     * dalam rentang tanggal, dan dibandingkan dengan periode sebelumnya yang sama panjang.
+     */
+    public function test_activity_counts_leads_created_in_period_and_compares_to_previous_period(): void
+    {
+        $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Cust', 'created_by' => $sales->id]);
+
+        Lead::create(['contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'new'])->forceFill(['created_at' => '2026-01-15'])->save();
+        Lead::create(['contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'new'])->forceFill(['created_at' => '2026-01-16'])->save();
+        // Periode sebelumnya (Desember, panjang sama 31 hari) cuma 1 lead -> delta naik 100%.
+        Lead::create(['contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'new'])->forceFill(['created_at' => '2025-12-20'])->save();
+
+        $overview = $this->actingAs($management)->get('/dashboard?from=2026-01-01&to=2026-01-31')
+            ->viewData('page')['props']['managementOverview'];
+
+        $this->assertSame(2, $overview['activity']['leads_created']);
+        $this->assertSame(100.0, $overview['activity']['leads_created_delta_percent']);
     }
 
     public function test_non_management_cannot_be_shown_overview_even_if_role_changes(): void
