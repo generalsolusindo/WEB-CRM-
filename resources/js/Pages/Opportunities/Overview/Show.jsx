@@ -1,16 +1,35 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { useState } from 'react';
+import { FiTrash2 } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader } from '../../../Components/ui';
+import { PageHeader, Button, PromptDialog } from '../../../Components/ui';
 import { feedback } from '../../../Components/feedback';
 
-export default function Show({ opportunity, canDelegate, projectManagerOptions = [] }) {
+export default function Show({ opportunity, canDelegate, canForceDelete = false, projectManagerOptions = [] }) {
     const delegateForm = useForm({ project_manager_id: opportunity.delegated_to?.id ?? '' });
     const backHref = canDelegate ? '/management/opportunities' : '/project-manager/opportunities';
+    const [forceDeleteOpen, setForceDeleteOpen] = useState(false);
+    const [forceDeleting, setForceDeleting] = useState(false);
+    const [forceDeleteError, setForceDeleteError] = useState('');
 
     function submitDelegate(e) {
         e.preventDefault();
         feedback.expect({ success: { title: 'Delegasi opportunity diperbarui', style: 'popup' } });
         delegateForm.put(`/management/opportunities/${opportunity.id}/delegate`, { preserveScroll: true });
+    }
+
+    function confirmForceDelete(value) {
+        if (value !== opportunity.code) {
+            setForceDeleteError(`Ketik "${opportunity.code}" persis untuk konfirmasi.`);
+            return;
+        }
+        setForceDeleteError('');
+        setForceDeleting(true);
+        feedback.expect({ success: { title: 'Data dihapus total', style: 'popup' } });
+        router.delete(`/management/opportunities/${opportunity.id}`, {
+            onError: () => setForceDeleting(false),
+            onFinish: () => setForceDeleting(false),
+        });
     }
 
     return (
@@ -21,6 +40,31 @@ export default function Show({ opportunity, canDelegate, projectManagerOptions =
                     title={opportunity.code}
                     subtitle={opportunity.company || opportunity.customer}
                     back={{ href: backHref, label: 'Kembali' }}
+                    actions={canForceDelete && (
+                        <Button
+                            onClick={() => { setForceDeleteError(''); setForceDeleteOpen(true); }}
+                            variant="ghost"
+                            icon={FiTrash2}
+                            className="text-danger hover:bg-danger-soft hover:text-danger"
+                        >
+                            Hapus Total
+                        </Button>
+                    )}
+                />
+
+                <PromptDialog
+                    open={forceDeleteOpen}
+                    onClose={() => setForceDeleteOpen(false)}
+                    onConfirm={confirmForceDelete}
+                    title="Hapus total data ini?"
+                    description={`Seluruh Requirement, Meeting, Survey, Procurement Request, Quotation, Sales Order, Invoice, Project, SOW, BAST, pembayaran vendor, dokumen, dan notifikasi yang terhubung akan ikut terhapus PERMANEN — termasuk yang sudah ada transaksi/pembayaran nyata. Tindakan ini tidak bisa dibatalkan. Ketik ${opportunity.code} untuk konfirmasi.`}
+                    label="Kode Opportunity"
+                    placeholder={opportunity.code}
+                    required
+                    error={forceDeleteError}
+                    processing={forceDeleting}
+                    confirmLabel="Hapus Total"
+                    confirmVariant="danger"
                 />
 
                 <section className="grid gap-x-6 gap-y-4 card p-6 sm:grid-cols-2">

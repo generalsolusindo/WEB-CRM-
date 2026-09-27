@@ -85,6 +85,67 @@ class ProjectProfitTest extends TestCase
             ->assertInertia(fn ($page) => $page->where('projects.data.0.uses_vendor_fee', false)->where('projects.data.0.hpp', 2000000));
     }
 
+    /**
+     * Regresi untuk pertanyaan "diskon dihitung dua kali atau tidak": Harga Jual di laporan
+     * ini SUDAH bersih dari diskon (diambil dari `subtotal`, bukan `selling_price x qty`
+     * mentah), jadi rumus Profit = Harga Jual - HPP TIDAK boleh mengurangi diskon lagi
+     * secara terpisah. HPP sendiri tetap dari cost_price mentah (belum ada sourcing aktual),
+     * tidak ikut terpotong diskon — diskon murni urusan sisi harga jual ke customer.
+     */
+    public function test_discount_is_reflected_once_in_harga_jual_not_subtracted_again_from_profit(): void
+    {
+        $sales = User::factory()->create(['role' => 'sales']);
+        $contact = Contact::create(['name' => 'Cust Diskon', 'created_by' => $sales->id]);
+        $lead = Lead::create(['contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified']);
+        $lead->requirements()->create(['item_name' => 'Router', 'qty' => 2, 'unit' => 'unit', 'created_by' => $sales->id]);
+        $this->actingAs($sales)->post("/sales/leads/{$lead->id}/submit-procurement");
+        $pr = ProcurementRequest::with('lines')->latest('id')->firstOrFail();
+        // Cost dari Procurement (dasar HPP): 1.000.000/unit x 2 = HPP 2.000.000.
+        $pr->lines()->update(['cost_price' => 1000000, 'availability_status' => 'available']);
+        $pr->update(['status' => 'ready']);
+        // Sales pasang harga jual 1.300.000/unit, TAPI kasih diskon 20% saat quotation.
+        $this->actingAs($sales)->post("/sales/procurement-requests/{$pr->id}/quotations", [
+            'lines' => [[
+                'procurement_request_line_id' => $pr->lines()->first()->id,
+                'selling_price' => 1300000,
+                'discount_percent' => 20,
+            ]],
+        ]);
+        $quotation = Quotation::latest('id')->firstOrFail();
+        // Harga jual per unit setelah diskon 20% = 1.040.000 -> subtotal 2 unit = 2.080.000.
+        $this->assertSame('2080000.00', $quotation->lines()->first()->subtotal);
+        $quotation->update(['status' => 'sent']);
+        $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload('mixed'));
+        $so = $quotation->salesOrder()->firstOrFail();
+
+        $finance = User::factory()->create(['role' => 'finance']);
+        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'dp']);
+        $invoice = $so->invoices()->latest('id')->firstOrFail();
+        $this->actingAs($finance)->post("/finance/invoices/{$invoice->id}/payments", [
+            'amount_paid' => (float) $invoice->amount + (float) $invoice->tax_amount,
+            'paid_at' => now()->toDateTimeString(),
+        ]);
+        $project = Project::where('sales_order_id', $so->id)->firstOrFail();
+        $project->salesOrder->update(['status' => 'won']);
+
+        $response = $this->actingAs($this->management())->get('/management/project-profit');
+        $response->assertInertia(fn ($page) => $page
+            // Harga Jual = subtotal yang SUDAH bersih diskon (2.080.000), bukan 2.600.000 (harga sebelum diskon).
+            ->where('projects.data.0.harga_jual', 2080000)
+            // HPP tetap dari cost_price mentah, tidak ikut didiskon.
+            ->where('projects.data.0.hpp', 2000000)
+            // Profit = 2.080.000 - 2.000.000 = 80.000 — BUKAN 2.080.000 - 2.000.000 - diskon lagi.
+            ->where('projects.data.0.profit', 80000));
+
+        // Dashboard (kartu Pendapatan & Profit) harus persis sama, karena satu rumus yang sama.
+        $monthStart = now()->startOfMonth()->toDateString();
+        $monthEnd = now()->endOfMonth()->toDateString();
+        $dash = $this->actingAs($this->management())->get("/dashboard?from={$monthStart}&to={$monthEnd}")
+            ->viewData('page')['props']['managementOverview']['revenue'];
+        $this->assertSame(2080000.0, $dash['revenue']);
+        $this->assertSame(80000.0, $dash['profit']);
+    }
+
     public function test_can_filter_by_won_scope(): void
     {
         $project = $this->plannedProject();

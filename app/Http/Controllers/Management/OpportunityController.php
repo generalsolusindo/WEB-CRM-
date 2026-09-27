@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Management;
 
+use App\Actions\Management\DeleteLeadCompletely;
 use App\Enums\LeadStage;
 use App\Http\Controllers\Concerns\BuildsOpportunityOverview;
 use App\Http\Controllers\Concerns\NormalizesDateRangeFilter;
@@ -63,6 +64,7 @@ class OpportunityController extends Controller
         return Inertia::render('Opportunities/Overview/Show', [
             'opportunity' => $this->opportunityDetail($lead),
             'canDelegate' => request()->user()->can('delegate', $lead),
+            'canForceDelete' => request()->user()->can('forceDelete', Lead::class),
             'projectManagerOptions' => User::query()
                 ->where('role', 'project_manager')
                 ->where('is_active', true)
@@ -82,5 +84,19 @@ class OpportunityController extends Controller
         ]);
 
         return back()->with('success', $pmId ? 'Opportunity didelegasikan.' : 'Delegasi opportunity ditarik kembali.');
+    }
+
+    /**
+     * Hapus total (permanen, tanpa batasan) — pembersihan data dummy/coba-coba.
+     * Beda dari Sales\LeadController::destroy() yang dikunci begitu ada transaksi nyata.
+     */
+    public function destroy(Lead $lead, DeleteLeadCompletely $action): RedirectResponse
+    {
+        Gate::authorize('forceDelete', Lead::class);
+
+        $action->handle($lead);
+
+        return redirect()->route('management.opportunities.index')
+            ->with('success', 'Data berhasil dihapus total beserta seluruh riwayatnya.');
     }
 }

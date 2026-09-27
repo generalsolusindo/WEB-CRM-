@@ -16,12 +16,17 @@ use App\Models\Quotation;
 use App\Models\SalesOrder;
 use App\Models\User;
 use App\Models\Vendor;
+use Illuminate\Http\UploadedFile;
 
 trait BuildsProcurementProject
 {
     /**
      * Bangun sebuah Project berstatus Planning yang punya baris pengadaan
      * material ({@see ActualProcurement}) hasil seeding dari Procurement Request.
+     *
+     * Setiap pencarian record (PR/Quotation/SO/Invoice/Project) di-scope ke rantai
+     * lead yang baru dibuat (bukan sekadar firstOrFail() polos), jadi AMAN dipanggil
+     * berkali-kali dalam satu test untuk mendapat beberapa Project independen.
      *
      * @param  array<int, array{item_name?: string, qty?: int|float, unit?: string, cost_price?: int|float}>  $items
      */
@@ -48,7 +53,7 @@ trait BuildsProcurementProject
         }
 
         $this->actingAs($sales)->post("/sales/leads/{$lead->id}/submit-procurement");
-        $pr = ProcurementRequest::with('lines')->firstOrFail();
+        $pr = ProcurementRequest::with('lines')->where('lead_id', $lead->id)->firstOrFail();
 
         foreach ($pr->lines as $i => $line) {
             $line->update([
@@ -64,7 +69,7 @@ trait BuildsProcurementProject
                 'selling_price' => (float) $line->cost_price * 1.3,
             ])->all(),
         ]);
-        $quotation = Quotation::firstOrFail();
+        $quotation = Quotation::where('procurement_request_id', $pr->id)->firstOrFail();
         $quotation->update([
             'status' => 'sent',
             'pm_review_status' => 'approved',
@@ -72,18 +77,18 @@ trait BuildsProcurementProject
         ]);
 
         $this->actingAs($sales)->post("/sales/quotations/{$quotation->id}/confirm", $this->confirmPayload($orderType));
-        $so = SalesOrder::firstOrFail();
+        $so = SalesOrder::where('quotation_id', $quotation->id)->firstOrFail();
 
         $finance = User::factory()->create(['role' => 'finance']);
         $invoicePhase = $orderType === 'material_only' ? 'full' : 'dp';
         $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => $invoicePhase]);
-        $invoice = Invoice::firstOrFail();
+        $invoice = Invoice::where('sales_order_id', $so->id)->firstOrFail();
         $this->actingAs($finance)->post("/finance/invoices/{$invoice->id}/payments", [
             'amount_paid' => (float) $invoice->amount + (float) $invoice->tax_amount,
             'paid_at' => now()->toDateTimeString(),
         ]);
 
-        $project = Project::firstOrFail();
+        $project = Project::where('sales_order_id', $so->id)->firstOrFail();
         $project->update(['status' => 'planning']);
 
         return $project->fresh();
@@ -108,7 +113,7 @@ trait BuildsProcurementProject
         app(ReviewProcurementPayment::class)->handle($payment, $pm, true, null);
         app(RecordProcurementPayment::class)->handle($payment->fresh(), $finance, [
             'item_ids' => $project->actualProcurements()->where('from_office_stock', false)->pluck('id')->all(),
-            'proof' => \Illuminate\Http\UploadedFile::fake()->create('tf.pdf', 20, 'application/pdf'),
+            'proof' => UploadedFile::fake()->create('tf.pdf', 20, 'application/pdf'),
         ]);
         app(ConfirmProcurementPayment::class)->handle($payment->fresh(), $procurement);
 

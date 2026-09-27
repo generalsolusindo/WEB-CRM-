@@ -8,10 +8,29 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\Auth;
 
 class Project extends Model
 {
     use HasFactory;
+
+    /**
+     * Catat setiap perpindahan status ke project_status_histories secara otomatis,
+     * supaya semua titik kode yang mengubah status (InitializeProject, MarkProjectReady,
+     * ProjectMaterialProgress, dst.) tidak perlu masing-masing menulis log sendiri.
+     */
+    protected static function booted(): void
+    {
+        static::updated(function (self $project) {
+            if ($project->wasChanged('status')) {
+                $project->statusHistories()->create([
+                    'from_status' => $project->getOriginal('status'),
+                    'to_status' => $project->status,
+                    'changed_by' => Auth::id(),
+                ]);
+            }
+        });
+    }
 
     protected $fillable = [
         'sales_order_id',
@@ -142,5 +161,10 @@ class Project extends Model
     public function leader(): HasOne
     {
         return $this->hasOne(ProjectTechnician::class)->where('is_leader', true);
+    }
+
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(ProjectStatusHistory::class)->orderBy('created_at')->orderBy('id');
     }
 }

@@ -106,6 +106,7 @@ Route::middleware('auth')->group(function () {
         Route::get('opportunities', [ManagementOpportunityController::class, 'index'])->name('opportunities.index');
         Route::get('opportunities/{lead}', [ManagementOpportunityController::class, 'show'])->name('opportunities.show');
         Route::put('opportunities/{lead}/delegate', [ManagementOpportunityController::class, 'delegate'])->name('opportunities.delegate');
+        Route::delete('opportunities/{lead}', [ManagementOpportunityController::class, 'destroy'])->name('opportunities.destroy');
         Route::get('quotations', [ManagementQuotationController::class, 'index'])->name('quotations.index');
         Route::get('quotations-overview', [ManagementQuotationController::class, 'all'])->name('quotations.all');
         // Alias URL untuk baris di "Semua Quotation" — controller show() sama persis, cuma

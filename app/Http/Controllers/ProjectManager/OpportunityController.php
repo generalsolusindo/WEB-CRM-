@@ -49,6 +49,7 @@ class OpportunityController extends Controller
         return Inertia::render('Opportunities/Overview/Show', [
             'opportunity' => $this->opportunityDetail($lead),
             'canDelegate' => false,
+            'canForceDelete' => false,
             'projectManagerOptions' => [],
         ]);
     }

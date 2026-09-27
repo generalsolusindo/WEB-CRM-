@@ -95,6 +95,20 @@ class OpportunityDelegationTest extends TestCase
         $this->actingAs($pmA)->get("/project-manager/opportunities/{$leadB->id}")->assertForbidden();
     }
 
+    public function test_only_management_sees_the_force_delete_capability(): void
+    {
+        $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
+        $pm = User::factory()->create(['role' => 'project_manager', 'is_active' => true]);
+        $lead = $this->opportunity();
+        $this->actingAs($management)->put("/management/opportunities/{$lead->id}/delegate", ['project_manager_id' => $pm->id]);
+
+        $this->actingAs($management)->get("/management/opportunities/{$lead->id}")
+            ->assertInertia(fn ($page) => $page->where('canForceDelete', true));
+
+        $this->actingAs($pm)->get("/project-manager/opportunities/{$lead->id}")
+            ->assertInertia(fn ($page) => $page->where('canForceDelete', false));
+    }
+
     public function test_pm_and_sales_cannot_delegate(): void
     {
         $pm = User::factory()->create(['role' => 'project_manager', 'is_active' => true]);

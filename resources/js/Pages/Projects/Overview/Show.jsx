@@ -3,6 +3,29 @@ import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, StatusBadge, StageStepper } from '../../../Components/ui';
 import { feedback } from '../../../Components/feedback';
 
+function formatDate(value) {
+    return value ? new Date(value).toLocaleDateString('id-ID') : null;
+}
+
+function formatDateTime(value) {
+    return value ? new Date(value).toLocaleString('id-ID') : null;
+}
+
+function formatDuration(fromIso) {
+    if (!fromIso) return null;
+    const ms = Date.now() - new Date(fromIso).getTime();
+    const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+    if (days <= 0) {
+        const hours = Math.max(1, Math.floor(ms / (1000 * 60 * 60)));
+        return `${hours} jam`;
+    }
+    return `${days} hari`;
+}
+
+function formatRupiah(value) {
+    return `Rp${Number(value ?? 0).toLocaleString('id-ID')}`;
+}
+
 export default function Show({ project, canDelegate, projectManagerOptions = [] }) {
     const delegateForm = useForm({ project_manager_id: project.delegated_to?.id ?? '' });
 
@@ -31,8 +54,45 @@ export default function Show({ project, canDelegate, projectManagerOptions = [] 
                 />
 
                 <section className="card p-6">
-                    <h2 className="mb-4 font-semibold text-text">Progress Project</h2>
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                        <h2 className="font-semibold text-text">Progress Project</h2>
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                            {project.is_overdue && <StatusBadge status="overdue" label="Terlambat dari Target" />}
+                            {project.status !== 'completed' && formatDuration(project.current_stage_since) && (
+                                <span className="rounded-full bg-bg px-2.5 py-1 font-semibold text-text-muted">
+                                    {formatDuration(project.current_stage_since)} di tahap ini
+                                </span>
+                            )}
+                        </div>
+                    </div>
                     <StageStepper stages={project.stage_options} current={project.status} />
+
+                    <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 border-t border-border pt-4 text-sm">
+                        <span className="text-text-muted">
+                            Rencana Mulai: <span className="font-medium text-text">{formatDate(project.planned_start) || 'Belum diatur'}</span>
+                        </span>
+                        <span className="text-text-muted">
+                            Target Selesai: <span className={`font-medium ${project.is_overdue ? 'text-danger' : 'text-text'}`}>{formatDate(project.planned_end) || 'Belum diatur'}</span>
+                        </span>
+                    </div>
+
+                    {project.status_histories.length > 0 && (
+                        <div className="mt-4 border-t border-border pt-4">
+                            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-text-faint">Riwayat Tahap</h3>
+                            <ul className="space-y-1.5 text-sm">
+                                {project.status_histories.map((h) => (
+                                    <li key={h.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
+                                        <span className="text-text">
+                                            {h.from_label ? `${h.from_label} → ${h.to_label}` : h.to_label}
+                                        </span>
+                                        <span className="text-xs text-text-muted">
+                                            {formatDateTime(h.at)}{h.changed_by ? ` · ${h.changed_by}` : ''}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </section>
 
                 <section className="grid gap-x-6 gap-y-4 card p-6 sm:grid-cols-2">
@@ -120,6 +180,27 @@ export default function Show({ project, canDelegate, projectManagerOptions = [] 
                                 <li key={b.id} className="flex justify-between py-2">
                                     <span className="text-text">{b.submitter} · {b.submitted_at ? new Date(b.submitted_at).toLocaleString('id-ID') : '—'}</span>
                                     <span className="text-text-muted">{b.status}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </section>
+
+                <section className="card p-6">
+                    <h2 className="font-semibold text-text">Invoice</h2>
+                    {project.invoices.length === 0 ? (
+                        <p className="mt-2 text-sm text-text-muted">Belum ada invoice untuk Sales Order ini.</p>
+                    ) : (
+                        <ul className="mt-2 divide-y divide-border text-sm">
+                            {project.invoices.map((inv) => (
+                                <li key={inv.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
+                                    <span className="text-text">
+                                        {inv.number}{inv.phase_label ? ` · ${inv.phase_label}` : ''}
+                                    </span>
+                                    <span className="flex items-center gap-3">
+                                        <span className="text-text-muted">{formatRupiah(inv.paid_amount)} / {formatRupiah(inv.grand_total)}</span>
+                                        <StatusBadge status={inv.status} label={inv.status_label} />
+                                    </span>
                                 </li>
                             ))}
                         </ul>

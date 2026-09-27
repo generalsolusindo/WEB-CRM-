@@ -72,6 +72,17 @@ class LeadPolicy
         return ! $lead->surveys()->whereHas('invoice')->exists();
     }
 
+    /**
+     * Hapus total tanpa batasan apa pun (beda dari delete() di atas) — dipakai Manajemen
+     * untuk membersihkan data dummy/coba-coba, termasuk yang sudah ada Invoice, Project,
+     * pembayaran Procurement, dst. Sengaja hanya Manajemen: aksi ini permanen dan tidak
+     * bisa dibatalkan, jadi tidak dibuka untuk Sales meski itu lead miliknya sendiri.
+     */
+    public function forceDelete(User $user): bool
+    {
+        return $this->isManagement($user);
+    }
+
     public function convert(User $user, Lead $lead): bool
     {
         return $this->owns($user, $lead);

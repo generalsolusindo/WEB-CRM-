@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Concerns;
 
+use App\Enums\InvoicePhase;
+use App\Enums\InvoiceStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\SalesOrderStatus;
 use App\Models\Project;
@@ -36,6 +38,7 @@ trait BuildsProjectOverview
             'salesOrder:id,number,contact_id,order_type,status',
             'salesOrder.contact:id,name,company_name',
             'salesOrder.lines:id,sales_order_id,category,qty',
+            'salesOrder.invoices' => fn ($q) => $q->oldest('id'),
             'technicians.technician:id,name',
             'delegatedTo:id,name',
             'delegatedBy:id,name',
@@ -44,7 +47,13 @@ trait BuildsProjectOverview
             'bastRecords.submitter:id,name',
             'attachments' => fn ($q) => $q->where('category', 'checkin_selfie')->latest(),
             'attachments.uploader:id,name',
+            'statusHistories.changedBy:id,name',
         ]);
+
+        $lastTransitionAt = $project->statusHistories->last()?->created_at ?? $project->created_at;
+        $isOverdue = $project->planned_end
+            && $project->planned_end->isPast()
+            && $project->status !== ProjectStatus::Completed->value;
 
         return [
             'id' => $project->id,
@@ -57,10 +66,33 @@ trait BuildsProjectOverview
             'sales_order' => $project->salesOrder?->number,
             'is_won' => $project->salesOrder?->status === SalesOrderStatus::Won->value,
             'stage_options' => ProjectStatus::options(),
+            'planned_start' => $project->planned_start?->format('Y-m-d'),
+            'planned_end' => $project->planned_end?->format('Y-m-d'),
+            'is_overdue' => $isOverdue,
+            'current_stage_since' => $lastTransitionAt,
             'delegated_to' => $project->delegatedTo ? ['id' => $project->delegatedTo->id, 'name' => $project->delegatedTo->name] : null,
             'delegated_by' => $project->delegatedBy?->name,
             'delegated_at' => $project->delegated_at,
             'material_status' => $project->salesOrder ? MaterialDeliveryStatus::of($project->salesOrder) : null,
+            'status_histories' => $project->statusHistories->map(fn ($h) => [
+                'id' => $h->id,
+                'from_status' => $h->from_status,
+                'from_label' => $h->from_status ? ProjectStatus::from($h->from_status)->label() : null,
+                'to_status' => $h->to_status,
+                'to_label' => ProjectStatus::from($h->to_status)->label(),
+                'changed_by' => $h->changedBy?->name,
+                'at' => $h->created_at,
+            ]),
+            'invoices' => $project->salesOrder?->invoices->map(fn ($inv) => [
+                'id' => $inv->id,
+                'number' => $inv->number,
+                'phase_label' => $inv->invoice_phase ? InvoicePhase::from($inv->invoice_phase)->label() : null,
+                'status' => $inv->status,
+                'status_label' => InvoiceStatus::from($inv->status)->label(),
+                'grand_total' => $inv->grandTotal(),
+                'paid_amount' => $inv->settledAmount(),
+                'due_date' => $inv->due_date?->format('Y-m-d'),
+            ])->all() ?? [],
             'technicians' => $project->technicians->map(fn ($pt) => [
                 'name' => $pt->technician?->name,
                 'is_leader' => (bool) $pt->is_leader,
