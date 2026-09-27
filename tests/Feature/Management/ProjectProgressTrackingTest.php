@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Management;
 
+use App\Models\Bast;
 use App\Models\Contact;
 use App\Models\Lead;
 use App\Models\ProcurementRequest;
@@ -10,6 +11,8 @@ use App\Models\ProjectStatusHistory;
 use App\Models\Quotation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ProjectProgressTrackingTest extends TestCase
@@ -76,6 +79,48 @@ class ProjectProgressTrackingTest extends TestCase
         $project->update(['status' => 'completed']);
         $res2 = $this->actingAs($management)->get("/management/projects/{$project->id}");
         $res2->assertInertia(fn ($page) => $page->where('project.is_overdue', false));
+    }
+
+    public function test_overview_page_exposes_items_payment_proofs_and_documents(): void
+    {
+        Storage::fake('local');
+        $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
+        $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
+        $project = $this->plannedProject();
+
+        $payment = $project->salesOrder->invoices->first()->payments()->first();
+        $payment->attachments()->create([
+            'category' => 'payment_proof',
+            'file_path' => UploadedFile::fake()->image('bukti.jpg')->store('payment-proofs'),
+            'uploaded_by' => $management->id,
+        ]);
+
+        $bast = Bast::create([
+            'project_id' => $project->id, 'status' => 'verified',
+            'submitted_by' => $ops->id, 'submitted_at' => now(),
+        ]);
+        $bast->attachments()->create([
+            'category' => 'bast_document',
+            'file_path' => UploadedFile::fake()->image('bast.jpg')->store('bast-documents'),
+            'uploaded_by' => $ops->id,
+        ]);
+
+        $task = $project->tasks()->create(['title' => 'Instalasi', 'status' => 'done', 'created_by' => $ops->id]);
+        $task->attachments()->create([
+            'category' => 'task_after',
+            'file_path' => UploadedFile::fake()->image('after.jpg')->store('task-photos'),
+            'uploaded_by' => $ops->id,
+        ]);
+
+        $res = $this->actingAs($management)->get("/management/projects/{$project->id}");
+        $res->assertOk();
+        $res->assertInertia(fn ($page) => $page
+            ->has('project.items', 1)
+            ->where('project.items.0.item_name', 'Router')
+            ->where('project.items.0.qty', '2.00')
+            ->has('project.invoices.0.payments', 1)
+            ->has('project.invoices.0.payments.0.proofs', 1)
+            ->has('project.documents', 2));
     }
 
     private function lastIndex(int $count): int

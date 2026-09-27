@@ -107,6 +107,30 @@ export default function Show({ project, canDelegate, projectManagerOptions = [] 
                         label="Didelegasikan ke"
                         value={project.delegated_to ? `${project.delegated_to.name} (oleh ${project.delegated_by}, ${new Date(project.delegated_at).toLocaleDateString('id-ID')})` : 'Belum didelegasikan — dipegang Manager'}
                     />
+                    {project.sow && (
+                        <Info
+                            label="SOW"
+                            value={<a href={project.sow.url} className="font-medium text-primary hover:underline">Lihat SOW ({project.sow.status})</a>}
+                        />
+                    )}
+                </section>
+
+                <section className="card p-6">
+                    <h2 className="font-semibold text-text">Kebutuhan & Harga</h2>
+                    {project.items.length === 0 ? (
+                        <p className="mt-2 text-sm text-text-muted">Belum ada baris item.</p>
+                    ) : (
+                        <ul className="mt-2 divide-y divide-border text-sm">
+                            {project.items.map((it) => (
+                                <li key={it.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-0.5 py-2">
+                                    <span className="text-text">
+                                        {it.item_name} <span className="text-text-muted">· {it.qty} {it.unit}</span>
+                                    </span>
+                                    <span className="text-text-muted">{formatRupiah(it.line_total)}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </section>
 
                 {canDelegate && (
@@ -193,17 +217,62 @@ export default function Show({ project, canDelegate, projectManagerOptions = [] 
                     ) : (
                         <ul className="mt-2 divide-y divide-border text-sm">
                             {project.invoices.map((inv) => (
-                                <li key={inv.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2">
-                                    <span className="text-text">
-                                        {inv.number}{inv.phase_label ? ` · ${inv.phase_label}` : ''}
-                                    </span>
-                                    <span className="flex items-center gap-3">
-                                        <span className="text-text-muted">{formatRupiah(inv.paid_amount)} / {formatRupiah(inv.grand_total)}</span>
-                                        <StatusBadge status={inv.status} label={inv.status_label} />
-                                    </span>
+                                <li key={inv.id} className="py-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                                        <span className="text-text">
+                                            {inv.number}{inv.phase_label ? ` · ${inv.phase_label}` : ''}
+                                        </span>
+                                        <span className="flex items-center gap-3">
+                                            <span className="text-text-muted">{formatRupiah(inv.paid_amount)} / {formatRupiah(inv.grand_total)}</span>
+                                            <StatusBadge status={inv.status} label={inv.status_label} />
+                                        </span>
+                                    </div>
+
+                                    {inv.pph23_slip_url && (
+                                        <a href={inv.pph23_slip_url} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs font-medium text-primary hover:underline">
+                                            Lihat Bukti Potong PPh 23
+                                        </a>
+                                    )}
+
+                                    {inv.payments.length > 0 && (
+                                        <div className="mt-2 flex flex-wrap gap-3">
+                                            {inv.payments.map((p) => (
+                                                <div key={p.id} className="flex items-center gap-2 rounded-lg border border-border p-2 text-xs">
+                                                    <div>
+                                                        <div className="font-medium text-text">{formatRupiah(p.amount_paid)}</div>
+                                                        <div className="text-text-muted">{formatDateTime(p.paid_at)}</div>
+                                                    </div>
+                                                    {p.proofs.map((proof) => (
+                                                        <a key={proof.id} href={proof.url} target="_blank" rel="noreferrer">
+                                                            <img src={proof.url} alt="Bukti bayar" className="h-10 w-10 rounded object-cover" />
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </li>
                             ))}
                         </ul>
+                    )}
+                </section>
+
+                <section className="card p-6">
+                    <h2 className="font-semibold text-text">Dokumen Lainnya</h2>
+                    {project.documents.length === 0 ? (
+                        <p className="mt-2 text-sm text-text-muted">Belum ada dokumen tambahan.</p>
+                    ) : (
+                        <div className="mt-3 flex flex-wrap gap-4">
+                            {project.documents.map((d) => (
+                                <a key={d.id} href={d.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-lg border border-border p-2 text-sm">
+                                    <img src={d.url} alt={d.label} className="h-12 w-12 rounded-lg object-cover" />
+                                    <div>
+                                        <div className="font-medium text-text">{d.label}</div>
+                                        <div className="text-xs text-text-muted">{d.uploader ? `${d.uploader} · ` : ''}{formatDateTime(d.at)}</div>
+                                    </div>
+                                </a>
+                            ))}
+                        </div>
                     )}
                 </section>
             </div>
