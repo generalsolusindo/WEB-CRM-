@@ -15,6 +15,7 @@ use App\Http\Requests\Sales\UpdateLeadRequest;
 use App\Models\Contact;
 use App\Models\Lead;
 use App\Models\Meeting;
+use App\Models\Quotation;
 use App\Models\Requirement;
 use App\Models\Survey;
 use Illuminate\Http\RedirectResponse;
@@ -166,10 +167,25 @@ class LeadController extends Controller
             ->latest('revision_number')
             ->first(['id', 'status', 'revision_number']);
 
+        // Quotation yang PR-nya ditolak dan masih bisa diperbaiki lewat "Perbaiki Kebutuhan" —
+        // Sales harus lewat sana, bukan kirim ulang dari Lead (yang membuat PR baru & quotation ganda).
+        $quotationToFix = $procurementRequest?->status === 'rejected'
+            ? Quotation::query()
+                ->where('lead_id', $lead->id)
+                ->where('sales_id', request()->user()->id)
+                ->where('status', '!=', 'cancelled')
+                ->whereHas('procurementRequest', fn ($query) => $query->where('status', 'rejected'))
+                ->whereDoesntHave('salesOrder')
+                ->whereDoesntHave('revisions')
+                ->latest('id')
+                ->first(['id', 'number', 'revision_number'])
+            : null;
+
         $procurementData = $procurementRequest ? [
             'id' => $procurementRequest->id,
             'status' => $procurementRequest->status,
             'rejection_reason' => $procurementRequest->rejection_reason,
+            'quotation_to_fix' => $quotationToFix,
             'created_at' => $procurementRequest->created_at,
             'quotation' => $existingQuotation,
             'lines' => $procurementRequest->lines->map(fn ($line) => [

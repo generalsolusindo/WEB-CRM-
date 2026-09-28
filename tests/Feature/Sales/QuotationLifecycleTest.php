@@ -1303,6 +1303,32 @@ class QuotationLifecycleTest extends TestCase
         $this->assertSame('rejected', $pr->fresh()->status);
     }
 
+    public function test_lead_page_points_to_the_quotation_when_its_request_was_rejected(): void
+    {
+        [$sales, $quotation] = $this->quotationWithTwoItems();
+        $quotation->procurementRequest->update(['status' => 'rejected', 'rejection_reason' => 'Salah Penjelasan']);
+
+        $this->actingAs($sales)->get("/sales/leads/{$quotation->lead_id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('procurementRequest.status', 'rejected')
+                ->where('procurementRequest.quotation_to_fix.id', $quotation->id));
+    }
+
+    public function test_lead_page_has_no_quotation_to_fix_when_request_is_not_rejected_or_has_no_quotation(): void
+    {
+        [$sales, $quotation] = $this->quotationWithTwoItems();
+
+        $this->actingAs($sales)->get("/sales/leads/{$quotation->lead_id}")
+            ->assertInertia(fn ($page) => $page->where('procurementRequest.quotation_to_fix', null));
+
+        $quotation->lines()->delete();
+        $quotation->delete();
+        $quotation->procurementRequest->update(['status' => 'rejected', 'rejection_reason' => 'x']);
+
+        $this->actingAs($sales)->get("/sales/leads/{$quotation->lead_id}")
+            ->assertInertia(fn ($page) => $page->where('procurementRequest.quotation_to_fix', null));
+    }
+
     public function test_rejection_notification_links_to_the_quotation_when_one_exists(): void
     {
         [$sales, $quotation] = $this->quotationWithTwoItems();

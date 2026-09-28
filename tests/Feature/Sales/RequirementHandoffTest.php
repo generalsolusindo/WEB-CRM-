@@ -220,6 +220,12 @@ class RequirementHandoffTest extends TestCase
         }
     }
 
+    public function test_akun_and_sesi_are_available_as_units(): void
+    {
+        $this->assertContains('akun', Requirement::UNITS);
+        $this->assertContains('sesi', Requirement::UNITS);
+    }
+
     private function requirementData(): array
     {
         return [

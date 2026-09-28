@@ -16,7 +16,7 @@ class Requirement extends Model
      * @var list<string>
      */
     public const UNITS = [
-        'meter', 'node', 'rol', 'batang', 'pasang', 'titik', 'set', 'pack', 'core', 'kilo', 'unit', 'pcs', 'lot', 'license', 'month', 'm²',
+        'meter', 'node', 'rol', 'batang', 'pasang', 'titik', 'set', 'pack', 'core', 'kilo', 'unit', 'pcs', 'lot', 'license', 'month', 'm²', 'akun', 'sesi',
     ];
 
     /**

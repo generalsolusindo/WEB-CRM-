@@ -19,7 +19,14 @@ export default function ProcurementStatusPanel({ request }) {
             {rejected && (
                 <div className="mb-4 rounded-xl border border-danger/25 bg-danger-soft p-4 text-sm text-danger">
                     <strong>Ditolak Procurement:</strong> {request.rejection_reason}
-                    <div className="mt-1 text-danger/80">Perbaiki requirement di atas, lalu kirim ulang ke Procurement.</div>
+                    {request.quotation_to_fix ? (
+                        <div className="mt-1 text-danger/80">
+                            Lead ini sudah punya quotation {request.quotation_to_fix.number ?? `QT-${request.quotation_to_fix.id}`}. Buka quotation itu lalu klik &quot;Perbaiki Kebutuhan&quot; — jangan kirim ulang dari sini, karena akan membuat Procurement Request baru.{' '}
+                            <Link href={`/sales/quotations/${request.quotation_to_fix.id}`} className="font-semibold underline">Buka Quotation</Link>
+                        </div>
+                    ) : (
+                        <div className="mt-1 text-danger/80">Perbaiki requirement di atas, lalu kirim ulang ke Procurement.</div>
+                    )}
                 </div>
             )}
             <TableScroll className="rounded-xl border border-border">
