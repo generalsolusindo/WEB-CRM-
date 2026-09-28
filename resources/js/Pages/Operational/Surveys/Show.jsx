@@ -5,7 +5,7 @@ import { PageHeader, Button, StatusBadge, PromptDialog } from '../../../Componen
 import { feedback } from '../../../Components/feedback';
 import TableScroll from '../../../Components/ui/TableScroll';
 
-export default function Show({ survey, report, canBrief, canVerify, canCancel, canManageTeam, surveyorOptions = [], checkIns = [] }) {
+export default function Show({ survey, report, canBrief, canVerify, canCancel, canManageTeam, surveyorOptions = [], checkIns = [], resultDocuments = [], canManageResultDocuments = false }) {
     const currentTeam = survey.team ?? [];
     const currentLeader = currentTeam.find((t) => t.is_leader)?.id ?? currentTeam[0]?.id ?? null;
 
@@ -21,10 +21,34 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
     const verifyForm = useForm({ decision: 'approve', notes: '' });
     const [cancelOpen, setCancelOpen] = useState(false);
     const [cancelling, setCancelling] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState('');
 
     function submitBrief(e) { e.preventDefault(); feedback.expect({ success: { title: 'Briefing survey tersimpan', style: 'popup' } }); briefForm.post(`/operational/surveys/${survey.id}/brief`); }
     function submitTeam(e) { e.preventDefault(); teamForm.patch(`/operational/surveys/${survey.id}/team`, { preserveScroll: true }); }
     function submitVerify(e) { e.preventDefault(); feedback.expect({ success: { title: 'Laporan survey diverifikasi', style: 'popup' } }); verifyForm.post(`/operational/surveys/${survey.id}/verify`); }
+    function uploadResultDocument(e) {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file) return;
+        setUploadError('');
+        setUploading(true);
+        feedback.expect({ success: { title: 'Dokumen hasil survey tersimpan', style: 'popup' } });
+        router.post(`/operational/surveys/${survey.id}/result-documents`, { file }, {
+            forceFormData: true,
+            preserveScroll: true,
+            onError: (errors) => setUploadError(errors.file ?? 'Dokumen gagal diunggah.'),
+            onFinish: () => setUploading(false),
+        });
+    }
+    function deleteResultDocument(doc) {
+        feedback.act({
+            method: 'delete',
+            url: `/operational/surveys/${survey.id}/result-documents/${doc.id}`,
+            confirm: { title: 'Hapus dokumen ini?', text: `${doc.name} akan dihapus permanen.`, tone: 'danger', confirmLabel: 'Hapus' },
+            success: { title: 'Dokumen dihapus' },
+        });
+    }
     function cancelSurvey(reason) {
         setCancelling(true);
         feedback.expect({ success: { title: 'Survey dibatalkan', style: 'popup' } });
@@ -123,6 +147,46 @@ export default function Show({ survey, report, canBrief, canVerify, canCancel, c
                             </form>
                         )}
                     </>
+                )}
+
+                {(resultDocuments.length > 0 || canManageResultDocuments) && (
+                    <section className="card p-6">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <h2 className="font-semibold text-text">Dokumen Hasil Survey</h2>
+                                <p className="mt-0.5 text-xs text-text-muted">Gambar (JPG/PNG) atau PDF, maksimal 5 MB per file.</p>
+                            </div>
+                            {canManageResultDocuments && (
+                                <label className={`btn btn-outline cursor-pointer ${uploading ? 'pointer-events-none opacity-60' : ''}`}>
+                                    {uploading ? 'Mengunggah…' : 'Unggah Dokumen'}
+                                    <input type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" className="hidden" onChange={uploadResultDocument} disabled={uploading} />
+                                </label>
+                            )}
+                        </div>
+                        {uploadError && <span className="mt-2 block text-xs text-danger">{uploadError}</span>}
+                        {resultDocuments.length === 0 ? (
+                            <p className="mt-3 text-sm text-text-muted">Belum ada dokumen hasil survey.</p>
+                        ) : (
+                            <div className="mt-3 flex flex-wrap gap-4">
+                                {resultDocuments.map((d) => (
+                                    <div key={d.id} className="flex items-center gap-3 rounded-lg border border-border p-2 text-sm">
+                                        <a href={d.url} target="_blank" rel="noreferrer" className="flex items-center gap-3">
+                                            {d.is_image
+                                                ? <img src={d.url} alt={d.name} className="h-12 w-12 rounded-lg object-cover" />
+                                                : <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-danger-soft text-[11px] font-bold text-danger">PDF</span>}
+                                            <div>
+                                                <div className="max-w-[14rem] truncate font-medium text-text">{d.name}</div>
+                                                <div className="text-xs text-text-muted">{d.uploader ? `${d.uploader} · ` : ''}{new Date(d.at).toLocaleString('id-ID')}</div>
+                                            </div>
+                                        </a>
+                                        {canManageResultDocuments && (
+                                            <button type="button" onClick={() => deleteResultDocument(d)} className="text-xs font-semibold text-danger hover:underline">Hapus</button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </section>
                 )}
 
                 {report && ['submitted', 'verified', 'rejected'].includes(report.status) && (

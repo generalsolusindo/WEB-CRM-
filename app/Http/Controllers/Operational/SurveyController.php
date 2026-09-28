@@ -3,15 +3,21 @@
 namespace App\Http\Controllers\Operational;
 
 use App\Actions\Operational\BriefSurvey;
+use App\Actions\Operational\SyncSurveyTeam;
 use App\Actions\Operational\VerifySurveyReport;
 use App\Actions\Survey\CancelSurvey;
 use App\Enums\SurveyDeliveryMode;
 use App\Enums\SurveyStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Operational\BriefSurveyRequest;
+use App\Http\Requests\Operational\UpdateSurveyTeamRequest;
+use App\Http\Requests\Operational\UploadSurveyResultDocumentRequest;
 use App\Http\Requests\Operational\VerifySurveyReportRequest;
+use App\Models\Attachment;
 use App\Models\Survey;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -59,12 +65,20 @@ class SurveyController extends Controller
             'report.items' => fn ($q) => $q->orderBy('id'),
             'report.submittedBy:id,name',
             'report.attachments:id,attachable_type,attachable_id,category,file_path,created_at',
-            'attachments' => fn ($q) => $q->where('category', 'checkin_selfie')->latest(),
+            'attachments' => fn ($q) => $q->whereIn('category', ['checkin_selfie', 'survey_result_document'])->latest(),
             'attachments.uploader:id,name',
         ]);
 
         $report = $survey->report;
-        $checkIns = $survey->attachments->map(fn ($a) => [
+        $resultDocuments = $survey->attachments->where('category', 'survey_result_document')->values()->map(fn ($a) => [
+            'id' => $a->id,
+            'name' => basename($a->file_path),
+            'is_image' => in_array(strtolower(pathinfo($a->file_path, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png'], true),
+            'uploader' => $a->uploader?->name,
+            'at' => $a->created_at,
+            'url' => Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay()),
+        ]);
+        $checkIns = $survey->attachments->where('category', 'checkin_selfie')->values()->map(fn ($a) => [
             'id' => $a->id,
             'surveyor' => $a->uploader?->name,
             'at' => $a->created_at,
@@ -111,11 +125,13 @@ class SurveyController extends Controller
                 ]),
             ] : null,
             'checkIns' => $checkIns,
+            'resultDocuments' => $resultDocuments,
+            'canManageResultDocuments' => request()->user()->can('manageResultDocuments', $survey),
             'canBrief' => request()->user()->can('brief', $survey),
             'canVerify' => request()->user()->can('verifyReport', $survey),
             'canCancel' => request()->user()->can('cancel', $survey),
             'canManageTeam' => request()->user()->can('updateTeam', $survey),
-            'surveyorOptions' => \App\Models\User::query()
+            'surveyorOptions' => User::query()
                 ->where(fn ($q) => $q->where('role', 'technician')->orWhere('can_surveyor', true))
                 ->where('is_active', true)
                 ->orderBy('name')
@@ -127,6 +143,34 @@ class SurveyController extends Controller
                     'vendor_id' => $u->vendor_id,
                 ]),
         ]);
+    }
+
+    public function uploadResultDocument(UploadSurveyResultDocumentRequest $request, Survey $survey): RedirectResponse
+    {
+        $survey->attachments()->create([
+            'category' => 'survey_result_document',
+            'file_path' => $request->file('file')->store('survey-results'),
+            'uploaded_by' => $request->user()->id,
+        ]);
+
+        return back()->with('success', 'Dokumen hasil survey tersimpan.');
+    }
+
+    public function deleteResultDocument(Survey $survey, Attachment $attachment): RedirectResponse
+    {
+        Gate::authorize('manageResultDocuments', $survey);
+
+        abort_unless(
+            $attachment->category === 'survey_result_document'
+            && $attachment->attachable_type === $survey->getMorphClass()
+            && $attachment->attachable_id === $survey->id,
+            404,
+        );
+
+        Storage::disk('local')->delete($attachment->file_path);
+        $attachment->delete();
+
+        return back()->with('success', 'Dokumen hasil survey dihapus.');
     }
 
     public function brief(BriefSurveyRequest $request, Survey $survey, BriefSurvey $action): RedirectResponse
@@ -143,7 +187,7 @@ class SurveyController extends Controller
             ->with('success', 'Tim surveyor ditugaskan & arahan dikirim.');
     }
 
-    public function updateTeam(\App\Http\Requests\Operational\UpdateSurveyTeamRequest $request, Survey $survey, \App\Actions\Operational\SyncSurveyTeam $action): RedirectResponse
+    public function updateTeam(UpdateSurveyTeamRequest $request, Survey $survey, SyncSurveyTeam $action): RedirectResponse
     {
         $action->handle(
             $survey,
@@ -168,7 +212,7 @@ class SurveyController extends Controller
             ->with('success', 'Verifikasi laporan tersimpan.');
     }
 
-    public function cancel(\Illuminate\Http\Request $request, Survey $survey, CancelSurvey $action): RedirectResponse
+    public function cancel(Request $request, Survey $survey, CancelSurvey $action): RedirectResponse
     {
         Gate::authorize('cancel', $survey);
 

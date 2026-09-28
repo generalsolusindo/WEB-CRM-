@@ -340,6 +340,8 @@ Route::middleware('auth')->group(function () {
         Route::post('surveys/{survey}/brief', [OperationalSurveyController::class, 'brief'])->name('surveys.brief');
         Route::patch('surveys/{survey}/team', [OperationalSurveyController::class, 'updateTeam'])->name('surveys.team');
         Route::post('surveys/{survey}/verify', [OperationalSurveyController::class, 'verify'])->name('surveys.verify');
+        Route::post('surveys/{survey}/result-documents', [OperationalSurveyController::class, 'uploadResultDocument'])->name('surveys.result-documents.store');
+        Route::delete('surveys/{survey}/result-documents/{attachment}', [OperationalSurveyController::class, 'deleteResultDocument'])->name('surveys.result-documents.destroy');
         Route::post('surveys/{survey}/cancel', [OperationalSurveyController::class, 'cancel'])->name('surveys.cancel');
         Route::get('sales-orders/{salesOrder}/delivery-notes', [DeliveryNoteController::class, 'index'])
             ->name('sales-orders.delivery-notes.index');
