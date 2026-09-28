@@ -53,7 +53,13 @@ class QuotationPolicy
      */
     public function reviseScope(User $user, Quotation $quotation): bool
     {
-        return $this->update($user, $quotation);
+        // Juga boleh saat PR ditolak Procurement: Sales memperbaiki kebutuhan di quotation
+        // yang sama lalu mengirim ulang ke PR yang sama, bukan membuat PR/quotation baru.
+        return $this->owns($user, $quotation)
+            && $quotation->status !== QuotationStatus::Cancelled->value
+            && in_array($quotation->procurementRequest?->status, ['ready', 'rejected'], true)
+            && ! $quotation->salesOrder()->exists()
+            && ! $quotation->revisions()->exists();
     }
 
     /** Ubah nomor quotation secara manual (mis. menyambung dari sistem lama) — bisa di status apa saja. */

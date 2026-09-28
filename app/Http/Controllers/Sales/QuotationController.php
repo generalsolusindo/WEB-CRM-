@@ -164,7 +164,7 @@ class QuotationController extends Controller
             'lead:id,type,stage,delegated_to',
             'lead.delegatedTo:id,name',
             'sales:id,name',
-            'procurementRequest:id,status',
+            'procurementRequest:id,status,rejection_reason',
             'lines.tax:id,name,rate',
             'parent:id,revision_number,status',
             'pmReviewedBy:id,name',

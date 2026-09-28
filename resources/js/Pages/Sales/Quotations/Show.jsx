@@ -19,6 +19,7 @@ export default function Show({ quotation, history, totals, permissions, customer
     const cancelForm = useForm({ reason: '' });
     const needsCorrection = quotation.pm_review_status === 'rejected' || quotation.manager_review_status === 'rejected';
     const pricingPending = quotation.procurement_request.status === 'ready' && quotation.quoted_at === null;
+    const procurementRejected = quotation.procurement_request.status === 'rejected';
 
     function editNumber(value) {
         if (value === quotation.number) {
@@ -112,7 +113,7 @@ export default function Show({ quotation, history, totals, permissions, customer
                             <Button href={`/sales/quotations/${quotation.id}/print`} external variant="outline" icon={FiPrinter}>Cetak / PDF</Button>
                             {permissions.updateNumber && <Button onClick={() => { setNumberError(''); setNumberOpen(true); }} variant="outline" icon={FiHash}>Ubah Nomor</Button>}
                             {permissions.update && <Button href={`/sales/quotations/${quotation.id}/edit`} variant={needsCorrection || pricingPending ? 'primary' : 'outline'} icon={FiEdit2}>{pricingPending ? 'Lengkapi Harga Jual' : needsCorrection ? 'Perbaiki Quotation' : 'Edit'}</Button>}
-                            {permissions.reviseScope && <Button href={`/sales/quotations/${quotation.id}/scope-revision`} variant="outline" icon={FiRefreshCw}>Revisi Kebutuhan</Button>}
+                            {permissions.reviseScope && <Button href={`/sales/quotations/${quotation.id}/scope-revision`} variant={procurementRejected ? 'primary' : 'outline'} icon={FiRefreshCw}>{procurementRejected ? 'Perbaiki Kebutuhan' : 'Revisi Kebutuhan'}</Button>}
                             {permissions.pushToConversionSheet && (
                                 <Button
                                     onClick={() => askAction({
@@ -234,7 +235,13 @@ export default function Show({ quotation, history, totals, permissions, customer
                     )}
                 </Card>
 
-                {quotation.procurement_request.status !== 'ready' && (
+                {procurementRejected && (
+                    <div className="rounded-xl border border-danger/25 bg-danger-soft p-4 text-sm text-danger">
+                        <strong>Ditolak Procurement:</strong> {quotation.procurement_request.rejection_reason}
+                        <div className="mt-1 text-danger/80">Perbaiki kebutuhan lewat tombol &quot;Perbaiki Kebutuhan&quot;, lalu kirim ulang ke Procurement. Harga jual dan syarat item yang tidak berubah tetap dipertahankan.</div>
+                    </div>
+                )}
+                {!procurementRejected && quotation.procurement_request.status !== 'ready' && (
                     <div className="rounded-xl border border-info/25 bg-info-soft p-4 text-sm font-medium text-info">
                         Revisi kebutuhan sedang diproses Procurement. Setelah costing berstatus Ready, Sales dapat melengkapi harga jual dan mengirim quotation ini kembali ke Project Manager.
                     </div>

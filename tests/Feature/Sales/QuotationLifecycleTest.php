@@ -1229,6 +1229,92 @@ class QuotationLifecycleTest extends TestCase
         ])->assertSessionHasErrors('lines');
     }
 
+    /**
+     * Regresi produksi: Procurement menolak PR hasil Revisi Kebutuhan, tapi halaman Quotation
+     * cuma bilang "sedang diproses" tanpa alasan dan Sales buntu (tak bisa edit/revisi).
+     */
+    public function test_rejected_request_is_shown_on_quotation_and_scope_revision_stays_available(): void
+    {
+        [$sales, $quotation] = $this->quotationWithTwoItems();
+        $quotation->procurementRequest->update(['status' => 'rejected', 'rejection_reason' => 'Salah Penjelasan']);
+
+        $this->actingAs($sales)->get("/sales/quotations/{$quotation->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('quotation.procurement_request.status', 'rejected')
+                ->where('quotation.procurement_request.rejection_reason', 'Salah Penjelasan')
+                ->where('permissions.reviseScope', true)
+                ->where('permissions.update', false));
+
+        $this->actingAs($sales)->get("/sales/quotations/{$quotation->id}/scope-revision")->assertOk();
+    }
+
+    public function test_resubmitting_after_rejection_reuses_same_request_and_keeps_unchanged_lines(): void
+    {
+        [$sales, $quotation, $kept, $extra] = $this->quotationWithTwoItems();
+        $pr = $quotation->procurementRequest;
+        $requirement = $quotation->lead->requirements()->create([
+            'item_name' => 'Router', 'qty' => 2, 'unit' => 'unit', 'created_by' => $sales->id, 'submitted_at' => null,
+        ]);
+        $kept->update(['requirement_id' => $requirement->id]);
+        $pr->update(['status' => 'rejected', 'rejection_reason' => 'qty barang']);
+        $keptQuotationLine = $quotation->lines()->where('procurement_request_line_id', $kept->id)->first();
+        $requestsBefore = ProcurementRequest::count();
+
+        $this->actingAs($sales)->put("/sales/quotations/{$quotation->id}/scope-revision", [
+            'lines' => [
+                $this->scopeLine($kept->fresh()),
+                $this->scopeLine($extra->fresh(), ['qty' => 12]),
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame($requestsBefore, ProcurementRequest::count());
+        $this->assertSame('submitted', $pr->fresh()->status);
+        $this->assertNull($pr->fresh()->rejection_reason);
+        $this->assertNotNull($requirement->fresh()->submitted_at);
+        $this->assertDatabaseHas('quotation_lines', [
+            'id' => $keptQuotationLine?->id, 'selling_price' => $keptQuotationLine?->selling_price,
+        ]);
+    }
+
+    public function test_rejected_request_with_only_removals_goes_back_to_procurement_not_straight_to_ready(): void
+    {
+        [$sales, $quotation, $kept, $extra] = $this->quotationWithTwoItems();
+        $pr = $quotation->procurementRequest;
+        $pr->update(['status' => 'rejected', 'rejection_reason' => 'Salah Penjelasan']);
+
+        $this->actingAs($sales)->put("/sales/quotations/{$quotation->id}/scope-revision", [
+            'lines' => [$this->scopeLine($kept->fresh())],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame('submitted', $pr->fresh()->status);
+        $this->assertDatabaseMissing('procurement_request_lines', ['id' => $extra->id]);
+    }
+
+    public function test_rejected_request_resubmitted_without_any_change_is_refused(): void
+    {
+        [$sales, $quotation, $kept, $extra] = $this->quotationWithTwoItems();
+        $pr = $quotation->procurementRequest;
+        $pr->update(['status' => 'rejected', 'rejection_reason' => 'Salah Penjelasan']);
+
+        $this->actingAs($sales)->put("/sales/quotations/{$quotation->id}/scope-revision", [
+            'lines' => [$this->scopeLine($kept->fresh()), $this->scopeLine($extra->fresh())],
+        ])->assertSessionHasErrors('lines');
+
+        $this->assertSame('rejected', $pr->fresh()->status);
+    }
+
+    public function test_rejection_notification_links_to_the_quotation_when_one_exists(): void
+    {
+        [$sales, $quotation] = $this->quotationWithTwoItems();
+        $rejected = Notification::create([
+            'user_id' => $sales->id, 'type' => 'procurement_request.rejected', 'title' => 'x', 'message' => 'x',
+            'related_id' => $quotation->procurementRequest->id,
+        ]);
+
+        $this->actingAs($sales)->post("/notifications/{$rejected->id}/read")
+            ->assertRedirect("/sales/quotations/{$quotation->id}");
+    }
+
     public function test_scope_revision_is_blocked_after_sales_order_and_for_other_sales(): void
     {
         [$sales, $quotation, $kept] = $this->quotationWithTwoItems();

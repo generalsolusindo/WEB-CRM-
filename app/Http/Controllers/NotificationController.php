@@ -41,7 +41,7 @@ class NotificationController extends Controller
             'vendor_service.pay_after_bast' => $this->vendorServiceUrl($notification->related_id),
             'procurement_request.recost_requested' => "/procurement/procurement-requests/{$notification->related_id}",
             'procurement_request.ready' => $this->quotationOrLeadUrlForProcurementRequest($notification->related_id),
-            'procurement_request.rejected' => $this->leadUrlForProcurementRequest($notification->related_id),
+            'procurement_request.rejected' => $this->quotationOrLeadUrlForProcurementRequest($notification->related_id),
             'quotation.pending_pm_review' => "/project-manager/quotations/{$notification->related_id}",
             'quotation.pending_manager_review' => "/management/quotations/{$notification->related_id}",
             'quotation.review_rejected',

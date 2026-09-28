@@ -7,6 +7,7 @@ use App\Enums\ProcurementRequestStatus;
 use App\Enums\QuotationStatus;
 use App\Models\Notification;
 use App\Models\Quotation;
+use App\Models\Requirement;
 use App\Models\User;
 use App\Services\Notifications\Notify;
 use App\Support\ProcurementScope;
@@ -28,7 +29,9 @@ class RequestQuotationRecost
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($locked->procurementRequest->status !== ProcurementRequestStatus::Ready->value) {
+            $wasRejected = $locked->procurementRequest->status === ProcurementRequestStatus::Rejected->value;
+
+            if (! $wasRejected && $locked->procurementRequest->status !== ProcurementRequestStatus::Ready->value) {
                 throw ValidationException::withMessages([
                     'quotation' => 'Procurement Request masih dalam proses costing ulang.',
                 ]);
@@ -36,6 +39,7 @@ class RequestQuotationRecost
 
             $request = $locked->procurementRequest;
             $existingById = $request->lines->keyBy('id');
+            $reopenedRequirementIds = $request->lines->pluck('requirement_id')->filter()->all();
             $keptIds = collect($lines)->pluck('procurement_request_line_id')->filter()->map(fn ($id) => (int) $id);
 
             // Hanya menghapus item (tidak ada item baru / berubah)? Tidak ada harga baru yang
@@ -53,11 +57,13 @@ class RequestQuotationRecost
                 ]);
             });
 
-            if (! $needsCosting) {
-                if ($existingById->keys()->diff($keptIds)->isEmpty()) {
-                    throw ValidationException::withMessages(['lines' => 'Tidak ada perubahan pada kebutuhan.']);
-                }
+            if (! $needsCosting && $existingById->keys()->diff($keptIds)->isEmpty()) {
+                throw ValidationException::withMessages(['lines' => 'Tidak ada perubahan pada kebutuhan.']);
+            }
 
+            // PR yang ditolak harus selalu kembali ke Procurement (bukan langsung Ready), walau
+            // perubahannya cuma hapus item — sisa barisnya belum pernah selesai di-costing.
+            if (! $needsCosting && ! $wasRejected) {
                 return $this->removeItemsOnly($locked, $keptIds);
             }
 
@@ -107,6 +113,12 @@ class RequestQuotationRecost
                 'status' => ProcurementRequestStatus::Submitted->value,
                 'rejection_reason' => null,
             ]);
+
+            // Penolakan tadi membuka lagi requirement milik PR ini (RejectProcurementRequest);
+            // kirim ulang menutupnya lagi supaya tidak muncul sebagai requirement "baru" di Lead.
+            if ($wasRejected) {
+                Requirement::whereIn('id', $reopenedRequirementIds)->update(['submitted_at' => now()]);
+            }
 
             $locked->update([
                 'status' => QuotationStatus::Draft->value,
