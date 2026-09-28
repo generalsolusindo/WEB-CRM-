@@ -10,6 +10,7 @@ use App\Http\Controllers\Finance\PaymentController;
 use App\Http\Controllers\Finance\ProcurementPaymentController as FinanceProcurementPaymentController;
 use App\Http\Controllers\Finance\SurveyController as FinanceSurveyController;
 use App\Http\Controllers\Finance\VendorServicePaymentController;
+use App\Http\Controllers\Hr\AttendanceController as HrAttendanceController;
 use App\Http\Controllers\Hr\SowController as HrSowController;
 use App\Http\Controllers\Management\OpportunityController as ManagementOpportunityController;
 use App\Http\Controllers\Management\ProjectController as ManagementProjectController;
@@ -149,6 +150,7 @@ Route::middleware('auth')->group(function () {
         Route::get('sows/{sow}', [HrSowController::class, 'show'])->name('sows.show');
         Route::post('sows/{sow}/review', [HrSowController::class, 'review'])->name('sows.review');
         Route::post('sows/{sow}/verify-signatures', [HrSowController::class, 'verifySignatures'])->name('sows.verify-signatures');
+        Route::get('attendance', [HrAttendanceController::class, 'index'])->name('attendance.index');
     });
 
     Route::prefix('vendor')->name('vendor.')->middleware('role:vendor')->group(function () {

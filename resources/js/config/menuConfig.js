@@ -17,6 +17,7 @@ import {
     FiPercent,
     FiBarChart2,
     FiBox,
+    FiCamera,
 } from 'react-icons/fi';
 
 /**
@@ -93,6 +94,7 @@ const menuConfig = {
     hr: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
         { label: 'Review SOW', href: '/hr/sows', icon: FiFileText },
+        { label: 'Absensi Teknisi', href: '/hr/attendance', icon: FiCamera },
     ],
     vendor: [
         { label: 'Dashboard', href: '/dashboard', icon: FiHome },
