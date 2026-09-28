@@ -21,6 +21,11 @@ class GoogleSheetsConversionWriter implements ConversionSheetWriter
         $spreadsheetId = config('services.google_sheets.conversion_spreadsheet_id');
         $sheetName = config('services.google_sheets.conversion_sheet_name');
 
+        // Path relatif dihitung dari folder proyek, bukan folder kerja PHP (di web server beda).
+        if ($credentialsPath && ! str_starts_with($credentialsPath, '/')) {
+            $credentialsPath = base_path($credentialsPath);
+        }
+
         if (! $credentialsPath || ! is_file($credentialsPath)) {
             throw new RuntimeException('File kredensial Google Sheets belum diatur/ditemukan.');
         }

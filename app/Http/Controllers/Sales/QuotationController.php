@@ -34,6 +34,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -315,7 +316,11 @@ class QuotationController extends Controller
     {
         Gate::authorize('pushToConversionSheet', $quotation);
 
-        $action->handle($quotation);
+        try {
+            $action->handle($quotation);
+        } catch (ValidationException $e) {
+            return back()->with('error', collect($e->errors())->flatten()->first());
+        }
 
         return back()->with('success', 'Data berhasil dikirim ke Google Sheet conversion tracker.');
     }

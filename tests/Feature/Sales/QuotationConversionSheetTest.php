@@ -83,7 +83,26 @@ class QuotationConversionSheetTest extends TestCase
 
         $this->actingAs($this->sales($quotation))
             ->post("/sales/quotations/{$quotation->id}/push-conversion")
-            ->assertSessionHasErrors('conversion');
+            ->assertSessionHas('error');
+
+        $this->assertNull($quotation->fresh()->pushed_to_conversion_sheet_at);
+    }
+
+    public function test_google_failure_is_shown_as_error_and_not_marked_as_sent(): void
+    {
+        $this->app->instance(ConversionSheetWriter::class, new class implements ConversionSheetWriter
+        {
+            public function appendRow(array $row): void
+            {
+                throw new RuntimeException('izin sheet ditolak');
+            }
+        });
+
+        $quotation = $this->draftQuotationForContact('CV Kusuma Karya', '0812-3456-7890');
+
+        $this->actingAs($this->sales($quotation))
+            ->post("/sales/quotations/{$quotation->id}/push-conversion")
+            ->assertSessionHas('error', fn ($message) => str_contains($message, 'izin sheet ditolak'));
 
         $this->assertNull($quotation->fresh()->pushed_to_conversion_sheet_at);
     }
