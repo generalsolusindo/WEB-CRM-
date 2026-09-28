@@ -11,9 +11,7 @@ use App\Enums\SurveyStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Operational\BriefSurveyRequest;
 use App\Http\Requests\Operational\UpdateSurveyTeamRequest;
-use App\Http\Requests\Operational\UploadSurveyResultDocumentRequest;
 use App\Http\Requests\Operational\VerifySurveyReportRequest;
-use App\Models\Attachment;
 use App\Models\Survey;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -126,7 +124,6 @@ class SurveyController extends Controller
             ] : null,
             'checkIns' => $checkIns,
             'resultDocuments' => $resultDocuments,
-            'canManageResultDocuments' => request()->user()->can('manageResultDocuments', $survey),
             'canBrief' => request()->user()->can('brief', $survey),
             'canVerify' => request()->user()->can('verifyReport', $survey),
             'canCancel' => request()->user()->can('cancel', $survey),
@@ -143,34 +140,6 @@ class SurveyController extends Controller
                     'vendor_id' => $u->vendor_id,
                 ]),
         ]);
-    }
-
-    public function uploadResultDocument(UploadSurveyResultDocumentRequest $request, Survey $survey): RedirectResponse
-    {
-        $survey->attachments()->create([
-            'category' => 'survey_result_document',
-            'file_path' => $request->file('file')->store('survey-results'),
-            'uploaded_by' => $request->user()->id,
-        ]);
-
-        return back()->with('success', 'Dokumen hasil survey tersimpan.');
-    }
-
-    public function deleteResultDocument(Survey $survey, Attachment $attachment): RedirectResponse
-    {
-        Gate::authorize('manageResultDocuments', $survey);
-
-        abort_unless(
-            $attachment->category === 'survey_result_document'
-            && $attachment->attachable_type === $survey->getMorphClass()
-            && $attachment->attachable_id === $survey->id,
-            404,
-        );
-
-        Storage::disk('local')->delete($attachment->file_path);
-        $attachment->delete();
-
-        return back()->with('success', 'Dokumen hasil survey dihapus.');
     }
 
     public function brief(BriefSurveyRequest $request, Survey $survey, BriefSurvey $action): RedirectResponse

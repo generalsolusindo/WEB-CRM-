@@ -10,8 +10,10 @@ use App\Http\Requests\Technician\CheckInSurveyRequest;
 use App\Http\Requests\Technician\CheckOutSurveyRequest;
 use App\Http\Requests\Technician\SaveSurveyReportRequest;
 use App\Http\Requests\Technician\UploadSurveyAttachmentRequest;
+use App\Http\Requests\Technician\UploadSurveyResultDocumentRequest;
 use App\Models\Attachment;
 use App\Models\Survey;
+use App\Models\SurveyReport;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -100,6 +102,15 @@ class SurveyController extends Controller
                 'is_leader' => (bool) $survey->surveyors->firstWhere('id', $userId)?->pivot->is_leader,
             ],
             'report' => $this->reportPayload($survey),
+            'resultDocuments' => $survey->attachments()->where('category', 'survey_result_document')->with('uploader:id,name')->latest()->get()->map(fn ($a) => [
+                'id' => $a->id,
+                'name' => basename($a->file_path),
+                'is_image' => in_array(strtolower(pathinfo($a->file_path, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png'], true),
+                'uploader' => $a->uploader?->name,
+                'at' => $a->created_at,
+                'url' => Storage::disk('local')->temporaryUrl($a->file_path, now()->addDay()),
+            ]),
+            'canManageResultDocuments' => request()->user()->can('manageResultDocuments', $survey),
             'canWork' => request()->user()->can('workReport', $survey),
             'canSubmit' => request()->user()->can('submitReport', $survey),
             'checkedIn' => $checkedIn,
@@ -185,12 +196,40 @@ class SurveyController extends Controller
         return back()->with('success', 'Lampiran tersimpan.');
     }
 
+    public function uploadResultDocument(UploadSurveyResultDocumentRequest $request, Survey $survey): RedirectResponse
+    {
+        $survey->attachments()->create([
+            'category' => 'survey_result_document',
+            'file_path' => $request->file('file')->store('survey-results'),
+            'uploaded_by' => $request->user()->id,
+        ]);
+
+        return back()->with('success', 'Dokumen hasil survey tersimpan.');
+    }
+
+    public function deleteResultDocument(Survey $survey, Attachment $attachment): RedirectResponse
+    {
+        Gate::authorize('manageResultDocuments', $survey);
+
+        abort_unless(
+            $attachment->category === 'survey_result_document'
+            && $attachment->attachable_type === $survey->getMorphClass()
+            && $attachment->attachable_id === $survey->id,
+            404,
+        );
+
+        Storage::disk('local')->delete($attachment->file_path);
+        $attachment->delete();
+
+        return back()->with('success', 'Dokumen hasil survey dihapus.');
+    }
+
     public function deleteAttachment(Survey $survey, Attachment $attachment): RedirectResponse
     {
         Gate::authorize('workReport', $survey);
 
         abort_unless(
-            $attachment->attachable_type === (new \App\Models\SurveyReport)->getMorphClass()
+            $attachment->attachable_type === (new SurveyReport)->getMorphClass()
             && $survey->report
             && $attachment->attachable_id === $survey->report->id,
             404,

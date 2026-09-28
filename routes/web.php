@@ -252,6 +252,8 @@ Route::middleware('auth')->group(function () {
         Route::post('surveys/{survey}/report/submit', [TechnicianSurveyController::class, 'submitReport'])->name('surveys.report.submit');
         Route::post('surveys/{survey}/report/attachments', [TechnicianSurveyController::class, 'uploadAttachment'])->name('surveys.report.attachments');
         Route::delete('surveys/{survey}/report/attachments/{attachment}', [TechnicianSurveyController::class, 'deleteAttachment'])->name('surveys.report.attachments.destroy');
+        Route::post('surveys/{survey}/result-documents', [TechnicianSurveyController::class, 'uploadResultDocument'])->name('surveys.result-documents.store');
+        Route::delete('surveys/{survey}/result-documents/{attachment}', [TechnicianSurveyController::class, 'deleteResultDocument'])->name('surveys.result-documents.destroy');
         Route::post('surveys/{survey}/checkin', [TechnicianSurveyController::class, 'checkIn'])->name('surveys.checkin');
         Route::post('surveys/{survey}/checkout', [TechnicianSurveyController::class, 'checkOut'])->name('surveys.checkout');
         Route::get('tasks', [TechnicianTaskController::class, 'index'])->name('tasks.index');
@@ -340,8 +342,6 @@ Route::middleware('auth')->group(function () {
         Route::post('surveys/{survey}/brief', [OperationalSurveyController::class, 'brief'])->name('surveys.brief');
         Route::patch('surveys/{survey}/team', [OperationalSurveyController::class, 'updateTeam'])->name('surveys.team');
         Route::post('surveys/{survey}/verify', [OperationalSurveyController::class, 'verify'])->name('surveys.verify');
-        Route::post('surveys/{survey}/result-documents', [OperationalSurveyController::class, 'uploadResultDocument'])->name('surveys.result-documents.store');
-        Route::delete('surveys/{survey}/result-documents/{attachment}', [OperationalSurveyController::class, 'deleteResultDocument'])->name('surveys.result-documents.destroy');
         Route::post('surveys/{survey}/cancel', [OperationalSurveyController::class, 'cancel'])->name('surveys.cancel');
         Route::get('sales-orders/{salesOrder}/delivery-notes', [DeliveryNoteController::class, 'index'])
             ->name('sales-orders.delivery-notes.index');

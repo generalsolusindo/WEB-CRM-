@@ -152,19 +152,6 @@ class SurveyPolicy
             && $survey->status === SurveyStatus::ReportReview->value;
     }
 
-    /** Operasional mengunggah/menghapus Dokumen Hasil Survey — sejak survey berjalan sampai selesai, tidak untuk yang dibatalkan. */
-    public function manageResultDocuments(User $user, Survey $survey): bool
-    {
-        return $user->role === 'operational'
-            && $user->is_active
-            && in_array($survey->status, [
-                SurveyStatus::InProgress->value,
-                SurveyStatus::ReportReview->value,
-                SurveyStatus::Verified->value,
-                SurveyStatus::Closed->value,
-            ], true);
-    }
-
     /** Surveyor yang ditugaskan melihat survey-nya. */
     public function viewAsSurveyor(User $user, Survey $survey): bool
     {
@@ -193,6 +180,12 @@ class SurveyPolicy
         return $this->viewAsSurveyor($user, $survey)
             && $survey->status === SurveyStatus::InProgress->value
             && $survey->hasCheckedIn($user);
+    }
+
+    /** Anggota tim surveyor mengunggah/menghapus Dokumen Hasil Survey — sama seperti isi laporan: saat survey berjalan & sudah absen. */
+    public function manageResultDocuments(User $user, Survey $survey): bool
+    {
+        return $this->workReport($user, $survey);
     }
 
     /** Hanya leader tim yang boleh mengirim laporan final ke Operasional. */

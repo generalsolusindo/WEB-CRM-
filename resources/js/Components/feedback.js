@@ -121,6 +121,17 @@ export function installFlashListener(initialFlash) {
     if (installed) return;
     installed = true;
     router.on('success', (event) => handleFlash(event.detail.page.props.flash));
+    // Server/proxy (nginx) menolak body yang terlalu besar dengan halaman 413 mentah, yang kalau
+    // dibiarkan tampil sebagai kotak HTML nginx di atas aplikasi. Ganti dengan pesan yang jelas.
+    router.on('invalid', (event) => {
+        if (event.detail.response?.status !== 413) return;
+        event.preventDefault();
+        alert({
+            tone: 'error',
+            title: 'File terlalu besar',
+            text: 'Server menolak unggahan karena ukurannya melebihi batas. Kecilkan foto atau dokumen (maksimal 5 MB per file), lalu coba lagi. Kalau sudah kecil tapi tetap ditolak, hubungi admin untuk menaikkan batas unggah server.',
+        });
+    });
     router.on('finish', () => { override = null; });
     handleFlash(initialFlash);
 }

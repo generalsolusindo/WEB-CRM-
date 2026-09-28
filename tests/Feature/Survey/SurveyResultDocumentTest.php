@@ -16,15 +16,15 @@ class SurveyResultDocumentTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_operational_uploads_image_and_pdf_result_documents_and_sees_them_listed(): void
+    public function test_surveyor_uploads_image_and_pdf_result_documents_after_checking_in(): void
     {
         Storage::fake('local');
-        [$survey, $ops] = $this->survey('report_review');
+        [$survey, $surveyor] = $this->briefedSurvey(checkIn: true);
 
-        $this->actingAs($ops)->post("/operational/surveys/{$survey->id}/result-documents", [
+        $this->actingAs($surveyor)->post("/technician/surveys/{$survey->id}/result-documents", [
             'file' => UploadedFile::fake()->image('denah.jpg'),
         ])->assertRedirect()->assertSessionHas('success');
-        $this->actingAs($ops)->post("/operational/surveys/{$survey->id}/result-documents", [
+        $this->actingAs($surveyor)->post("/technician/surveys/{$survey->id}/result-documents", [
             'file' => UploadedFile::fake()->create('hasil.pdf', 200, 'application/pdf'),
         ])->assertRedirect();
 
@@ -33,83 +33,112 @@ class SurveyResultDocumentTest extends TestCase
         foreach ($documents as $document) {
             $this->assertSame(Survey::class, $document->attachable_type);
             $this->assertSame($survey->id, $document->attachable_id);
-            $this->assertSame($ops->id, $document->uploaded_by);
+            $this->assertSame($surveyor->id, $document->uploaded_by);
             Storage::disk('local')->assertExists($document->file_path);
         }
 
-        $this->actingAs($ops)->get("/operational/surveys/{$survey->id}")
+        $this->actingAs($surveyor)->get("/technician/surveys/{$survey->id}")
             ->assertInertia(fn ($page) => $page
                 ->where('canManageResultDocuments', true)
-                ->has('resultDocuments', 2)
-                ->has('checkIns', 0));
+                ->has('resultDocuments', 2));
+    }
+
+    public function test_operational_only_views_the_documents_and_cannot_upload_or_delete(): void
+    {
+        Storage::fake('local');
+        [$survey, $surveyor] = $this->briefedSurvey(checkIn: true);
+        $this->actingAs($surveyor)->post("/technician/surveys/{$survey->id}/result-documents", [
+            'file' => UploadedFile::fake()->image('denah.jpg'),
+        ]);
+        $document = Attachment::where('category', 'survey_result_document')->firstOrFail();
+        $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
+
+        $this->actingAs($ops)->get("/operational/surveys/{$survey->id}")
+            ->assertInertia(fn ($page) => $page->has('resultDocuments', 1)->has('checkIns', 1));
+
+        $this->actingAs($ops)->post("/operational/surveys/{$survey->id}/result-documents", [
+            'file' => UploadedFile::fake()->image('x.jpg'),
+        ])->assertNotFound();
+        $this->actingAs($ops)->post("/technician/surveys/{$survey->id}/result-documents", [
+            'file' => UploadedFile::fake()->image('x.jpg'),
+        ])->assertForbidden();
+        $this->actingAs($ops)->delete("/technician/surveys/{$survey->id}/result-documents/{$document->id}")->assertForbidden();
+
+        $this->assertSame(1, Attachment::where('category', 'survey_result_document')->count());
+    }
+
+    public function test_only_assigned_surveyor_who_checked_in_during_a_running_survey_can_upload(): void
+    {
+        Storage::fake('local');
+        [$survey, $surveyor] = $this->briefedSurvey(checkIn: false);
+        $file = fn () => ['file' => UploadedFile::fake()->image('x.jpg')];
+
+        $this->actingAs($surveyor)->post("/technician/surveys/{$survey->id}/result-documents", $file())->assertForbidden();
+
+        $stranger = User::factory()->create(['role' => 'technician', 'is_active' => true]);
+        $this->actingAs($stranger)->post("/technician/surveys/{$survey->id}/result-documents", $file())->assertForbidden();
+
+        $this->actingAs($surveyor)->post("/technician/surveys/{$survey->id}/checkin", ['photo' => UploadedFile::fake()->image('selfie.jpg')]);
+        $survey->update(['status' => 'report_review']);
+        $this->actingAs($surveyor)->post("/technician/surveys/{$survey->id}/result-documents", $file())->assertForbidden();
+
+        $this->assertSame(0, Attachment::where('category', 'survey_result_document')->count());
     }
 
     public function test_only_images_and_pdf_up_to_5mb_are_accepted(): void
     {
         Storage::fake('local');
-        [$survey, $ops] = $this->survey('report_review');
+        [$survey, $surveyor] = $this->briefedSurvey(checkIn: true);
 
-        $this->actingAs($ops)->post("/operational/surveys/{$survey->id}/result-documents", [
+        $this->actingAs($surveyor)->post("/technician/surveys/{$survey->id}/result-documents", [
             'file' => UploadedFile::fake()->create('hasil.docx', 10, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
         ])->assertSessionHasErrors('file');
-        $this->actingAs($ops)->post("/operational/surveys/{$survey->id}/result-documents", [
+        $this->actingAs($surveyor)->post("/technician/surveys/{$survey->id}/result-documents", [
             'file' => UploadedFile::fake()->create('besar.pdf', 6000, 'application/pdf'),
         ])->assertSessionHasErrors('file');
 
         $this->assertSame(0, Attachment::where('category', 'survey_result_document')->count());
     }
 
-    public function test_other_roles_and_early_or_cancelled_surveys_cannot_take_uploads(): void
+    public function test_surveyor_deletes_a_result_document_and_its_file_but_not_other_attachments(): void
     {
         Storage::fake('local');
-        [$survey, $ops] = $this->survey('report_review');
-        $file = fn () => ['file' => UploadedFile::fake()->image('x.jpg')];
-
-        foreach (['sales', 'finance', 'technician', 'management'] as $role) {
-            $this->actingAs(User::factory()->create(['role' => $role, 'is_active' => true]))
-                ->post("/operational/surveys/{$survey->id}/result-documents", $file())
-                ->assertForbidden();
-        }
-
-        foreach (['requested', 'awaiting_briefing', 'cancelled'] as $status) {
-            $survey->update(['status' => $status]);
-            $this->actingAs($ops)->post("/operational/surveys/{$survey->id}/result-documents", $file())->assertForbidden();
-        }
-
-        $this->assertSame(0, Attachment::where('category', 'survey_result_document')->count());
-    }
-
-    public function test_operational_deletes_a_result_document_and_its_file_but_not_other_attachments(): void
-    {
-        Storage::fake('local');
-        [$survey, $ops] = $this->survey('report_review');
-        $this->actingAs($ops)->post("/operational/surveys/{$survey->id}/result-documents", ['file' => UploadedFile::fake()->image('a.jpg')]);
+        [$survey, $surveyor] = $this->briefedSurvey(checkIn: true);
+        $this->actingAs($surveyor)->post("/technician/surveys/{$survey->id}/result-documents", ['file' => UploadedFile::fake()->image('a.jpg')]);
         $document = Attachment::where('category', 'survey_result_document')->firstOrFail();
+        $selfie = Attachment::where('category', 'checkin_selfie')->firstOrFail();
 
-        $selfie = $survey->attachments()->create([
-            'category' => 'checkin_selfie', 'file_path' => UploadedFile::fake()->image('s.jpg')->store('checkin'), 'uploaded_by' => $ops->id,
-        ]);
-
-        $this->actingAs($ops)->delete("/operational/surveys/{$survey->id}/result-documents/{$selfie->id}")->assertNotFound();
+        $this->actingAs($surveyor)->delete("/technician/surveys/{$survey->id}/result-documents/{$selfie->id}")->assertNotFound();
         $this->assertDatabaseHas('attachments', ['id' => $selfie->id]);
 
-        $this->actingAs($ops)->delete("/operational/surveys/{$survey->id}/result-documents/{$document->id}")->assertRedirect();
+        $this->actingAs($surveyor)->delete("/technician/surveys/{$survey->id}/result-documents/{$document->id}")->assertRedirect();
         $this->assertDatabaseMissing('attachments', ['id' => $document->id]);
         Storage::disk('local')->assertMissing($document->file_path);
     }
 
-    /** @return array{Survey, User} */
-    private function survey(string $status): array
+    /** @return array{Survey, User} [survey, surveyor] */
+    private function briefedSurvey(bool $checkIn): array
     {
         $sales = User::factory()->create(['role' => 'sales']);
-        $ops = User::factory()->create(['role' => 'operational', 'is_active' => true]);
+        $operational = User::factory()->create(['role' => 'operational', 'is_active' => true]);
+        $surveyor = User::factory()->create(['role' => 'technician', 'is_active' => true]);
         $contact = Contact::create(['name' => 'Cust', 'created_by' => $sales->id]);
         $lead = Lead::create(['contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified']);
         $survey = $lead->surveys()->create([
-            'requested_by' => $sales->id, 'site_address' => 'a', 'site_region' => 'x',
-            'delivery_mode' => 'internal', 'billable' => true, 'cost' => 300000, 'status' => $status,
+            'requested_by' => $sales->id, 'site_address' => 'Jl. Z', 'site_region' => 'Solo',
+            'delivery_mode' => 'internal', 'billable' => false, 'cost' => 0, 'status' => 'awaiting_briefing',
         ]);
 
-        return [$survey, $ops];
+        $this->actingAs($operational)->post("/operational/surveys/{$survey->id}/brief", [
+            'briefing' => 'Cek lokasi', 'surveyor_ids' => [$surveyor->id], 'leader_id' => $surveyor->id,
+        ]);
+
+        if ($checkIn) {
+            $this->actingAs($surveyor)->post("/technician/surveys/{$survey->id}/checkin", [
+                'photo' => UploadedFile::fake()->image('selfie.jpg'),
+            ]);
+        }
+
+        return [$survey->fresh(), $surveyor];
     }
 }

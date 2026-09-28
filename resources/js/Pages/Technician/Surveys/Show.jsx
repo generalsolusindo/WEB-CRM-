@@ -7,12 +7,13 @@ import { feedback } from '../../../Components/feedback';
 
 const emptyItem = { item_name: '', qty: 1, unit: '', notes: '' };
 
-export default function Show({ survey, report, canWork, canSubmit, checkedIn, canCheckIn, selfieUrl, checkedOut, canCheckOut, checkoutSelfieUrl }) {
+export default function Show({ survey, report, resultDocuments = [], canManageResultDocuments = false, canWork, canSubmit, checkedIn, canCheckIn, selfieUrl, checkedOut, canCheckOut, checkoutSelfieUrl }) {
     const { data, setData, put, processing, errors } = useForm({
         summary: report?.summary ?? '',
         items: report?.items?.map((i) => ({ item_name: i.item_name, qty: i.qty, unit: i.unit ?? '', notes: i.notes ?? '' })) ?? [],
     });
     const uploadForm = useForm({ file: null });
+    const docForm = useForm({ file: null });
     const checkInForm = useForm({ photo: null });
     const checkOutForm = useForm({ photo: null });
     const [submitError, setSubmitError] = useState(null);
@@ -40,6 +41,19 @@ export default function Show({ survey, report, canWork, canSubmit, checkedIn, ca
     function upload(e) {
         e.preventDefault();
         uploadForm.post(`/technician/surveys/${survey.id}/report/attachments`, { forceFormData: true, preserveScroll: true, onSuccess: () => uploadForm.reset() });
+    }
+    function uploadDocument(e) {
+        e.preventDefault();
+        feedback.expect({ success: { title: 'Dokumen hasil survey tersimpan', style: 'popup' } });
+        docForm.post(`/technician/surveys/${survey.id}/result-documents`, { forceFormData: true, preserveScroll: true, onSuccess: () => docForm.reset() });
+    }
+    function removeDocument(doc) {
+        feedback.act({
+            method: 'delete',
+            url: `/technician/surveys/${survey.id}/result-documents/${doc.id}`,
+            confirm: { tone: 'danger', title: 'Hapus dokumen ini?', text: `${doc.name} akan dihapus permanen.`, confirmLabel: 'Ya, hapus' },
+            success: { title: 'Dokumen dihapus' },
+        });
     }
     function removeAttachment(id) {
         feedback.act({
@@ -170,6 +184,35 @@ export default function Show({ survey, report, canWork, canSubmit, checkedIn, ca
                             {data.items.length === 0 && <p className="text-xs text-text-muted">Belum ada item rekomendasi.</p>}
                         </div>
                         {errors.items && <span className="text-xs text-danger">{errors.items}</span>}
+                    </div>
+
+                    <div>
+                        <span className="text-sm font-medium text-text">Dokumen Hasil Survey</span>
+                        <p className="text-[11px] text-text-muted">Gambar (JPG/PNG) atau PDF, maks 5 MB per file.</p>
+                        <div className="mt-2 flex flex-wrap gap-3">
+                            {resultDocuments.map((d) => (
+                                <div key={d.id} className="flex items-center gap-3 rounded-lg border border-border p-2 text-sm">
+                                    <a href={d.url} target="_blank" rel="noreferrer" className="flex items-center gap-3">
+                                        {d.is_image
+                                            ? <img src={d.url} alt={d.name} className="h-12 w-12 rounded-lg object-cover" />
+                                            : <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-danger-soft text-[11px] font-bold text-danger">PDF</span>}
+                                        <div>
+                                            <div className="max-w-[12rem] truncate font-medium text-text">{d.name}</div>
+                                            <div className="text-xs text-text-muted">{d.uploader ? `${d.uploader} · ` : ''}{new Date(d.at).toLocaleString('id-ID')}</div>
+                                        </div>
+                                    </a>
+                                    {canManageResultDocuments && <button type="button" onClick={() => removeDocument(d)} className="text-xs font-semibold text-danger hover:underline">Hapus</button>}
+                                </div>
+                            ))}
+                            {resultDocuments.length === 0 && <p className="text-xs text-text-muted">Belum ada dokumen hasil survey.</p>}
+                        </div>
+                        {canManageResultDocuments && (
+                            <form onSubmit={uploadDocument} className="mt-3 flex flex-wrap items-center gap-2">
+                                <input type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={(e) => pickFile(docForm, 'file', e.target.files[0], 5)} className="min-w-0 w-full sm:w-auto sm:flex-1 text-sm text-text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-strong" />
+                                <button disabled={docForm.processing || !docForm.data.file} className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50">Upload</button>
+                                {docForm.errors.file && <span className="text-xs text-danger">{docForm.errors.file}</span>}
+                            </form>
+                        )}
                     </div>
 
                     <div>
