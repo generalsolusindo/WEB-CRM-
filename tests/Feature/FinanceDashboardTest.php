@@ -19,7 +19,7 @@ class FinanceDashboardTest extends TestCase
     private function confirmedSalesOrder(): SalesOrder
     {
         $sales = User::factory()->create(['role' => 'sales']);
-        $contact = Contact::create(['name' => 'Customer', 'created_by' => $sales->id]);
+        $contact = Contact::create(['name' => 'Nur Agung', 'company_name' => 'PT Maju Jaya', 'created_by' => $sales->id]);
         $lead = Lead::create([
             'contact_id' => $contact->id, 'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified',
         ]);
@@ -47,8 +47,25 @@ class FinanceDashboardTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('financeActions.needs_upfront_invoice', fn ($items) => collect($items)->contains(
-                    fn ($i) => str_contains($i['label'], $so->number),
+                    fn ($i) => $i['label'] === 'Nur Agung · PT Maju Jaya',
                 )));
+    }
+
+    public function test_finance_actions_show_only_pic_and_company_not_document_numbers(): void
+    {
+        $so = $this->confirmedSalesOrder();
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+        $this->actingAs($finance)->post('/finance/invoices', ['sales_order_id' => $so->id, 'phase' => 'dp']);
+
+        $this->actingAs($finance)->get('/dashboard')
+            ->assertInertia(fn ($page) => $page
+                ->where('financeActions.draft.0.label', 'Nur Agung · PT Maju Jaya'));
+
+        $so->contact->update(['company_name' => null]);
+
+        $this->actingAs($finance)->get('/dashboard')
+            ->assertInertia(fn ($page) => $page
+                ->where('financeActions.draft.0.label', 'Nur Agung (perorangan)'));
     }
 
     public function test_finance_dashboard_survives_unpaid_survey_invoice(): void

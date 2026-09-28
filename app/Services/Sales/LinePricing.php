@@ -11,6 +11,9 @@ namespace App\Services\Sales;
  */
 class LinePricing
 {
+    /** Batas kolom quotation_lines.markup_percent (decimal 6,2); di atas ini query gagal dengan error 500. */
+    private const MAX_MARKUP_PERCENT = 9999.99;
+
     /**
      * @return array{discount_percent: float|null, discount_amount: float, subtotal: float, markup_percent: float|null}
      */
@@ -41,7 +44,7 @@ class LinePricing
             'discount_amount' => $amount,
             'subtotal' => $subtotal,
             'markup_percent' => $costPrice > 0
-                ? round((($sellingPrice - $costPrice) / $costPrice) * 100, 2)
+                ? min(round((($sellingPrice - $costPrice) / $costPrice) * 100, 2), self::MAX_MARKUP_PERCENT)
                 : null,
         ];
     }

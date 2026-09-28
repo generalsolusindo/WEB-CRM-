@@ -338,14 +338,19 @@ class DashboardController extends Controller
      */
     private function financeActions(SalesOrderSettlement $settlement): array
     {
+        // Finance cukup butuh tahu siapa customernya: nama PIC (kontak) + nama perusahaan.
+        $who = fn ($contact) => $contact
+            ? ($contact->company_name ? "{$contact->name} · {$contact->company_name}" : "{$contact->name} (perorangan)")
+            : '—';
+
         $map = fn ($inv) => [
-            'label' => "{$inv->number} · ".($inv->salesOrder->contact->name ?? '—'),
+            'label' => $who($inv->salesOrder->contact ?? null),
             'href' => "/finance/invoices/{$inv->id}",
         ];
 
         // Hanya invoice Sales Order (invoice survey dikelola di menu Survey, tak punya salesOrder).
         $saleInvoices = fn () => Invoice::query()->where('invoice_type', 'sale');
-        $withRels = fn ($query) => $query->with('salesOrder.contact:id,name')->latest()->get();
+        $withRels = fn ($query) => $query->with('salesOrder.contact:id,name,company_name')->latest()->get();
 
         return [
             'needs_upfront_invoice' => SalesOrder::query()
@@ -353,11 +358,11 @@ class DashboardController extends Controller
                 ->whereDoesntHave('invoices', fn ($query) => $query
                     ->whereIn('invoice_phase', [InvoicePhase::Dp->value, InvoicePhase::Full->value])
                     ->where('status', '!=', InvoiceStatus::Cancelled->value))
-                ->with('contact:id,name')
+                ->with('contact:id,name,company_name')
                 ->latest()
                 ->get(['id', 'number', 'contact_id'])
                 ->map(fn ($so) => [
-                    'label' => "{$so->number} · ".($so->contact->name ?? '—'),
+                    'label' => $who($so->contact),
                     'href' => '/finance/invoices',
                 ]),
             'draft' => $withRels($saleInvoices()->where('status', 'draft'))->map($map),
@@ -368,12 +373,12 @@ class DashboardController extends Controller
                 ->whereDate('due_date', '<', now()))->map($map),
             'ready_for_final' => SalesOrder::query()
                 ->whereIn('order_type', [OrderType::ServiceOnly->value, OrderType::Mixed->value])
-                ->with('contact:id,name')
+                ->with('contact:id,name,company_name')
                 ->latest()
                 ->get()
                 ->filter(fn ($so) => $settlement->canCreateFinalInvoice($so))
                 ->map(fn ($so) => [
-                    'label' => "{$so->number} · ".($so->contact->name ?? '—'),
+                    'label' => $who($so->contact),
                     'href' => '/finance/invoices',
                 ])
                 ->values(),

@@ -1303,6 +1303,40 @@ class QuotationLifecycleTest extends TestCase
         $this->assertSame('rejected', $pr->fresh()->status);
     }
 
+    /**
+     * Regresi produksi (PR-000039): item direvisi dari "1 lot" jadi "200 meter" tapi harga jual
+     * lama per satuan ikut terbawa saat Procurement menandai Ready, jadi subtotal Rp644 juta dan
+     * markup 32.100% yang melewati kolom database, lalu Tandai Ready gagal dengan error 500.
+     */
+    public function test_ready_does_not_carry_over_old_selling_price_when_the_item_changed(): void
+    {
+        [$sales, $quotation, $kept, $extra] = $this->quotationWithTwoItems();
+        $quotation->lines()->where('procurement_request_line_id', $extra->id)->update(['selling_price' => 3220000]);
+        $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
+
+        $this->actingAs($sales)->put("/sales/quotations/{$quotation->id}/scope-revision", [
+            'lines' => [
+                $this->scopeLine($kept->fresh()),
+                $this->scopeLine($extra->fresh(), ['item_name' => 'Kabel Grounding 2,5', 'qty' => 200, 'unit' => 'meter']),
+            ],
+        ])->assertRedirect();
+
+        $pr = $quotation->procurementRequest;
+        $pr->lines()->update(['cost_price' => 10000, 'availability_status' => 'available']);
+
+        $keptPrice = $quotation->lines()->where('procurement_request_line_id', $kept->id)->value('selling_price');
+
+        $this->actingAs($procurement)->post("/procurement/procurement-requests/{$pr->id}/ready")
+            ->assertSessionHas('success');
+
+        $this->assertSame('ready', $pr->fresh()->status);
+        $changed = $quotation->lines()->where('procurement_request_line_id', $extra->id)->first();
+        $this->assertSame('Kabel Grounding 2,5', $changed->item_name);
+        $this->assertEquals(0, $changed->selling_price);
+        $this->assertEquals(0, $changed->subtotal);
+        $this->assertEquals($keptPrice, $quotation->lines()->where('procurement_request_line_id', $kept->id)->value('selling_price'));
+    }
+
     public function test_lead_page_points_to_the_quotation_when_its_request_was_rejected(): void
     {
         [$sales, $quotation] = $this->quotationWithTwoItems();

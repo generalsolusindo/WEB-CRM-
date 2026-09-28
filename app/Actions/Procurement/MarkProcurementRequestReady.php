@@ -56,13 +56,23 @@ class MarkProcurementRequestReady
 
                 foreach ($locked->lines as $requestLine) {
                     $line = $quotation->lines->firstWhere('procurement_request_line_id', $requestLine->id);
-                    $sellingPrice = (float) ($line?->selling_price ?? 0);
+
+                    // Harga jual per satuan hanya berlaku untuk barang yang SAMA. Kalau nama/satuan/
+                    // kategori berubah lewat Revisi Kebutuhan (mis. "1 lot" jadi "200 meter"), harga
+                    // lama tidak boleh ikut terbawa: hasilnya subtotal & markup yang absurd. Kosongkan
+                    // supaya Sales mengisi harga jual yang baru.
+                    $sameItem = $line !== null
+                        && $line->item_name === $requestLine->item_name
+                        && $line->unit === $requestLine->unit
+                        && $line->category === $requestLine->category;
+
+                    $sellingPrice = $sameItem ? (float) ($line->selling_price ?? 0) : 0.0;
                     $priced = LinePricing::resolve(
                         (float) $requestLine->qty,
                         $sellingPrice,
                         (float) $requestLine->cost_price,
-                        $line?->discount_percent !== null ? (float) $line->discount_percent : null,
-                        $line?->discount_amount !== null ? (float) $line->discount_amount : null,
+                        $sameItem && $line->discount_percent !== null ? (float) $line->discount_percent : null,
+                        $sameItem && $line->discount_amount !== null ? (float) $line->discount_amount : null,
                     );
 
                     $quotation->lines()->updateOrCreate(
