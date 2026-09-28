@@ -115,4 +115,4 @@ function label(value) { return String(value || '—').replaceAll('_', ' ').repla
 function phaseLabel(value) { return value === 'dp' ? 'DP' : value === 'full' ? 'Pelunasan 100%' : value === 'final' ? 'Pelunasan Akhir' : label(value); }
 function date(value) { if (!value) return '—'; const d = new Date(String(value).length <= 10 ? `${value}T00:00:00` : value); return Number.isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium' }).format(d); }
 function dateTime(value) { return value ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—'; }
-function money(value) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(value || 0)); }
+function money(value) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value || 0)); }

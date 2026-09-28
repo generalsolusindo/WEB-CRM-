@@ -5,9 +5,9 @@ import { feedback } from '../../../Components/feedback';
 import TableScroll from '../../../Components/ui/TableScroll';
 
 function money(v) {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(v || 0));
 }
-function r2(n) { return Math.round(n * 100) / 100; }
+function rp(n) { return Math.round(n); }
 
 function Alert({ text }) {
     return <div className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">{text}</div>;
@@ -53,19 +53,19 @@ export default function Edit({ invoice, linesEditable }) {
     const sourceLines = linesEditable ? data.lines : invoice.lines;
     const computed = sourceLines.map((l) => {
         const qty = Number(l.qty) || 0;
-        const unitPrice = Number(l.unit_price) || 0;
-        const discount = Number(l.discount_amount) || 0;
+        const unitPrice = rp(Number(l.unit_price) || 0);
+        const discount = rp(Number(l.discount_amount) || 0);
         const rate = Number(l.tax_rate) || 0;
-        const subtotal = r2(qty * unitPrice - discount);
-        const tax = r2(subtotal * rate / 100);
+        const subtotal = rp(qty * unitPrice - discount);
+        const tax = rp(subtotal * rate / 100);
         return { ...l, subtotal, tax, discount };
     });
-    const grossTotal = r2(computed.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unit_price) || 0), 0));
-    const discountTotal = r2(computed.reduce((s, l) => s + l.discount, 0));
-    const subtotalTotal = r2(computed.reduce((s, l) => s + l.subtotal, 0));
-    const taxTotal = r2(computed.reduce((s, l) => s + l.tax, 0));
-    const grandTotal = r2(subtotalTotal + taxTotal);
-    const serviceDpp = r2(computed.filter((l) => l.category === 'service').reduce((s, l) => s + l.subtotal, 0));
+    const grossTotal = rp(computed.reduce((s, l) => s + (Number(l.qty) || 0) * rp(Number(l.unit_price) || 0), 0));
+    const discountTotal = rp(computed.reduce((s, l) => s + l.discount, 0));
+    const subtotalTotal = rp(computed.reduce((s, l) => s + l.subtotal, 0));
+    const taxTotal = rp(computed.reduce((s, l) => s + l.tax, 0));
+    const grandTotal = rp(subtotalTotal + taxTotal);
+    const serviceDpp = rp(computed.filter((l) => l.category === 'service').reduce((s, l) => s + l.subtotal, 0));
     const pph23Preview = invoice.pph23_enabled ? Math.round(serviceDpp * Number(invoice.pph23_rate || 0) / 100) : 0;
 
     return (

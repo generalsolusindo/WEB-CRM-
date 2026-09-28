@@ -85,7 +85,7 @@ class MarkProcurementRequestReady
                             'qty' => $requestLine->qty,
                             'unit' => $requestLine->unit,
                             'cost_price' => $requestLine->cost_price,
-                            'selling_price' => $sellingPrice,
+                            'selling_price' => $priced['selling_price'],
                             'discount_percent' => $priced['discount_percent'],
                             'discount_amount' => $priced['discount_amount'],
                             'markup_percent' => $priced['markup_percent'],

@@ -5,7 +5,7 @@ import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Toolbar, SearchInput, FilterSelect, Button, DataTable, StatusBadge, Pagination, EmptyState } from '../../../Components/ui';
 
 function money(value) {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(value || 0));
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value || 0));
 }
 
 export default function Index({ quotations, filters, statusOptions, temperatureOptions = [] }) {

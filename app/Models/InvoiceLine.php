@@ -48,15 +48,15 @@ class InvoiceLine extends Model
         ];
     }
 
-    /** PPN baris ini: DPP x tax_rate%, dibulatkan 2 desimal. */
+    /** PPN baris ini: DPP x tax_rate%, dibulatkan ke rupiah bulat. */
     protected function taxAmount(): Attribute
     {
-        return Attribute::get(fn (): float => round((float) $this->subtotal * (float) $this->tax_rate / 100, 2));
+        return Attribute::get(fn (): float => round((float) $this->subtotal * (float) $this->tax_rate / 100));
     }
 
     protected function lineTotal(): Attribute
     {
-        return Attribute::get(fn (): float => round((float) $this->subtotal + $this->tax_amount, 2));
+        return Attribute::get(fn (): float => round((float) $this->subtotal + $this->tax_amount));
     }
 
     public function invoice(): BelongsTo

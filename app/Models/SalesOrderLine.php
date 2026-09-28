@@ -56,17 +56,17 @@ class SalesOrderLine extends Model
 
     protected function gross(): Attribute
     {
-        return Attribute::get(fn (): float => round((float) $this->subtotal + (float) $this->discount_amount, 2));
+        return Attribute::get(fn (): float => round((float) $this->subtotal + (float) $this->discount_amount));
     }
 
     protected function taxAmount(): Attribute
     {
-        return Attribute::get(fn (): float => round((float) $this->subtotal * (float) $this->tax_rate / 100, 2));
+        return Attribute::get(fn (): float => round((float) $this->subtotal * (float) $this->tax_rate / 100));
     }
 
     protected function lineTotal(): Attribute
     {
-        return Attribute::get(fn (): float => round((float) $this->subtotal + $this->tax_amount, 2));
+        return Attribute::get(fn (): float => round((float) $this->subtotal + $this->tax_amount));
     }
 
     public function salesOrder(): BelongsTo

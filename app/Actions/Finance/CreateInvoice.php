@@ -96,7 +96,7 @@ class CreateInvoice
             // baris manual sudah final apa adanya, tidak perlu difinalisasi ulang.
             if (! $hasManualLines && $agreedDpp !== null) {
                 AgreedDpp::distribute($order->lines, $agreedDpp);
-                $order->update(['agreed_dpp' => $agreedDpp]);
+                $order->update(['agreed_dpp' => round($agreedDpp)]);
                 $order->load('lines.tax');
             }
 
@@ -134,11 +134,11 @@ class CreateInvoice
 
                 foreach ($lines as $line) {
                     $qty = (float) $line['qty'];
-                    $unitPrice = (float) $line['unit_price'];
-                    $discountAmount = round((float) ($line['discount_amount'] ?? 0), 2);
+                    $unitPrice = round((float) $line['unit_price']);
+                    $discountAmount = round((float) ($line['discount_amount'] ?? 0));
                     $taxRate = round((float) ($line['tax_rate'] ?? 0), 2);
-                    $subtotal = round($qty * $unitPrice - $discountAmount, 2);
-                    $taxAmount = round($subtotal * $taxRate / 100, 2);
+                    $subtotal = round($qty * $unitPrice - $discountAmount);
+                    $taxAmount = round($subtotal * $taxRate / 100);
                     $soLineId = $line['sales_order_line_id'] ?? null;
 
                     $invoice->lines()->create([
@@ -158,11 +158,11 @@ class CreateInvoice
                 }
             } else {
                 foreach ($order->lines as $soLine) {
-                    $subtotal = round((float) $soLine->subtotal * $ratio, 2);
-                    $discountAmount = round((float) $soLine->discount_amount * $ratio, 2);
+                    $subtotal = round((float) $soLine->subtotal * $ratio);
+                    $discountAmount = round((float) $soLine->discount_amount * $ratio);
                     $qty = (float) $soLine->qty;
-                    $unitPrice = $qty > 0 ? round(($subtotal + $discountAmount) / $qty, 2) : 0.0;
-                    $taxAmount = round($subtotal * (float) $soLine->tax_rate / 100, 2);
+                    $unitPrice = $qty > 0 ? round(($subtotal + $discountAmount) / $qty) : 0.0;
+                    $taxAmount = round($subtotal * (float) $soLine->tax_rate / 100);
 
                     $invoice->lines()->create([
                         'sales_order_line_id' => $soLine->id,
@@ -194,8 +194,8 @@ class CreateInvoice
             }
 
             $invoice->update([
-                'amount' => round($amount, 2),
-                'tax_amount' => round($taxTotal, 2),
+                'amount' => round($amount),
+                'tax_amount' => round($taxTotal),
                 'pph23_enabled' => $pph23Enabled,
                 'pph23_rate' => $pph23FinalRate,
                 'pph23_amount' => $pph23FinalAmount,

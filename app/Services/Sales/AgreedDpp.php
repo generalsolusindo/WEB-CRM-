@@ -2,6 +2,8 @@
 
 namespace App\Services\Sales;
 
+use App\Models\QuotationLine;
+use App\Models\SalesOrderLine;
 use Illuminate\Support\Collection;
 
 /**
@@ -13,34 +15,37 @@ use Illuminate\Support\Collection;
 class AgreedDpp
 {
     /**
-     * @param  Collection<int, \App\Models\QuotationLine|\App\Models\SalesOrderLine>  $lines
+     * @param  Collection<int, QuotationLine|SalesOrderLine>  $lines
+     *
+     * Semua angka rupiah bulat: nilai disepakati dibulatkan, tiap baris dibulatkan, dan sisa
+     * pembulatan dibebankan ke baris terakhir supaya jumlah DPP persis sama dengan nilai itu.
      */
     public static function distribute(Collection $lines, float $agreedDpp): void
     {
-        $gross = round($lines->sum(fn ($l) => (float) $l->qty * (float) $l->selling_price), 2);
+        $gross = round($lines->sum(fn ($l) => round((float) $l->qty * (float) $l->selling_price)));
 
         if ($gross <= 0) {
             return;
         }
 
         // Tidak menaikkan harga di atas bruto — target dibatasi maksimal = gross.
-        $target = max(0.0, min($agreedDpp, $gross));
+        $target = max(0.0, min(round($agreedDpp), $gross));
         $factor = $target / $gross;
 
         $running = 0.0;
         $last = $lines->count() - 1;
 
         $lines->values()->each(function ($line, $i) use ($factor, $target, &$running, $last) {
-            $lineGross = round((float) $line->qty * (float) $line->selling_price, 2);
+            $lineGross = round((float) $line->qty * (float) $line->selling_price);
 
             if ($i === $last) {
-                $subtotal = round($target - $running, 2);
+                $subtotal = round($target - $running);
             } else {
-                $subtotal = round($lineGross * $factor, 2);
-                $running = round($running + $subtotal, 2);
+                $subtotal = round($lineGross * $factor);
+                $running = round($running + $subtotal);
             }
 
-            $discount = round($lineGross - $subtotal, 2);
+            $discount = round($lineGross - $subtotal);
 
             $line->update([
                 'discount_amount' => max($discount, 0),

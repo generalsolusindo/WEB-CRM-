@@ -6,10 +6,12 @@ import { feedback } from '../../../Components/feedback';
 import TableScroll from '../../../Components/ui/TableScroll';
 
 function money(v) {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(v || 0));
 }
 
+// Persentase tetap berdesimal (r2); semua angka rupiah dibulatkan ke rupiah bulat (rp) — sama dengan server.
 function r2(n) { return Math.round(n * 100) / 100; }
+function rp(n) { return Math.round(n); }
 
 function Alert({ text }) {
     return <div className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">{text}</div>;
@@ -44,26 +46,40 @@ export default function Create({
     const pct = isDp ? Math.min(99, Math.max(1, Number(data.dp_percent) || defaultDpPercent)) : 100;
     const ratio = pct / 100;
 
-    const grossAll = r2(salesOrder.lines.reduce((s, l) => s + Number(l.qty) * Number(l.selling_price || 0), 0));
-    const agreed = data.agreed_dpp !== '' ? Number(data.agreed_dpp) : null;
+    const lineGrosses = salesOrder.lines.map((l) => rp(Number(l.qty) * Number(l.selling_price || 0)));
+    const grossAll = rp(lineGrosses.reduce((s, g) => s + g, 0));
+    const agreed = data.agreed_dpp !== '' ? Math.round(Number(data.agreed_dpp)) : null;
     const dppFactor = agreed != null && agreed > 0 && grossAll > 0 ? Math.min(agreed, grossAll) / grossAll : null;
     const ppnOverride = data.ppn_rate !== '' ? Number(data.ppn_rate) : null;
 
-    const computedLines = salesOrder.lines.map((l) => {
-        const lineGross = r2(Number(l.qty) * Number(l.selling_price || 0));
-        const fullSubtotal = dppFactor != null ? r2(lineGross * dppFactor) : Number(l.subtotal);
-        const fullDiscount = dppFactor != null ? r2(lineGross - fullSubtotal) : Number(l.discount_amount || 0);
-        const subtotal = r2(fullSubtotal * ratio);
-        const discount = r2(fullDiscount * ratio);
+    // Sama persis dengan server (AgreedDpp::distribute): sisa pembulatan ke baris terakhir.
+    const agreedSubtotals = (() => {
+        if (dppFactor == null) return null;
+        const target = Math.min(agreed, grossAll);
+        let running = 0;
+        return lineGrosses.map((gross, i) => {
+            if (i === lineGrosses.length - 1) return rp(target - running);
+            const sub = rp(gross * dppFactor);
+            running = rp(running + sub);
+            return sub;
+        });
+    })();
+
+    const computedLines = salesOrder.lines.map((l, i) => {
+        const lineGross = lineGrosses[i];
+        const fullSubtotal = agreedSubtotals != null ? agreedSubtotals[i] : Number(l.subtotal);
+        const fullDiscount = agreedSubtotals != null ? rp(lineGross - fullSubtotal) : Number(l.discount_amount || 0);
+        const subtotal = rp(fullSubtotal * ratio);
+        const discount = rp(fullDiscount * ratio);
         const rate = ppnOverride != null ? ppnOverride : Number(l.tax_rate || 0);
-        const tax = r2(subtotal * rate / 100);
+        const tax = rp(subtotal * rate / 100);
         return { ...l, invRate: rate, invSubtotal: subtotal, invTax: tax, invDiscount: discount };
     });
 
     function enableManualLines() {
         const seeded = computedLines.map((l) => {
             const qty = Number(l.qty) || 1;
-            const unitPrice = qty > 0 ? r2((l.invSubtotal + l.invDiscount) / qty) : 0;
+            const unitPrice = qty > 0 ? rp((l.invSubtotal + l.invDiscount) / qty) : 0;
             return {
                 sales_order_line_id: l.id,
                 item_name: l.item_name,
@@ -101,21 +117,21 @@ export default function Create({
 
     const manualComputed = manualLines ? (data.lines || []).map((l) => {
         const qty = Number(l.qty) || 0;
-        const unitPrice = Number(l.unit_price) || 0;
-        const discount = Number(l.discount_amount) || 0;
+        const unitPrice = rp(Number(l.unit_price) || 0);
+        const discount = rp(Number(l.discount_amount) || 0);
         const rate = Number(l.tax_rate) || 0;
-        const subtotal = r2(qty * unitPrice - discount);
-        const tax = r2(subtotal * rate / 100);
+        const subtotal = rp(qty * unitPrice - discount);
+        const tax = rp(subtotal * rate / 100);
         return { ...l, invSubtotal: subtotal, invTax: tax, invDiscount: discount, invRate: rate };
     }) : [];
 
     const displayLines = manualLines ? manualComputed : computedLines;
-    const subtotalTotal = r2(displayLines.reduce((s, l) => s + l.invSubtotal, 0));
-    const taxTotal = r2(displayLines.reduce((s, l) => s + l.invTax, 0));
-    const discountTotal = r2(displayLines.reduce((s, l) => s + l.invDiscount, 0));
-    const serviceDpp = r2(displayLines.filter((l) => l.category === 'service').reduce((s, l) => s + l.invSubtotal, 0));
+    const subtotalTotal = rp(displayLines.reduce((s, l) => s + l.invSubtotal, 0));
+    const taxTotal = rp(displayLines.reduce((s, l) => s + l.invTax, 0));
+    const discountTotal = rp(displayLines.reduce((s, l) => s + l.invDiscount, 0));
+    const serviceDpp = rp(displayLines.filter((l) => l.category === 'service').reduce((s, l) => s + l.invSubtotal, 0));
     const pph23Amount = data.pph23_enabled ? Math.round(serviceDpp * Number(data.pph23_rate || 0) / 100) : 0;
-    const totalTagihan = r2(subtotalTotal + taxTotal);
+    const totalTagihan = rp(subtotalTotal + taxTotal);
 
     return (
         <AppLayout>
@@ -302,12 +318,12 @@ export default function Create({
                                     {pph23Amount > 0 && <tr><td colSpan={manualLines ? 7 : 4} className="px-4 py-2 text-right text-text-muted">PPh 23 ({data.pph23_rate}%)</td><td className="px-4 py-2 text-right font-medium tabular-nums text-danger">− {money(pph23Amount)}</td></tr>}
                                     <tr><td colSpan={manualLines ? 7 : 4} className="px-4 py-4 text-right font-semibold">{pph23Amount > 0 ? 'Dibayar Customer (kas)' : 'Grand Total'}</td><td className="px-4 py-4 text-right text-lg font-bold tabular-nums">{money(totalTagihan - pph23Amount)}</td></tr>
                                     {isDp && ratio < 1 && !manualLines && (() => {
-                                        const dpPayable = r2(totalTagihan - pph23Amount);
-                                        const fullPayable = r2(dpPayable / ratio);
+                                        const dpPayable = rp(totalTagihan - pph23Amount);
+                                        const fullPayable = rp(dpPayable / ratio);
                                         return (
                                             <>
                                                 <tr><td colSpan="4" className="px-4 pt-3 pb-1 text-right text-xs text-text-muted">Nilai kontrak (100%)</td><td className="px-4 pt-3 pb-1 text-right text-xs tabular-nums">{money(fullPayable)}</td></tr>
-                                                <tr><td colSpan="4" className="px-4 py-1 text-right text-xs text-text-muted">Sisa — pelunasan setelah BAST</td><td className="px-4 py-1 text-right text-xs font-medium tabular-nums">{money(r2(fullPayable - dpPayable))}</td></tr>
+                                                <tr><td colSpan="4" className="px-4 py-1 text-right text-xs text-text-muted">Sisa — pelunasan setelah BAST</td><td className="px-4 py-1 text-right text-xs font-medium tabular-nums">{money(rp(fullPayable - dpPayable))}</td></tr>
                                             </>
                                         );
                                     })()}

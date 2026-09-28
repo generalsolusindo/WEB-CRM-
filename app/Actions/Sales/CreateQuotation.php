@@ -66,7 +66,7 @@ class CreateQuotation
                 'notes' => $data['notes'] ?? null,
                 'terms' => ($data['terms'] ?? '') !== '' ? $data['terms'] : QuotationDefaults::terms(),
                 'agreed_dpp' => isset($data['agreed_dpp']) && $data['agreed_dpp'] !== null && $data['agreed_dpp'] !== ''
-                    ? (float) $data['agreed_dpp']
+                    ? round((float) $data['agreed_dpp'])
                     : null,
             ]);
 
@@ -121,7 +121,7 @@ class CreateQuotation
             'qty' => $qty,
             'unit' => $source->unit,
             'cost_price' => $source->cost_price,
-            'selling_price' => $input['selling_price'],
+            'selling_price' => $priced['selling_price'],
             'discount_percent' => $priced['discount_percent'],
             'discount_amount' => $priced['discount_amount'],
             'markup_percent' => $priced['markup_percent'],

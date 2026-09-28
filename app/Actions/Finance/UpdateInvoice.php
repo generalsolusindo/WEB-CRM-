@@ -11,8 +11,8 @@ class UpdateInvoice
 {
     /**
      * @param  array<int, array<string, mixed>>  $lines  Diabaikan (rincian baris tidak disentuh)
-     *                                                    kalau invoice sudah ada pembayaran tercatat —
-     *                                                    hanya jatuh tempo & catatan yang tetap tersimpan.
+     *                                                   kalau invoice sudah ada pembayaran tercatat —
+     *                                                   hanya jatuh tempo & catatan yang tetap tersimpan.
      */
     public function handle(Invoice $invoice, ?string $dueDate, ?string $notes, array $lines): Invoice
     {
@@ -36,11 +36,11 @@ class UpdateInvoice
 
             foreach ($lines as $line) {
                 $qty = (float) $line['qty'];
-                $unitPrice = (float) $line['unit_price'];
-                $discountAmount = round((float) ($line['discount_amount'] ?? 0), 2);
+                $unitPrice = round((float) $line['unit_price']);
+                $discountAmount = round((float) ($line['discount_amount'] ?? 0));
                 $taxRate = round((float) ($line['tax_rate'] ?? 0), 2);
-                $subtotal = round($qty * $unitPrice - $discountAmount, 2);
-                $taxAmount = round($subtotal * $taxRate / 100, 2);
+                $subtotal = round($qty * $unitPrice - $discountAmount);
+                $taxAmount = round($subtotal * $taxRate / 100);
 
                 $locked->lines()->create([
                     'sales_order_line_id' => $line['sales_order_line_id'] ?? null,
@@ -69,8 +69,8 @@ class UpdateInvoice
             $update = [
                 'due_date' => $dueDate,
                 'notes' => $notes,
-                'amount' => round($amount, 2),
-                'tax_amount' => round($taxTotal, 2),
+                'amount' => round($amount),
+                'tax_amount' => round($taxTotal),
                 'pph23_amount' => $pph23Amount,
                 // Angka berubah -> kembali ke Draft, invoice dianggap belum terkirim
                 // lagi ke customer dan perlu dikirim ulang.

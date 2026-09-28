@@ -6,7 +6,7 @@ import { PageHeader, PillTabs, Toolbar, FilterSelect, DataTable, StatusBadge, Pa
 import { feedback } from '../../../Components/feedback';
 
 function money(v) {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(v || 0));
 }
 
 export default function Index({ needsInvoice, readyForFinal = [], invoices, filters, phaseOptions, statusOptions }) {

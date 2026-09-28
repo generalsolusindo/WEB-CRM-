@@ -42,7 +42,7 @@ class UpdateQuotation
                 'notes' => $data['notes'] ?? null,
                 'terms' => $data['terms'] ?? null,
                 'agreed_dpp' => isset($data['agreed_dpp']) && $data['agreed_dpp'] !== null && $data['agreed_dpp'] !== ''
-                    ? (float) $data['agreed_dpp']
+                    ? round((float) $data['agreed_dpp'])
                     : null,
                 'pm_review_status' => null,
                 'pm_reviewed_by' => null,
@@ -87,7 +87,7 @@ class UpdateQuotation
                     'qty' => $qty,
                     'unit' => $existing->unit,
                     'cost_price' => $costPrice,
-                    'selling_price' => $input['selling_price'],
+                    'selling_price' => $priced['selling_price'],
                     'discount_percent' => $priced['discount_percent'],
                     'discount_amount' => $priced['discount_amount'],
                     'markup_percent' => $priced['markup_percent'],

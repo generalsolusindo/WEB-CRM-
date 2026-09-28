@@ -7,10 +7,12 @@ import TableScroll from '../../../Components/ui/TableScroll';
 import TotalsSummary from '../../../Components/ui/TotalsSummary';
 
 function money(v) {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 }).format(Number(v || 0));
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(v || 0));
 }
-function suggestedPrice(cost) { return (Number(cost) * 1.3).toFixed(2); }
+function suggestedPrice(cost) { return String(Math.round(Number(cost) * 1.3)); }
+// Persentase tetap berdesimal (r2); semua angka rupiah dibulatkan ke rupiah bulat (rp) — sama dengan server.
 function r2(n) { return Math.round(n * 100) / 100; }
+function rp(n) { return Math.round(n); }
 
 function initialLine(line, taxes, editing) {
     const dp = line.discount_percent != null ? Number(line.discount_percent) : null;
@@ -88,23 +90,38 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
         setData('lines', data.lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
     }
 
-    const grossAll = r2(data.lines.reduce((s, l) => s + Number(l.qty || 0) * Number(l.selling_price || 0), 0));
-    const agreedDpp = data.agreed_dpp !== '' ? Number(data.agreed_dpp) : null;
+    const lineGrosses = data.lines.map((l) => rp(Number(l.qty || 0) * Number(l.selling_price || 0)));
+    const grossAll = rp(lineGrosses.reduce((s, g) => s + g, 0));
+    const agreedDpp = data.agreed_dpp !== '' ? Math.round(Number(data.agreed_dpp)) : null;
     const agreedFactor = agreedDpp != null && agreedDpp > 0 && grossAll > 0
         ? Math.min(agreedDpp, grossAll) / grossAll
         : null;
 
+    // Sama persis dengan server (AgreedDpp::distribute): tiap baris dibulatkan, sisa pembulatan
+    // dibebankan ke baris terakhir supaya jumlah DPP tepat sama dengan Nilai DPP disepakati.
+    const agreedSubtotals = (() => {
+        if (agreedFactor == null) return null;
+        const target = Math.min(agreedDpp, grossAll);
+        let running = 0;
+        return lineGrosses.map((gross, i) => {
+            if (i === lineGrosses.length - 1) return rp(target - running);
+            const sub = rp(gross * agreedFactor);
+            running = rp(running + sub);
+            return sub;
+        });
+    })();
+
     function calc(i) {
         const d = data.lines[i];
         const qty = Number(d.qty || 0);
-        const gross = r2(qty * Number(d.selling_price || 0));
+        const gross = lineGrosses[i];
         let discount = 0;
-        if (agreedFactor != null) {
-            discount = r2(gross - r2(gross * agreedFactor));
-        } else if (d.discount_mode === 'percent' && d.discount_percent !== '') discount = r2(gross * Number(d.discount_percent) / 100);
+        if (agreedSubtotals != null) {
+            discount = rp(gross - agreedSubtotals[i]);
+        } else if (d.discount_mode === 'percent' && d.discount_percent !== '') discount = rp(gross * Number(d.discount_percent) / 100);
         else if (d.discount_mode === 'amount' && d.discount_amount !== '') discount = Math.min(Number(d.discount_amount), gross);
-        const dpp = r2(gross - discount);
-        const tax = r2(dpp * Number(d.tax_rate || 0) / 100);
+        const dpp = rp(gross - discount);
+        const tax = rp(dpp * Number(d.tax_rate || 0) / 100);
         const cost = Number(d.cost_price || 0);
         const totalCost = r2(qty * cost);
         return {
@@ -115,15 +132,15 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
     }
 
     function onDiscountPercent(i, value) {
-        const gross = r2(Number(data.lines[i].qty || 0) * Number(data.lines[i].selling_price || 0));
+        const gross = lineGrosses[i];
         setLine(i, {
             discount_mode: 'percent',
             discount_percent: value,
-            discount_amount: value === '' ? '' : String(r2(gross * Number(value) / 100)),
+            discount_amount: value === '' ? '' : String(rp(gross * Number(value) / 100)),
         });
     }
     function onDiscountAmount(i, value) {
-        const gross = r2(Number(data.lines[i].qty || 0) * Number(data.lines[i].selling_price || 0));
+        const gross = lineGrosses[i];
         setLine(i, {
             discount_mode: 'amount',
             discount_amount: value,
@@ -140,14 +157,14 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
     const totals = data.lines.reduce((acc, l, i) => {
         const c = calc(i);
         acc.gross += c.gross; acc.discount += c.discount; acc.dpp += c.dpp; acc.tax += c.tax;
-        acc.cost += r2(Number(l.qty || 0) * Number(l.cost_price || 0));
+        acc.cost += Number(l.qty || 0) * Number(l.cost_price || 0);
         if (l.category === 'service') acc.serviceDpp += c.dpp;
         return acc;
     }, { gross: 0, discount: 0, dpp: 0, tax: 0, cost: 0, serviceDpp: 0 });
-    const grand = r2(totals.dpp + totals.tax);
-    const pph23Estimate = r2(totals.serviceDpp * 0.02);
+    const grand = rp(totals.dpp + totals.tax);
+    const pph23Estimate = rp(totals.serviceDpp * 0.02);
     const discPct = totals.gross > 0 ? r2(totals.discount / totals.gross * 100) : 0;
-    const marginRp = r2(totals.dpp - totals.cost);
+    const marginRp = rp(totals.dpp - totals.cost);
     const marginPct = totals.cost > 0 ? r2((totals.dpp - totals.cost) / totals.cost * 100) : null;
 
     const reviewResetRequired = editing && (
@@ -233,7 +250,7 @@ export default function Form({ procurementRequest = null, quotation = null, taxe
                                 {errors.agreed_dpp && <span className="text-xs text-danger">{errors.agreed_dpp}</span>}
                                 {agreedFactor != null && (
                                     <span className="mt-1 block text-xs text-info">
-                                        Diskon global {r2((1 - agreedFactor) * 100)}% (−{money(r2(grossAll - Math.min(agreedDpp, grossAll)))}) dibagi rata ke semua baris. Diskon per-baris dinonaktifkan.
+                                        Diskon global {r2((1 - agreedFactor) * 100)}% (−{money(rp(grossAll - Math.min(agreedDpp, grossAll)))}) dibagi rata ke semua baris. Diskon per-baris dinonaktifkan.
                                     </span>
                                 )}
                                 {agreedDpp != null && agreedDpp > grossAll && (

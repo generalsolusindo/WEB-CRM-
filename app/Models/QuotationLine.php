@@ -62,22 +62,22 @@ class QuotationLine extends Model
         ];
     }
 
-    /** Bruto sebelum diskon. */
+    /** Bruto sebelum diskon (rupiah bulat). */
     protected function gross(): Attribute
     {
-        return Attribute::get(fn (): float => round((float) $this->subtotal + (float) $this->discount_amount, 2));
+        return Attribute::get(fn (): float => round((float) $this->subtotal + (float) $this->discount_amount));
     }
 
-    /** PPN baris ini: DPP x tax_rate%, dibulatkan 2 desimal. */
+    /** PPN baris ini: DPP x tax_rate%, dibulatkan ke rupiah bulat. */
     protected function taxAmount(): Attribute
     {
-        return Attribute::get(fn (): float => round((float) $this->subtotal * (float) $this->tax_rate / 100, 2));
+        return Attribute::get(fn (): float => round((float) $this->subtotal * (float) $this->tax_rate / 100));
     }
 
     /** Total baris = DPP + PPN. */
     protected function lineTotal(): Attribute
     {
-        return Attribute::get(fn (): float => round((float) $this->subtotal + $this->tax_amount, 2));
+        return Attribute::get(fn (): float => round((float) $this->subtotal + $this->tax_amount));
     }
 
     /** Margin efektif setelah diskon terhadap cost. */

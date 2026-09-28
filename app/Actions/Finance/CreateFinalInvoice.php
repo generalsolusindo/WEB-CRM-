@@ -97,12 +97,12 @@ class CreateFinalInvoice
 
             foreach ($order->lines as $soLine) {
                 $full = (float) $soLine->subtotal;
-                $remaining = round($full - round((float) ($dpSubtotalByLine[$soLine->id] ?? 0), 2), 2);
+                $remaining = round($full - round((float) ($dpSubtotalByLine[$soLine->id] ?? 0)));
                 $discountFull = (float) $soLine->discount_amount;
-                $discountRemaining = round($discountFull - round((float) ($dpDiscountByLine[$soLine->id] ?? 0), 2), 2);
+                $discountRemaining = round($discountFull - round((float) ($dpDiscountByLine[$soLine->id] ?? 0)));
                 $qty = (float) $soLine->qty;
-                $unitPrice = $qty > 0 ? round(($remaining + $discountRemaining) / $qty, 2) : 0.0;
-                $taxAmount = round($remaining * (float) $soLine->tax_rate / 100, 2);
+                $unitPrice = $qty > 0 ? round(($remaining + $discountRemaining) / $qty) : 0.0;
+                $taxAmount = round($remaining * (float) $soLine->tax_rate / 100);
 
                 $invoice->lines()->create([
                     'sales_order_line_id' => $soLine->id,
@@ -120,7 +120,6 @@ class CreateFinalInvoice
                 $taxTotal += $taxAmount;
             }
 
-
             // PPh 23 mengikuti invoice DP: bila DP kena potong, pelunasan menanggung
             // sisanya — basis = baris JASA pelunasan ini, tarif ikut invoice DP.
             $pph23Enabled = (bool) ($dpInvoice?->pph23_enabled);
@@ -136,8 +135,8 @@ class CreateFinalInvoice
             }
 
             $invoice->update([
-                'amount' => round($amount, 2),
-                'tax_amount' => round($taxTotal, 2),
+                'amount' => round($amount),
+                'tax_amount' => round($taxTotal),
                 'pph23_enabled' => $pph23Enabled,
                 'pph23_rate' => $pph23FinalRate,
                 'pph23_amount' => $pph23FinalAmount,

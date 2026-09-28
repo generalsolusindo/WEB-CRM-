@@ -8,6 +8,10 @@ namespace App\Services\Sales;
  *   Diskon (persen ATAU rupiah, saling terhubung)
  *   DPP   = Bruto - Diskon        (disimpan di kolom `subtotal`)
  *   PPN   = DPP x tax_rate%       (accessor `tax_amount`)
+ *
+ * Semua angka rupiah (harga jual, bruto, diskon, DPP) dibulatkan ke rupiah BULAT sejak
+ * dihitung — tidak ada sen — supaya total, diskon, dan PPN dokumen selalu menyesuaikan
+ * dan konsisten dengan angka yang tampil.
  */
 class LinePricing
 {
@@ -15,7 +19,7 @@ class LinePricing
     private const MAX_MARKUP_PERCENT = 9999.99;
 
     /**
-     * @return array{discount_percent: float|null, discount_amount: float, subtotal: float, markup_percent: float|null}
+     * @return array{selling_price: float, discount_percent: float|null, discount_amount: float, subtotal: float, markup_percent: float|null}
      */
     public static function resolve(
         float $qty,
@@ -24,22 +28,24 @@ class LinePricing
         ?float $discountPercent,
         ?float $discountAmount,
     ): array {
-        $gross = round($qty * $sellingPrice, 2);
+        $sellingPrice = round($sellingPrice);
+        $gross = round($qty * $sellingPrice);
 
         if ($discountPercent !== null && $discountPercent > 0) {
             $percent = min(max($discountPercent, 0), 100);
-            $amount = round($gross * $percent / 100, 2);
+            $amount = round($gross * $percent / 100);
         } elseif ($discountAmount !== null && $discountAmount > 0) {
-            $amount = min(max($discountAmount, 0), $gross);
+            $amount = min(max(round($discountAmount), 0), $gross);
             $percent = $gross > 0 ? round($amount / $gross * 100, 2) : null;
         } else {
             $percent = null;
             $amount = 0.0;
         }
 
-        $subtotal = round($gross - $amount, 2);
+        $subtotal = round($gross - $amount);
 
         return [
+            'selling_price' => $sellingPrice,
             'discount_percent' => $percent,
             'discount_amount' => $amount,
             'subtotal' => $subtotal,
