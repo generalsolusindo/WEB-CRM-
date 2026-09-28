@@ -2,11 +2,15 @@
 
 namespace App\Providers;
 
+use App\Contracts\ConversionSheetWriter;
 use App\Models\Attachment;
 use App\Models\Payment;
 use App\Models\User;
 use App\Observers\AttachmentObserver;
 use App\Observers\PaymentObserver;
+use App\Services\GoogleAds\GoogleSheetsConversionWriter;
+use App\Services\Whatsapp\ClickToChatGateway;
+use App\Services\Whatsapp\WhatsappGateway;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -18,8 +22,13 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(
-            \App\Services\Whatsapp\WhatsappGateway::class,
-            \App\Services\Whatsapp\ClickToChatGateway::class,
+            WhatsappGateway::class,
+            ClickToChatGateway::class,
+        );
+
+        $this->app->bind(
+            ConversionSheetWriter::class,
+            GoogleSheetsConversionWriter::class,
         );
     }
 

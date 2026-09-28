@@ -387,6 +387,8 @@ Route::middleware('auth')->group(function () {
         Route::get('reports/leads', LeadReportController::class)->name('reports.leads');
         Route::post('quotations/{quotation}/send-whatsapp', [QuotationController::class, 'sendWhatsapp'])
             ->name('quotations.send-whatsapp');
+        Route::post('quotations/{quotation}/push-conversion', [QuotationController::class, 'pushToConversionSheet'])
+            ->name('quotations.push-conversion');
         Route::patch('quotations/{quotation}/number', [QuotationController::class, 'updateNumber'])
             ->name('quotations.number.update');
         Route::get('quotations/{quotation}/scope-revision', [QuotationController::class, 'editScope'])

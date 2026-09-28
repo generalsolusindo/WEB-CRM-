@@ -33,6 +33,7 @@ class Quotation extends Model
         'terms',
         'whatsapp_sent_at',
         'whatsapp_sent_by',
+        'pushed_to_conversion_sheet_at',
         'cancelled_at',
         'cancelled_by',
         'cancellation_reason',
@@ -58,6 +59,7 @@ class Quotation extends Model
             'manager_reviewed_at' => 'datetime',
             'is_addendum' => 'boolean',
             'whatsapp_sent_at' => 'datetime',
+            'pushed_to_conversion_sheet_at' => 'datetime',
             'cancelled_at' => 'datetime',
         ];
     }

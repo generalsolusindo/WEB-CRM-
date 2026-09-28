@@ -163,6 +163,12 @@ class QuotationPolicy
             && ! $quotation->salesOrder()->exists();
     }
 
+    /** Kirim data ke Google Sheet conversion tracker — boleh di status apa pun, ini menandai leads/quotation masuk, bukan cuma closing. */
+    public function pushToConversionSheet(User $user, Quotation $quotation): bool
+    {
+        return $this->owns($user, $quotation);
+    }
+
     public function confirm(User $user, Quotation $quotation): bool
     {
         return $this->owns($user, $quotation)

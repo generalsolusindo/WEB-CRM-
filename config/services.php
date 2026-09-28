@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'google_sheets' => [
+        'credentials_path' => env('GOOGLE_SHEETS_CREDENTIALS_PATH'),
+        'conversion_spreadsheet_id' => env('GOOGLE_ADS_CONVERSION_SPREADSHEET_ID'),
+        'conversion_sheet_name' => env('GOOGLE_ADS_CONVERSION_SHEET_NAME', 'Sheet1'),
+    ],
+
 ];

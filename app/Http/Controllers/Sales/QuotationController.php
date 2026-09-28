@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Sales;
 
 use App\Actions\Sales\CancelQuotationTransaction;
 use App\Actions\Sales\CreateQuotation;
+use App\Actions\Sales\PushQuotationToConversionSheet;
 use App\Actions\Sales\RequestQuotationRecost;
 use App\Actions\Sales\UpdateQuotation;
 use App\Enums\LeadStage;
@@ -190,6 +191,7 @@ class QuotationController extends Controller
                 'delete' => request()->user()->can('delete', $quotation),
                 'send' => request()->user()->can('send', $quotation),
                 'sendWhatsapp' => request()->user()->can('sendWhatsapp', $quotation),
+                'pushToConversionSheet' => request()->user()->can('pushToConversionSheet', $quotation),
                 'updateNumber' => request()->user()->can('updateNumber', $quotation),
                 'revise' => request()->user()->can('revise', $quotation),
                 'reject' => request()->user()->can('reject', $quotation),
@@ -307,6 +309,15 @@ class QuotationController extends Controller
             .'Terima kasih.';
 
         return back()->with('whatsappUrl', $whatsapp->link($number, $message));
+    }
+
+    public function pushToConversionSheet(Quotation $quotation, PushQuotationToConversionSheet $action): RedirectResponse
+    {
+        Gate::authorize('pushToConversionSheet', $quotation);
+
+        $action->handle($quotation);
+
+        return back()->with('success', 'Data berhasil dikirim ke Google Sheet conversion tracker.');
     }
 
     private function pdfFilename(Quotation $quotation): string

@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { FiPrinter, FiEdit2, FiSend, FiCheck, FiX, FiCopy, FiTrash2, FiHash, FiRefreshCw } from 'react-icons/fi';
+import { FiPrinter, FiEdit2, FiSend, FiCheck, FiX, FiCopy, FiTrash2, FiHash, FiRefreshCw, FiUploadCloud } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
 import CategoryBadge from '../../../Components/CategoryBadge';
 import { PageHeader, Card, CardHeader, Button, ConfirmDialog, Field, Info, InfoGrid, Modal, PromptDialog, StatusBadge, Textarea } from '../../../Components/ui';
@@ -113,6 +113,22 @@ export default function Show({ quotation, history, totals, permissions, customer
                             {permissions.updateNumber && <Button onClick={() => { setNumberError(''); setNumberOpen(true); }} variant="outline" icon={FiHash}>Ubah Nomor</Button>}
                             {permissions.update && <Button href={`/sales/quotations/${quotation.id}/edit`} variant={needsCorrection || pricingPending ? 'primary' : 'outline'} icon={FiEdit2}>{pricingPending ? 'Lengkapi Harga Jual' : needsCorrection ? 'Perbaiki Quotation' : 'Edit'}</Button>}
                             {permissions.reviseScope && <Button href={`/sales/quotations/${quotation.id}/scope-revision`} variant="outline" icon={FiRefreshCw}>Revisi Kebutuhan</Button>}
+                            {permissions.pushToConversionSheet && (
+                                <Button
+                                    onClick={() => askAction({
+                                        title: 'Kirim ke Google Sheet conversion tracker?',
+                                        description: 'Nomor telepon, nama perusahaan, dan nilai quotation ini akan ditambahkan sebagai baris baru di spreadsheet — dipakai Google Ads untuk mencocokkan conversion lewat nomor telepon.',
+                                        confirmLabel: 'Kirim',
+                                        tone: 'info',
+                                        path: `/sales/quotations/${quotation.id}/push-conversion`,
+                                        success: { title: 'Terkirim ke spreadsheet' },
+                                    })}
+                                    variant="outline"
+                                    icon={FiUploadCloud}
+                                >
+                                    {quotation.pushed_to_conversion_sheet_at ? 'Kirim Ulang ke Spreadsheet' : 'Kirim ke Spreadsheet'}
+                                </Button>
+                            )}
                             {permissions.sendWhatsapp && (
                                 <Button
                                     onClick={sendWhatsapp}
