@@ -2,6 +2,12 @@
     $qtyFmt = fn ($v) => rtrim(rtrim(number_format((float) $v, 2, ',', '.'), '0'), ',');
     $customer = $deliveryNote->salesOrder->contact;
     $forPdf = $forPdf ?? false;
+
+    // Base64 supaya logo tetap tampil saat dirender DomPDF (tidak bisa fetch URL remote).
+    $logoPath = public_path('images/logo-gs.png');
+    $logoSrc = is_file($logoPath)
+        ? 'data:image/png;base64,'.base64_encode(file_get_contents($logoPath))
+        : asset('images/logo-gs.png');
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -18,8 +24,8 @@
         td, th { vertical-align: top; }
 
         .top td { border: 0; padding: 0; }
-        .brand-name { font-size: 16px; font-weight: 700; color: #001B3A; }
-        .brand-sub { font-size: 9px; letter-spacing: .5px; color: #374151; }
+        .brand-logo { height: 40px; display: block; }
+        .brand-sub { font-size: 9px; letter-spacing: .5px; color: #374151; margin-top: 4px; }
         .muted { color: #6B7280; }
         .title { text-align: center; margin-top: 10px; }
         .title h1 { font-size: 18px; letter-spacing: 1px; }
@@ -57,7 +63,7 @@
         <table class="top">
             <tr>
                 <td style="width:60%">
-                    <div class="brand-name">CV. GENERAL SOLUSINDO</div>
+                    <img src="{{ $logoSrc }}" alt="General Solusindo" class="brand-logo">
                     <div class="brand-sub">IT - CONSULTAN - INTEGRATOR - SUPPLIER - TRAINING</div>
                 </td>
                 <td class="muted">
