@@ -21,7 +21,7 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'DejaVu Sans', Arial, sans-serif; color: #111827; font-size: 12px; background: {{ $forPdf ? '#fff' : '#f1f5f9' }}; line-height: 1.5; }
-        .sheet { background: #fff; {{ $forPdf ? '' : 'width: 210mm; min-height: 297mm; margin: 12px auto; padding: 18mm;' }} }
+        .sheet { background: #fff; padding: 18mm; {{ $forPdf ? '' : 'width: 210mm; min-height: 297mm; margin: 12px auto;' }} }
         .toolbar { width: 210mm; margin: 12px auto 0; text-align: right; }
         .toolbar button { padding: 8px 16px; border: 0; border-radius: 6px; background: #001B3A; color: #fff; font-size: 12px; cursor: pointer; }
         h1 { text-align: center; font-size: 15px; text-transform: uppercase; letter-spacing: .5px; }
