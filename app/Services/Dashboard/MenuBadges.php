@@ -5,6 +5,7 @@ namespace App\Services\Dashboard;
 use App\Enums\ActualProcurementStatus;
 use App\Enums\InvoicePhase;
 use App\Enums\InvoiceStatus;
+use App\Enums\LeadStage;
 use App\Enums\OrderType;
 use App\Enums\ProcurementPaymentStatus;
 use App\Enums\ProcurementRequestStatus;
@@ -14,6 +15,7 @@ use App\Enums\SurveyStatus;
 use App\Models\ActualProcurement;
 use App\Models\Bast;
 use App\Models\Invoice;
+use App\Models\Lead;
 use App\Models\ProcurementPayment;
 use App\Models\ProcurementRequest;
 use App\Models\Project;
@@ -147,10 +149,17 @@ class MenuBadges
             ->filter(fn ($p) => $p->canPayDp() || $p->canPayFinal())
             ->count();
 
+        // Sama persis dengan filter Finance\ProcurementPaymentController::index() — hanya yang
+        // sudah disetujui PM dan menunggu Finance benar-benar mentransfer yang dianggap "tugas".
+        $procurementPaymentsToPay = ProcurementPayment::query()
+            ->where('status', ProcurementPaymentStatus::ApprovedPm->value)
+            ->count();
+
         return [
             '/finance/invoices' => $needsUpfrontInvoice + $draft + $unpaidSent + $overdue + $readyForFinal,
             '/finance/surveys' => $surveyInbox,
             '/finance/vendor-service-payments' => $vendorService,
+            '/finance/procurement-payments' => $procurementPaymentsToPay,
         ];
     }
 
@@ -190,6 +199,15 @@ class MenuBadges
     private function management(): array
     {
         return [
+            // Opportunity yang belum ditunjuk Project Manager-nya — quotation dari opportunity
+            // ini tidak bisa maju ke verifikasi PM/Manager sampai ini diisi (lihat ReviewGate
+            // di Sales\Quotations\Show.jsx), jadi ini murni tugas Manager yang menunggu.
+            // Opportunity yang sudah Lost tidak dihitung — tidak ada lagi yang perlu dikerjakan.
+            '/management/opportunities' => Lead::query()
+                ->where('type', 'opportunity')
+                ->where('stage', '!=', LeadStage::Lost->value)
+                ->whereNull('delegated_to')
+                ->count(),
             '/management/quotations' => Quotation::query()
                 ->where('pm_review_status', 'approved')
                 ->whereNull('manager_review_status')

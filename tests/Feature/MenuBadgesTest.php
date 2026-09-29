@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Procurement\ReviewProcurementPayment;
+use App\Actions\Procurement\SubmitProcurementPayment;
 use App\Models\Contact;
 use App\Models\Lead;
 use App\Models\ProcurementRequest;
@@ -15,6 +17,7 @@ use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Tests\Concerns\BuildsProcurementProject;
 use Tests\TestCase;
 
 /**
@@ -25,6 +28,7 @@ use Tests\TestCase;
  */
 class MenuBadgesTest extends TestCase
 {
+    use BuildsProcurementProject;
     use RefreshDatabase;
 
     private function badges(User $user): array
@@ -180,5 +184,60 @@ class MenuBadgesTest extends TestCase
 
         $badges = $this->badges($vendorUser);
         $this->assertArrayHasKey('/technician/surveys', $badges);
+    }
+
+    /**
+     * Regresi produksi: quotation dari opportunity yang belum ditunjuk Project Manager-nya
+     * tidak bisa maju ke verifikasi PM/Manager (lihat ReviewGate di Sales\Quotations\Show.jsx),
+     * jadi ini murni tugas Manager yang menunggu — tapi sidebar Manajemen tidak pernah
+     * menghitungnya sama sekali.
+     */
+    public function test_management_sees_opportunity_badge_only_for_undelegated_live_opportunities(): void
+    {
+        $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
+        $pm = User::factory()->create(['role' => 'project_manager', 'is_active' => true]);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $undelegated = Lead::create([
+            'contact_id' => Contact::create(['name' => 'A', 'created_by' => $sales->id])->id,
+            'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified',
+        ]);
+        Lead::create([
+            'contact_id' => Contact::create(['name' => 'B', 'created_by' => $sales->id])->id,
+            'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'qualified', 'delegated_to' => $pm->id,
+        ]);
+        Lead::create([
+            'contact_id' => Contact::create(['name' => 'C', 'created_by' => $sales->id])->id,
+            'sales_id' => $sales->id, 'type' => 'opportunity', 'stage' => 'lost',
+        ]);
+        Lead::create([
+            'contact_id' => Contact::create(['name' => 'D', 'created_by' => $sales->id])->id,
+            'sales_id' => $sales->id, 'type' => 'lead', 'stage' => 'new',
+        ]);
+
+        $this->assertSame(1, $this->badges($management)['/management/opportunities']);
+
+        $undelegated->update(['delegated_to' => $pm->id]);
+        $this->assertSame(0, $this->badges($management)['/management/opportunities']);
+    }
+
+    /**
+     * Regresi produksi: "Pembayaran Vendor" (menu Finance) tidak pernah menampilkan badge
+     * sama sekali, walau ada pengajuan yang sudah disetujui PM dan menunggu Finance transfer.
+     */
+    public function test_finance_sees_procurement_payment_badge_only_when_approved_by_pm(): void
+    {
+        $finance = User::factory()->create(['role' => 'finance', 'is_active' => true]);
+        $project = $this->materialProject();
+        $vendor = Vendor::create(['name' => 'PT Vendor Uji']);
+        $project->actualProcurements()->update(['vendor_id' => $vendor->id, 'cost_price' => 100000]);
+        $procurement = User::factory()->create(['role' => 'procurement', 'is_active' => true]);
+        $pm = User::find($project->delegated_to);
+
+        $payment = app(SubmitProcurementPayment::class)->handle($project->fresh(), $procurement, ['pricing_mode' => 'itemized']);
+        $this->assertSame(0, $this->badges($finance)['/finance/procurement-payments']);
+
+        app(ReviewProcurementPayment::class)->handle($payment, $pm, true, null);
+        $this->assertSame(1, $this->badges($finance)['/finance/procurement-payments']);
     }
 }
