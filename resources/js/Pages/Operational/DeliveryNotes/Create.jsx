@@ -1,4 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import AppLayout from '../../../Layouts/AppLayout';
 import { PageHeader, Card, CardHeader, Field, Input, Select, Textarea, FormActions } from '../../../Components/ui';
 import TableScroll from '../../../Components/ui/TableScroll';
@@ -24,6 +25,13 @@ export default function Create({ salesOrder, defaultAddress, lines }) {
             .filter((l) => l.checked)
             .map((l) => ({ sales_order_line_id: l.sales_order_line_id, qty_delivered: l.qty_delivered })),
     }));
+
+    const [includeShipper, setIncludeShipper] = useState(false);
+
+    function toggleShipper(checked) {
+        setIncludeShipper(checked);
+        if (!checked) setData((prev) => ({ ...prev, shipper_name: '', tracking_number: '' }));
+    }
 
     function setLine(i, patch) {
         setData('lines', data.lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -60,16 +68,22 @@ export default function Create({ salesOrder, defaultAddress, lines }) {
                         <Field label="Alamat Pengiriman" required hint="Default dari alamat customer, bisa diubah sesuai lokasi pengiriman." error={errors.delivery_address}>
                             <Textarea rows={3} value={data.delivery_address} onChange={(e) => setData('delivery_address', e.target.value)} />
                         </Field>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label={isEkspedisi ? 'Nama Ekspedisi (opsional)' : 'Nama Pengantar (opsional)'} error={errors.shipper_name}>
-                                <Input value={data.shipper_name} onChange={(e) => setData('shipper_name', e.target.value)} placeholder={isEkspedisi ? 'contoh: JNE, J&T' : 'nama yang mengantar'} />
-                            </Field>
-                            {isEkspedisi && (
-                                <Field label="Nomor Resi (opsional)" error={errors.tracking_number}>
-                                    <Input value={data.tracking_number} onChange={(e) => setData('tracking_number', e.target.value)} placeholder="nomor resi" />
+                        <label className="flex items-center gap-2 text-sm font-medium text-text">
+                            <input type="checkbox" checked={includeShipper} onChange={(e) => toggleShipper(e.target.checked)} className="accent-navy" />
+                            Sertakan info {isEkspedisi ? 'ekspedisi' : 'pengantar'} di Delivery Note (opsional)
+                        </label>
+                        {includeShipper && (
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <Field label={isEkspedisi ? 'Nama Ekspedisi' : 'Nama Pengantar'} error={errors.shipper_name}>
+                                    <Input value={data.shipper_name} onChange={(e) => setData('shipper_name', e.target.value)} placeholder={isEkspedisi ? 'contoh: JNE, J&T' : 'nama yang mengantar'} />
                                 </Field>
-                            )}
-                        </div>
+                                {isEkspedisi && (
+                                    <Field label="Nomor Resi (opsional)" error={errors.tracking_number}>
+                                        <Input value={data.tracking_number} onChange={(e) => setData('tracking_number', e.target.value)} placeholder="nomor resi" />
+                                    </Field>
+                                )}
+                            </div>
+                        )}
                         <Field label="Approved by (opsional)" error={errors.approved_by_name}>
                             <Input value={data.approved_by_name} onChange={(e) => setData('approved_by_name', e.target.value)} placeholder="nama yang menyetujui" />
                         </Field>

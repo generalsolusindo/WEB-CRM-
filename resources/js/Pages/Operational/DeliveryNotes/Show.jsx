@@ -29,8 +29,8 @@ export default function Show({ deliveryNote: dn, canUploadReceivedProof }) {
                     <InfoGrid cols={2}>
                         <Info label="Metode Pengiriman" value={isEkspedisi ? 'Ekspedisi' : 'Diantar Sendiri'} />
                         <Info label="Alamat Pengiriman" value={dn.delivery_address} />
-                        <Info label={isEkspedisi ? 'Nama Ekspedisi' : 'Nama Pengantar'} value={dn.shipper_name} />
-                        {isEkspedisi && <Info label="Nomor Resi" value={dn.tracking_number} />}
+                        {dn.shipper_name && <Info label={isEkspedisi ? 'Nama Ekspedisi' : 'Nama Pengantar'} value={dn.shipper_name} />}
+                        {isEkspedisi && dn.tracking_number && <Info label="Nomor Resi" value={dn.tracking_number} />}
                         <Info label="Nomor PO" value={dn.sales_order.po_number} />
                         <Info label="Invoice Terkait" value={dn.invoice_number} />
                         <Info label="Dibuat oleh" value={dn.created_by} />
