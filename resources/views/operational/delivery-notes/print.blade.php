@@ -24,7 +24,7 @@
         td, th { vertical-align: top; }
 
         .top td { border: 0; padding: 0; }
-        .brand-logo { height: 40px; display: block; }
+        .brand-logo { height: 82px; display: block; margin-bottom: 4px; }
         .brand-sub { font-size: 9px; letter-spacing: .5px; color: #374151; margin-top: 4px; }
         .muted { color: #6B7280; }
         .title { text-align: center; margin-top: 10px; }
@@ -135,19 +135,22 @@
             </tbody>
         </table>
 
+        @php $hasShipper = filled($deliveryNote->shipper_name); @endphp
         <table class="sign">
             <tr>
-                <td>
-                    <div class="role">Diterima oleh (Teknisi)</div>
+                <td style="width: {{ $hasShipper ? '33.33%' : '50%' }}">
+                    <div class="role">Diterima oleh</div>
                     <div class="space"></div>
-                    <div class="name">&nbsp;</div>
+                    <div class="name">{{ $customer?->name ?: '' }}</div>
                 </td>
-                <td>
-                    <div class="role">Shipper</div>
-                    <div class="space"></div>
-                    <div class="name">{{ $deliveryNote->shipper_name ?: '' }}</div>
-                </td>
-                <td>
+                @if ($hasShipper)
+                    <td style="width: 33.33%">
+                        <div class="role">Shipper</div>
+                        <div class="space"></div>
+                        <div class="name">{{ $deliveryNote->shipper_name }}</div>
+                    </td>
+                @endif
+                <td style="width: {{ $hasShipper ? '33.33%' : '50%' }}">
                     <div class="role">Approved by</div>
                     <div class="space"></div>
                     <div class="name">{{ $deliveryNote->approved_by_name ?: '' }}</div>
