@@ -73,6 +73,11 @@ class InvoiceSignatureToggleTest extends TestCase
 
         $html = $this->actingAs($finance)->get("/finance/invoices/{$invoice->id}/print")->assertOk()->getContent();
         $this->assertStringNotContainsString('class="stamp"', $html);
+        // Ruang kosongnya harus tetap punya tinggi yang sama dengan gambar stempel yang
+        // digantikannya (dulu bug: div pengganti tidak punya CSS height sama sekali,
+        // jadi kolaps 0px — tidak ada ruang sama sekali untuk tanda tangan basah).
+        $this->assertStringContainsString('.sign .space { height: 90px', $html);
+        $this->assertMatchesRegularExpression('/<div class="space"><\/div>/', $html);
         // Nama terang & jabatan tetap tercetak walau gambarnya dimatikan.
         $this->assertStringContainsString('Adila Swasdika Putra', $html);
 

@@ -110,6 +110,7 @@
         .sign td { text-align: center; }
         .sign .box { display: inline-block; width: 240px; text-align: center; }
         .sign .stamp { height: 90px; margin: 4px 0; }
+        .sign .space { height: 90px; margin: 4px 0; }
         .sign .name { border-top: 1px solid #111827; padding-top: 3px; font-weight: 700; }
         .sign .title { font-weight: 400; font-size: 10px; color: #374151; }
         .contact-note { margin-top: 18px; text-align: center; font-size: 10px; color: #374151; }

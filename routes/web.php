@@ -284,6 +284,8 @@ Route::middleware('auth')->group(function () {
     Route::prefix('operational')->name('operational.')->middleware('role:operational')->group(function () {
         Route::put('projects/{project}/planning', [ProjectController::class, 'planning'])
             ->name('projects.planning');
+        Route::post('projects/{project}/flag-outside-vendor', [ProjectController::class, 'flagOutsideVendorNeed'])
+            ->name('projects.flag-outside-vendor');
         Route::post('projects/{project}/ready', [ProjectController::class, 'markReady'])
             ->name('projects.ready');
         Route::post('projects/{project}/start', [ProjectController::class, 'start'])

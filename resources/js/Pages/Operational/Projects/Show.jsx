@@ -72,7 +72,7 @@ export default function Show({ project, approvalDocs = [], bastRecords, taskPhot
                 </section>
 
                 <Planning project={project} canPlan={permissions.plan} />
-                <VendorAssignment project={project} canViewSow={permissions.viewSow} />
+                <VendorAssignment project={project} canViewSow={permissions.viewSow} canFlagOutsideVendorNeed={permissions.flagOutsideVendorNeed} />
                 <ActualProcurement project={project} availabilityOptions={availabilityOptions} progress={procurementProgress} editable={permissions.manageExtraProcurement} />
                 {!isMaterialOnly && (
                     <>
@@ -338,13 +338,27 @@ function ActualProcurement({ project, availabilityOptions, progress, editable })
     );
 }
 
-function VendorAssignment({ project, canViewSow }) {
+function VendorAssignment({ project, canViewSow, canFlagOutsideVendorNeed }) {
     const deal = project.vendor_service_payment;
     const dealNote = !deal ? null
         : deal.status === 'awaiting_dp' ? 'menunggu DP dibayar Finance sebelum project bisa dilanjutkan.'
             : deal.status === 'paid' ? 'sudah lunas.'
                 : project.status === 'completed' ? 'BAST terverifikasi, pelunasan vendor menunggu dibayar Finance.'
                     : 'vendor berjalan, pelunasan dibayar Finance setelah BAST diverifikasi.';
+
+    function flagOutsideVendorNeed() {
+        feedback.act({
+            method: 'post',
+            url: `/operational/projects/${project.id}/flag-outside-vendor`,
+            confirm: {
+                tone: 'warning',
+                title: 'Ternyata butuh vendor luar?',
+                text: 'Project ini akan ditandai butuh vendor luar dan muncul di antrean Procurement untuk dicarikan vendor. Kalau sebelumnya sudah ada tim internal yang ditugaskan, tim itu tidak dihapus — Procurement yang akan menentukan vendornya.',
+                confirmLabel: 'Ya, Tandai Butuh Vendor Luar',
+            },
+            success: { title: 'Ditandai butuh vendor luar', style: 'popup' },
+        });
+    }
 
     return (
         <section className="card p-6">
@@ -357,6 +371,11 @@ function VendorAssignment({ project, canViewSow }) {
                     <Link href={`/operational/projects/${project.id}/sow`} className="whitespace-nowrap btn btn-outline">
                         Generate SOW
                     </Link>
+                )}
+                {canFlagOutsideVendorNeed && (
+                    <Button variant="ghost" onClick={flagOutsideVendorNeed} className="whitespace-nowrap text-warning hover:bg-warning-soft">
+                        Ternyata Butuh Vendor Luar
+                    </Button>
                 )}
             </div>
             {project.needs_outside_vendor && !deal && (

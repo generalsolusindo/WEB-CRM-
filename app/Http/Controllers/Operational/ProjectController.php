@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Operational;
 
+use App\Actions\Operational\FlagOutsideVendorNeed;
 use App\Actions\Operational\MarkProjectReady;
 use App\Enums\ActualProcurementStatus;
 use App\Enums\ChangeRequestType;
@@ -138,6 +139,7 @@ class ProjectController extends Controller
                 'manageChangeRequests' => $user->can('manageChangeRequests', $project),
                 'manageBastDraft' => $user->can('manageBastDraft', $project),
                 'viewSow' => $user->can('viewSow', $project),
+                'flagOutsideVendorNeed' => $user->can('flagOutsideVendorNeed', $project),
             ],
         ]);
     }
@@ -158,6 +160,15 @@ class ProjectController extends Controller
         }
 
         return back()->with('success', 'Planning project tersimpan.');
+    }
+
+    public function flagOutsideVendorNeed(Project $project, FlagOutsideVendorNeed $action): RedirectResponse
+    {
+        Gate::authorize('flagOutsideVendorNeed', $project);
+
+        $action->handle($project, request()->user());
+
+        return back()->with('success', 'Ditandai butuh vendor luar. Procurement diberi tahu untuk mencarikan vendor.');
     }
 
     public function markReady(Project $project, MarkProjectReady $action): RedirectResponse

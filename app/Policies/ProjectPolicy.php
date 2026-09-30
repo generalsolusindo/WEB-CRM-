@@ -191,6 +191,21 @@ class ProjectPolicy
         return $deal ? $deal->released_at !== null : ! $project->needs_outside_vendor;
     }
 
+    /**
+     * Kebalikan dari CancelOutsideVendorNeed: Operasional menandai project yang tadinya
+     * disangka cukup dikerjakan tim sendiri ternyata butuh vendor luar. Boleh dipakai
+     * kapan pun selama project belum selesai dan belum ada vendor terpasang — TERMASUK
+     * kalau tim internal sudah sempat ditugaskan/mulai kerja (sengaja tidak dicegah,
+     * project boleh dialihkan ke vendor luar kapan saja sebelum selesai).
+     */
+    public function flagOutsideVendorNeed(User $user, Project $project): bool
+    {
+        return $this->isOperational($user)
+            && $project->status !== ProjectStatus::Completed->value
+            && ! $project->needs_outside_vendor
+            && $project->vendor_id === null;
+    }
+
     /** Lihat SOW — Operational, kapan saja selama project pakai vendor luar. */
     public function viewSow(User $user, Project $project): bool
     {
