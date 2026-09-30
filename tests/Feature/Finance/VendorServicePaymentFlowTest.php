@@ -9,6 +9,7 @@ use App\Models\Sow;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorServicePayment;
+use App\Policies\ProjectPolicy;
 use App\Services\Dashboard\MenuBadges;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -57,6 +58,20 @@ class VendorServicePaymentFlowTest extends TestCase
         ], $override));
     }
 
+    /**
+     * DP sekarang hanya bisa dibayar setelah SOW project ini selesai ditandatangani
+     * lengkap (bukan sebaliknya) — bikin SOW langsung berstatus completed lewat DB
+     * supaya test pembayaran tidak perlu menjalani seluruh rantai tanda tangan.
+     */
+    private function completeSow(VendorServicePayment $deal): void
+    {
+        $technician = User::factory()->create(['role' => 'technician', 'vendor_id' => $deal->vendor_id, 'is_active' => true]);
+        Sow::create([
+            'project_id' => $deal->project_id, 'status' => 'completed', 'number' => 'SOW-'.$deal->project_id,
+            'project_name' => 'X', 'technician_id' => $technician->id,
+        ]);
+    }
+
     private function verifyBast(VendorServicePayment $deal): void
     {
         Bast::create(['project_id' => $deal->project_id, 'status' => 'verified', 'submitted_at' => now(), 'verified_at' => now()]);
@@ -65,6 +80,7 @@ class VendorServicePaymentFlowTest extends TestCase
     public function test_finance_pays_dp_with_locked_amount_and_operational_is_released(): void
     {
         $deal = $this->deal();
+        $this->completeSow($deal);
 
         // Nominal dari client diabaikan — selalu mengikuti deal Procurement.
         $this->pay($deal, 'dp', ['amount' => 1])->assertRedirect()->assertSessionHasNoErrors();
@@ -87,6 +103,7 @@ class VendorServicePaymentFlowTest extends TestCase
     public function test_payment_requires_proof_and_finance_role_and_cannot_repeat(): void
     {
         $deal = $this->deal();
+        $this->completeSow($deal);
 
         $this->pay($deal, 'dp', ['proof' => null])->assertSessionHasErrors('proof');
         $this->actingAs($this->ops)->post("/finance/vendor-service-payments/{$deal->id}/pay", [
@@ -107,9 +124,30 @@ class VendorServicePaymentFlowTest extends TestCase
         $this->assertSame(0, $deal->entries()->count());
     }
 
+    /** SOW dulu yang harus selesai ditandatangani lengkap — bukan sebaliknya. */
+    public function test_dp_cannot_be_paid_before_sow_is_completed(): void
+    {
+        $deal = $this->deal();
+
+        $this->assertFalse($deal->canPayDp());
+        $this->pay($deal, 'dp')->assertSessionHasErrors('kind');
+        $this->assertSame(0, $deal->entries()->count());
+
+        $technician = User::factory()->create(['role' => 'technician', 'vendor_id' => $deal->vendor_id, 'is_active' => true]);
+        $sow = Sow::create([
+            'project_id' => $deal->project_id, 'status' => 'pending_hr_review', 'number' => 'SOW-'.$deal->project_id,
+            'project_name' => 'X', 'technician_id' => $technician->id,
+        ]);
+        $this->pay($deal, 'dp')->assertSessionHasErrors('kind');
+
+        $sow->update(['status' => 'completed']);
+        $this->pay($deal, 'dp')->assertSessionHasNoErrors();
+    }
+
     public function test_final_payment_is_blocked_until_bast_is_verified(): void
     {
         $deal = $this->deal();
+        $this->completeSow($deal);
         $this->pay($deal, 'dp');
 
         $this->pay($deal, 'final')->assertSessionHasErrors('kind');
@@ -138,6 +176,7 @@ class VendorServicePaymentFlowTest extends TestCase
     public function test_cancel_dp_relocks_operational_and_keeps_audit_trail(): void
     {
         $deal = $this->deal();
+        $this->completeSow($deal);
         $this->pay($deal, 'dp');
         $entry = $deal->entries()->firstOrFail();
 
@@ -163,6 +202,7 @@ class VendorServicePaymentFlowTest extends TestCase
     public function test_cancel_final_returns_to_in_progress_and_dp_cancel_is_guarded(): void
     {
         $deal = $this->deal();
+        $this->completeSow($deal);
         $this->pay($deal, 'dp');
         $this->verifyBast($deal);
         $this->pay($deal, 'final');
@@ -181,6 +221,7 @@ class VendorServicePaymentFlowTest extends TestCase
     public function test_dp_cancel_blocked_once_project_is_running(): void
     {
         $deal = $this->deal();
+        $this->completeSow($deal);
         $this->pay($deal, 'dp');
         $deal->project->update(['status' => 'in_progress']);
         $entry = $deal->entries()->firstOrFail();
@@ -190,35 +231,30 @@ class VendorServicePaymentFlowTest extends TestCase
         $this->assertSame('in_progress', $deal->fresh()->status->value);
     }
 
-    public function test_dp_cancel_blocked_once_sow_is_submitted_to_hr(): void
-    {
-        $deal = $this->deal();
-        $this->pay($deal, 'dp');
-        $technician = User::factory()->create(['role' => 'technician', 'vendor_id' => $deal->vendor_id, 'is_active' => true]);
-        Sow::create([
-            'project_id' => $deal->project_id, 'status' => 'pending_hr_review', 'number' => 'SOW-1',
-            'project_name' => 'X', 'technician_id' => $technician->id,
-        ]);
-        $entry = $deal->entries()->firstOrFail();
-
-        $this->actingAs($this->finance)->post("/finance/vendor-service-payments/{$deal->id}/entries/{$entry->id}/cancel", ['reason' => 'x'])
-            ->assertSessionHasErrors('reason');
-        $this->assertSame('in_progress', $deal->fresh()->status->value);
-    }
-
-    public function test_operational_is_gated_until_dp_paid(): void
+    /**
+     * SOW dulu yang harus ditandatangani lengkap sebelum DP bisa dibayar — begitu
+     * DP sudah tercatat, SOW yang jadi dasarnya pasti sudah completed, jadi tidak
+     * ada lagi state "DP dibayar tapi SOW masih diproses HR" untuk digerbangi.
+     */
+    public function test_sow_is_available_before_dp_is_paid_and_dp_requires_sow_completed_first(): void
     {
         $deal = $this->deal();
         $project = $deal->project;
         $project->update(['status' => 'planning']);
 
-        $this->actingAs($this->ops)->get("/operational/projects/{$project->id}/sow")->assertForbidden();
-        $this->assertFalse($this->ops->can('markReady', $project->fresh()));
-
-        $this->pay($deal, 'dp');
-
+        // SOW sudah boleh dibuat & dilihat meski DP belum dibayar sama sekali.
         $this->actingAs($this->ops)->get("/operational/projects/{$project->id}/sow")->assertOk();
         $this->assertTrue($this->ops->can('viewSow', $project->fresh()));
+        $this->assertTrue($this->ops->can('manageSow', $project->fresh()));
+
+        // Tapi project belum "dilepas" (DP belum dibayar) — markReady/start masih tertutup.
+        $policy = new ProjectPolicy;
+        $this->assertFalse($policy->vendorReleased($project->fresh()));
+
+        $this->completeSow($deal);
+        $this->pay($deal, 'dp');
+
+        $this->assertTrue($policy->vendorReleased($project->fresh()));
     }
 
     public function test_pay_at_end_is_released_immediately_and_flagged_project_without_deal_is_gated(): void
@@ -294,15 +330,22 @@ class VendorServicePaymentFlowTest extends TestCase
     {
         $deal = $this->deal();
 
+        // Belum ada tugas buat Finance — SOW-nya belum selesai ditandatangani.
         $this->actingAs($this->finance)->get('/finance/vendor-service-payments')
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->component('Finance/VendorServicePayments/Index')->where('payments.0.next', 'Bayar DP'));
-
+            ->assertInertia(fn ($page) => $page->component('Finance/VendorServicePayments/Index')->where('payments.0.next', 'Menunggu SOW selesai ditandatangani'));
         $this->actingAs($this->finance)->get("/finance/vendor-service-payments/{$deal->id}")
             ->assertOk()
-            ->assertInertia(fn ($page) => $page->where('canPayDp', true)->where('canPayFinal', false)->where('payment.bank_name', 'BCA'));
+            ->assertInertia(fn ($page) => $page->where('canPayDp', false)->where('canPayFinal', false)->where('payment.bank_name', 'BCA'));
+        $this->assertSame(0, app(MenuBadges::class)->for($this->finance)['/finance/vendor-service-payments']);
 
+        $this->completeSow($deal);
+
+        $this->actingAs($this->finance)->get('/finance/vendor-service-payments')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('payments.0.next', 'Bayar DP'));
         $this->assertSame(1, app(MenuBadges::class)->for($this->finance)['/finance/vendor-service-payments']);
+
         $this->pay($deal, 'dp');
         $this->assertSame(0, app(MenuBadges::class)->for($this->finance)['/finance/vendor-service-payments']);
         $this->verifyBast($deal);

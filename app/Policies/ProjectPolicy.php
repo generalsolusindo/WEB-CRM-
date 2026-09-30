@@ -192,6 +192,18 @@ class ProjectPolicy
     }
 
     /**
+     * Sudah boleh mulai proses vendor (bikin SOW) begitu Procurement mengisi deal —
+     * TIDAK perlu menunggu DP dibayar (itu urusan vendorReleased(), dipakai untuk
+     * markReady/start: eksekusi teknisi di lapangan). Project yang ditandai butuh
+     * vendor tapi deal-nya belum/tidak ada (mis. Procurement belum sempat mengisi,
+     * atau kasus data janggal) masih tertahan.
+     */
+    private function vendorDealFilled(Project $project): bool
+    {
+        return ! $project->needs_outside_vendor || $project->vendorServicePayment !== null;
+    }
+
+    /**
      * Kebalikan dari CancelOutsideVendorNeed: Operasional menandai project yang tadinya
      * disangka cukup dikerjakan tim sendiri ternyata butuh vendor luar. Boleh dipakai
      * kapan pun selama project belum selesai dan belum ada vendor terpasang — TERMASUK
@@ -206,10 +218,15 @@ class ProjectPolicy
             && $project->vendor_id === null;
     }
 
-    /** Lihat SOW — Operational, kapan saja selama project pakai vendor luar. */
+    /**
+     * Lihat SOW — Operational, kapan saja selama project sudah ditandai pakai vendor.
+     * Sengaja TIDAK menunggu DP dibayar (vendorReleased()) — urutannya justru terbalik:
+     * SOW yang harus dibuat & ditandatangani lengkap dulu, baru jadi dasar Finance
+     * membayar DP (lihat VendorServicePayment::canPayDp()).
+     */
     public function viewSow(User $user, Project $project): bool
     {
-        return $this->isOperational($user) && $project->vendor_id !== null && $this->vendorReleased($project);
+        return $this->isOperational($user) && $project->vendor_id !== null && $this->vendorDealFilled($project);
     }
 
     /**
@@ -219,10 +236,11 @@ class ProjectPolicy
      * diperbaiki. Mengedit di luar status Draft/RejectedByHr me-reset seluruh
      * proses review & tanda tangan (lihat SaveSowDraft) karena tanda tangan yang
      * sudah dikumpulkan hanya sah untuk isi SOW yang mereka tanda tangani.
+     * Sama seperti viewSow(), sengaja tidak menunggu DP dibayar.
      */
     public function manageSow(User $user, Project $project): bool
     {
-        if (! $this->isOperational($user) || $project->vendor_id === null || ! $this->vendorReleased($project)) {
+        if (! $this->isOperational($user) || $project->vendor_id === null || ! $this->vendorDealFilled($project)) {
             return false;
         }
 

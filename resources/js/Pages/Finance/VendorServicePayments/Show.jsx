@@ -138,6 +138,11 @@ export default function Show({ payment, entries, cancelledEntries = [], canPayDp
 
                 {canPayDp && <PayForm payment={payment} kind="dp" amount={payment.dp_amount} />}
                 {canPayFinal && <PayForm payment={payment} kind="final" amount={payment.final_amount} />}
+                {!canPayDp && payment.status === 'awaiting_dp' && (
+                    <div className="rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm font-medium text-warning">
+                        DP ({money(payment.dp_amount)}) belum bisa dibayar — menunggu SOW project ini selesai ditandatangani lengkap oleh semua pihak (status SOW saat ini: {payment.sow_status_label ?? 'belum dibuat'}).
+                    </div>
+                )}
                 {!canPayFinal && payment.status === 'in_progress' && !payment.bast_verified && (
                     <div className="rounded-xl border border-warning/25 bg-warning-soft px-4 py-3 text-sm font-medium text-warning">
                         Pelunasan ({money(payment.final_amount)}) belum bisa dibayar — menunggu BAST diverifikasi Operasional.

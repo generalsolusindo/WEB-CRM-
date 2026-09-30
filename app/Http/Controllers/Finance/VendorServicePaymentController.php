@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Finance;
 
 use App\Actions\Finance\CancelVendorServicePayment;
 use App\Actions\Finance\RecordVendorServicePayment;
+use App\Enums\SowStatus;
 use App\Enums\VendorServicePaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Finance\RecordVendorServicePaymentRequest;
@@ -24,7 +25,7 @@ class VendorServicePaymentController extends Controller
         Gate::authorize('viewAny', VendorServicePayment::class);
 
         $payments = VendorServicePayment::query()
-            ->with(['vendor:id,name', 'project.salesOrder:id,number,contact_id', 'project.salesOrder.contact:id,name'])
+            ->with(['vendor:id,name', 'project.salesOrder:id,number,contact_id', 'project.salesOrder.contact:id,name', 'project.sow:id,project_id,status'])
             ->orderByRaw("FIELD(status, 'awaiting_dp', 'in_progress', 'paid')")
             ->latest('id')
             ->get()
@@ -51,6 +52,7 @@ class VendorServicePaymentController extends Controller
             'vendor:id,name,contact_person,phone',
             'project.salesOrder:id,number,contact_id',
             'project.salesOrder.contact:id,name',
+            'project.sow:id,project_id,status',
             'submitter:id,name',
             'entries.attachments',
             'entries.payer:id,name',
@@ -93,6 +95,8 @@ class VendorServicePaymentController extends Controller
                 'notes' => $p->notes,
                 'submitted_by' => $p->submitter?->name,
                 'bast_verified' => $p->bastVerified(),
+                'sow_status' => $p->project->sow?->status?->value,
+                'sow_status_label' => $p->project->sow?->status?->label(),
             ],
             'entries' => $p->entries->map($entryRow)->values(),
             'cancelledEntries' => $cancelled->map(fn ($e) => [
@@ -138,6 +142,7 @@ class VendorServicePaymentController extends Controller
     {
         return match (true) {
             $p->status === VendorServicePaymentStatus::Paid => 'Lunas',
+            $p->status === VendorServicePaymentStatus::AwaitingDp && $p->project->sow?->status !== SowStatus::Completed->value => 'Menunggu SOW selesai ditandatangani',
             $p->canPayDp() => 'Bayar DP',
             $p->canPayFinal() => 'Bayar pelunasan',
             $p->status === VendorServicePaymentStatus::InProgress => 'Menunggu BAST diverifikasi',

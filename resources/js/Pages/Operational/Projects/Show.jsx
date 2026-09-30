@@ -341,7 +341,7 @@ function ActualProcurement({ project, availabilityOptions, progress, editable })
 function VendorAssignment({ project, canViewSow, canFlagOutsideVendorNeed }) {
     const deal = project.vendor_service_payment;
     const dealNote = !deal ? null
-        : deal.status === 'awaiting_dp' ? 'menunggu DP dibayar Finance sebelum project bisa dilanjutkan.'
+        : deal.status === 'awaiting_dp' ? 'buat & selesaikan SOW dulu — DP baru bisa dibayar Finance setelah SOW ditandatangani lengkap, baru project bisa dilanjutkan.'
             : deal.status === 'paid' ? 'sudah lunas.'
                 : project.status === 'completed' ? 'BAST terverifikasi, pelunasan vendor menunggu dibayar Finance.'
                     : 'vendor berjalan, pelunasan dibayar Finance setelah BAST diverifikasi.';
@@ -365,7 +365,7 @@ function VendorAssignment({ project, canViewSow, canFlagOutsideVendorNeed }) {
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 className="mb-1 font-semibold text-text">Vendor Teknisi Luar</h2>
-                    <p className="text-sm text-text-muted">Vendor luar ditentukan Procurement (deal, fee, dan pembayaran ditangani Procurement & Finance). Setelah dilepas, SOW dibuat dari sini.</p>
+                    <p className="text-sm text-text-muted">Vendor luar ditentukan Procurement (deal, fee, dan pembayaran ditangani Procurement & Finance). Begitu deal terisi, SOW sudah bisa dibuat dari sini — SOW yang ditandatangani lengkap jadi dasar Finance membayar DP.</p>
                 </div>
                 {canViewSow && (
                     <Link href={`/operational/projects/${project.id}/sow`} className="whitespace-nowrap btn btn-outline">

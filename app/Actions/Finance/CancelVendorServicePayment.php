@@ -2,7 +2,6 @@
 
 namespace App\Actions\Finance;
 
-use App\Enums\SowStatus;
 use App\Enums\VendorServicePaymentStatus;
 use App\Models\Notification;
 use App\Models\User;
@@ -21,7 +20,7 @@ class CancelVendorServicePayment
     {
         DB::transaction(function () use ($payment, $entry, $finance, $reason) {
             $locked = VendorServicePayment::query()
-                ->with(['project.salesOrder.contact', 'project.sow', 'vendor'])
+                ->with(['project.salesOrder.contact', 'vendor'])
                 ->whereKey($payment->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -36,9 +35,6 @@ class CancelVendorServicePayment
             if ($target->kind === VendorServicePaymentEntry::KIND_DP) {
                 if ($locked->activeEntry(VendorServicePaymentEntry::KIND_FINAL)) {
                     throw ValidationException::withMessages(['reason' => 'Batalkan pelunasan terlebih dahulu sebelum membatalkan DP.']);
-                }
-                if ($project->sow && $project->sow->status !== SowStatus::Draft->value && $project->sow->status !== SowStatus::RejectedByHr->value) {
-                    throw ValidationException::withMessages(['reason' => 'SOW project ini sudah diproses — koreksi DP memerlukan peninjauan bersama Operasional.']);
                 }
                 if (in_array($project->status, ['in_progress', 'verification', 'completed'], true)) {
                     throw ValidationException::withMessages(['reason' => 'Project sudah berjalan — koreksi DP memerlukan peninjauan bersama Operasional.']);

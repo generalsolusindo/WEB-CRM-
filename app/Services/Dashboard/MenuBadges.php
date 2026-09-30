@@ -144,8 +144,9 @@ class MenuBadges
             ->filter(fn ($so) => $this->settlement->canCreateFinalInvoice($so))
             ->count();
 
-        // Tugas bayar vendor jasa: DP yang sudah diajukan, atau pelunasan yang BAST-nya sudah terverifikasi.
-        $vendorService = VendorServicePayment::query()->with('project')->whereIn('status', ['awaiting_dp', 'in_progress'])->get()
+        // Tugas bayar vendor jasa: DP yang SOW-nya sudah selesai ditandatangani, atau
+        // pelunasan yang BAST-nya sudah terverifikasi.
+        $vendorService = VendorServicePayment::query()->with('project.sow')->whereIn('status', ['awaiting_dp', 'in_progress'])->get()
             ->filter(fn ($p) => $p->canPayDp() || $p->canPayFinal())
             ->count();
 

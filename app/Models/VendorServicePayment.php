@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\SowStatus;
 use App\Enums\VendorServicePaymentStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -84,11 +85,16 @@ class VendorServicePayment extends Model
             && $this->bastVerified();
     }
 
+    /**
+     * DP baru boleh dibayar setelah SOW selesai ditandatangani lengkap — SOW itulah
+     * dasar/otorisasi pembayaran ke vendor, bukan sebaliknya.
+     */
     public function canPayDp(): bool
     {
         return $this->hasDp()
             && $this->status === VendorServicePaymentStatus::AwaitingDp
-            && $this->activeEntry(VendorServicePaymentEntry::KIND_DP) === null;
+            && $this->activeEntry(VendorServicePaymentEntry::KIND_DP) === null
+            && $this->project->sow?->status === SowStatus::Completed->value;
     }
 
     public function hasDp(): bool

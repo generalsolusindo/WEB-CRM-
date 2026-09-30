@@ -2,6 +2,7 @@
 
 namespace App\Actions\Finance;
 
+use App\Enums\SowStatus;
 use App\Enums\VendorServicePaymentStatus;
 use App\Models\Notification;
 use App\Models\User;
@@ -25,12 +26,17 @@ class RecordVendorServicePayment
     {
         return DB::transaction(function () use ($payment, $finance, $kind, $paidAt, $notes, $proof) {
             $locked = VendorServicePayment::query()
-                ->with(['project.salesOrder.contact', 'vendor'])
+                ->with(['project.salesOrder.contact', 'project.sow', 'vendor'])
                 ->whereKey($payment->id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
             if ($kind === VendorServicePaymentEntry::KIND_DP) {
+                if ($locked->hasDp() && $locked->status === VendorServicePaymentStatus::AwaitingDp
+                    && $locked->activeEntry(VendorServicePaymentEntry::KIND_DP) === null
+                    && $locked->project->sow?->status !== SowStatus::Completed->value) {
+                    throw ValidationException::withMessages(['kind' => 'DP belum bisa dibayar — SOW project ini harus selesai ditandatangani lengkap dulu.']);
+                }
                 if (! $locked->canPayDp()) {
                     throw ValidationException::withMessages(['kind' => 'DP tidak bisa dibayar — sudah dibayar atau termin deal bukan DP.']);
                 }
