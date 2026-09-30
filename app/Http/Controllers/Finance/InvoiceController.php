@@ -564,6 +564,25 @@ class InvoiceController extends Controller
         return back()->with('success', 'Nomor invoice berhasil diperbarui.');
     }
 
+    /**
+     * Nyala/matikan gambar stempel & tanda tangan digital di cetakan invoice ini — nama
+     * terang & jabatan penanda tangan tetap selalu tercetak. Dimatikan untuk invoice yang
+     * klien-nya minta dicetak fisik lalu ditandatangani basah + materai sendiri (biasanya
+     * nominal di atas Rp5 juta). Murni pengaturan tampilan cetak, bukan data keuangan,
+     * jadi boleh diubah kapan saja termasuk setelah invoice terkirim/lunas.
+     */
+    public function updateSignature(Request $request, Invoice $invoice): RedirectResponse
+    {
+        Gate::authorize('updateMeta', $invoice);
+
+        $data = $request->validate(['with_signature' => ['required', 'boolean']]);
+        $invoice->update(['with_signature' => $data['with_signature']]);
+
+        return back()->with('success', $data['with_signature']
+            ? 'Stempel & tanda tangan digital diaktifkan.'
+            : 'Stempel & tanda tangan digital dimatikan — invoice ini dicetak kosong untuk ditandatangani basah.');
+    }
+
     public function cancel(Invoice $invoice): RedirectResponse
     {
         Gate::authorize('cancel', $invoice);

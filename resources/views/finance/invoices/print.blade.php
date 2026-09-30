@@ -29,8 +29,11 @@
         ? 'data:image/png;base64,'.base64_encode(file_get_contents($logoPath))
         : null;
 
+    // Nama terang & jabatan penanda tangan tetap selalu tercetak (di bawah); gambar
+    // stempel/ttd digital ini yang jadi opsional per-invoice — dimatikan Finance untuk
+    // invoice yang dicetak fisik lalu ditandatangani basah + materai oleh klien.
     $stampPath = public_path('images/stempel-invoice.png');
-    $stampSrc = is_file($stampPath)
+    $stampSrc = ($invoice->with_signature ?? true) && is_file($stampPath)
         ? 'data:image/png;base64,'.base64_encode(file_get_contents($stampPath))
         : null;
 @endphp

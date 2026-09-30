@@ -222,6 +222,7 @@ Route::middleware('auth')->group(function () {
         Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('invoices.send');
         Route::post('invoices/{invoice}/send-whatsapp', [InvoiceController::class, 'sendWhatsapp'])->name('invoices.send-whatsapp');
         Route::patch('invoices/{invoice}/number', [InvoiceController::class, 'updateNumber'])->name('invoices.number.update');
+        Route::patch('invoices/{invoice}/signature', [InvoiceController::class, 'updateSignature'])->name('invoices.signature.update');
         Route::get('invoices/{invoice}/edit', [InvoiceController::class, 'edit'])->name('invoices.edit');
         Route::put('invoices/{invoice}', [InvoiceController::class, 'update'])->name('invoices.update');
         Route::post('invoices/{invoice}/pph23', [InvoiceController::class, 'updatePph23'])->name('invoices.pph23');

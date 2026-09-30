@@ -44,6 +44,10 @@ export default function Show({ invoice, payments, cancelledPayments = [], totals
     function togglePph23(enabled) {
         router.post(`/finance/invoices/${invoice.id}/pph23`, { enabled, rate: pphForm.data.rate }, { preserveScroll: true });
     }
+    function toggleSignature(withSignature) {
+        feedback.expect({ success: { style: 'popup' } });
+        router.patch(`/finance/invoices/${invoice.id}/signature`, { with_signature: withSignature }, { preserveScroll: true });
+    }
     function savePph23(e) {
         e.preventDefault();
         pphForm.post(`/finance/invoices/${invoice.id}/pph23`, { forceFormData: true, preserveScroll: true, onSuccess: () => pphForm.setData('slip', null) });
@@ -171,6 +175,20 @@ export default function Show({ invoice, payments, cancelledPayments = [], totals
                         <div className="mt-3 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm">
                             <span className="font-semibold text-text">Catatan Finance:</span> <span className="whitespace-pre-line text-text-muted">{invoice.notes}</span>
                         </div>
+                    )}
+                    {permissions.update && (
+                        <label className="mt-3 flex items-start gap-2 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm">
+                            <input
+                                type="checkbox"
+                                checked={invoice.with_signature}
+                                onChange={(e) => toggleSignature(e.target.checked)}
+                                className="mt-0.5 accent-navy"
+                            />
+                            <span>
+                                <span className="font-medium text-text">Sertakan Tanda Tangan &amp; Stempel Digital</span>
+                                <span className="block text-xs text-text-muted">Nama terang & jabatan tetap tercetak. Matikan untuk invoice yang klien-nya minta dicetak fisik lalu ditandatangani basah + materai sendiri (biasanya nominal di atas Rp5 juta).</span>
+                            </span>
+                        </label>
                     )}
                 </Card>
 
