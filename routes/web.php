@@ -200,6 +200,8 @@ Route::middleware('auth')->group(function () {
             ->name('project-procurements.sourcing');
         Route::put('project-procurements/{project}/vendor-service', [ProjectVendorServiceController::class, 'save'])
             ->name('project-procurements.vendor-service');
+        Route::post('project-procurements/{project}/vendor-service/cancel-need', [ProjectVendorServiceController::class, 'cancelNeed'])
+            ->name('project-procurements.vendor-service.cancel-need');
         Route::post('project-procurements/{project}/submit', [ProjectProcurementController::class, 'submit'])
             ->name('project-procurements.submit');
         Route::post('project-procurements/{project}/confirm', [ProjectProcurementController::class, 'confirm'])

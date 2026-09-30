@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useForm } from '@inertiajs/react';
-import { FiTruck } from 'react-icons/fi';
+import { FiTruck, FiXCircle } from 'react-icons/fi';
 import { Card, CardHeader, Button, Field, Input, Select, Textarea, CurrencyInput, Info, InfoGrid, StatusBadge } from '../../../Components/ui';
 import { feedback } from '../../../Components/feedback';
 
@@ -38,9 +38,30 @@ export default function VendorServicePanel({ project, vendorService, vendorOptio
         put(`/procurement/project-procurements/${project.id}/vendor-service`, { preserveScroll: true });
     }
 
+    function cancelNeed() {
+        feedback.act({
+            method: 'post',
+            url: `/procurement/project-procurements/${project.id}/vendor-service/cancel-need`,
+            confirm: {
+                tone: 'warning',
+                title: 'Tidak jadi butuh vendor luar?',
+                text: 'Tanda "butuh vendor luar" dari Sales akan dibatalkan. Operasional langsung bisa menyusun tim teknisi sendiri untuk project ini.',
+                confirmLabel: 'Ya, Batalkan',
+            },
+            success: { title: 'Tidak jadi butuh vendor luar', style: 'popup' },
+        });
+    }
+
+    const cancelNeedButton = flagged && !vendorService && canManage && (
+        <Button variant="ghost" icon={FiXCircle} onClick={cancelNeed} className="text-danger hover:bg-danger-soft hover:text-danger">
+            Tidak Jadi Butuh Vendor Luar
+        </Button>
+    );
+
     if (!open) {
         return (
-            <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
+                {cancelNeedButton}
                 <Button variant="outline" icon={FiTruck} onClick={() => setOpen(true)}>Tambah Deal Vendor Jasa</Button>
             </div>
         );
@@ -56,6 +77,7 @@ export default function VendorServicePanel({ project, vendorService, vendorOptio
                     </span>
                 )}
                 subtitle="Pekerjaan di luar jangkauan tim sendiri. Setelah disimpan, Finance dan Operasional otomatis diberi tahu sesuai termin."
+                actions={cancelNeedButton}
             />
             {flagged && !vendorService && (
                 <div className="border-b border-border bg-warning-soft px-5 py-3 text-sm font-medium text-warning">
