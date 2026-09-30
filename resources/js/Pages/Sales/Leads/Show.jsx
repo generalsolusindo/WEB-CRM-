@@ -1,8 +1,8 @@
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
-import { FiArrowUpRight, FiEdit2, FiTrash2, FiXCircle } from 'react-icons/fi';
+import { FiArrowUpRight, FiEdit2, FiTrash2, FiXCircle, FiTrash } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, Card, Button, ConfirmDialog, Info, InfoGrid, StatusBadge } from '../../../Components/ui';
+import { PageHeader, Card, Button, ConfirmDialog, PromptDialog, Info, InfoGrid, StatusBadge } from '../../../Components/ui';
 import MeetingsPanel from './MeetingsPanel';
 import ProcurementStatusPanel from './ProcurementStatusPanel';
 import RequirementsPanel from './RequirementsPanel';
@@ -10,7 +10,7 @@ import SurveyPanel from './SurveyPanel';
 import { feedback } from '../../../Components/feedback';
 
 export default function Show({
-    lead, stageOptions, sourceOptions = [], procurementRequest, requirementsEditable, leadEditable, canDelete, canMarkLost = false,
+    lead, stageOptions, sourceOptions = [], procurementRequest, requirementsEditable, leadEditable, canDelete, canForceDelete = false, canMarkLost = false,
     temperatureOptions = [],
     convertBlockReason, meetings = [], meetingsEditable = false, surveys = [],
     surveyRequestable = false, surveyDeliveryOptions = [], unitOptions = [],
@@ -23,6 +23,25 @@ export default function Show({
     const [markingLost, setMarkingLost] = useState(false);
     const [confirmation, setConfirmation] = useState(null);
     const [actionProcessing, setActionProcessing] = useState(false);
+    const [forceDeleteOpen, setForceDeleteOpen] = useState(false);
+    const [forceDeleting, setForceDeleting] = useState(false);
+    const [forceDeleteError, setForceDeleteError] = useState('');
+    const leadCode = `${lead.type === 'opportunity' ? 'OPP' : 'LEAD'}-${String(lead.id).padStart(6, '0')}`;
+
+    function confirmForceDelete(value) {
+        if (value !== leadCode) {
+            setForceDeleteError(`Ketik "${leadCode}" persis untuk konfirmasi.`);
+            return;
+        }
+        setForceDeleteError('');
+        setForceDeleting(true);
+        feedback.expect({ success: { title: 'Data dihapus total', style: 'popup' } });
+        router.delete(`/sales/leads/${lead.id}/force`, {
+            onError: () => setForceDeleting(false),
+            onFinish: () => setForceDeleting(false),
+        });
+    }
+
     function runAction() {
         if (!confirmation) return;
         setActionProcessing(true);
@@ -67,6 +86,16 @@ export default function Show({
                             {leadEditable && <Button href={`/sales/leads/${lead.id}/edit`} variant="outline" icon={FiEdit2}>Edit</Button>}
                             {canMarkLost && <Button onClick={() => setLostOpen(true)} variant="outline" icon={FiXCircle} className="border-danger/30 text-danger hover:bg-danger-soft">Tandai Gagal</Button>}
                             {canDelete && <Button onClick={() => setConfirmation('delete')} variant="ghost" icon={FiTrash2} className="text-danger hover:bg-danger-soft hover:text-danger">Hapus</Button>}
+                            {!canDelete && canForceDelete && (
+                                <Button
+                                    onClick={() => { setForceDeleteError(''); setForceDeleteOpen(true); }}
+                                    variant="ghost"
+                                    icon={FiTrash}
+                                    className="text-danger hover:bg-danger-soft hover:text-danger"
+                                >
+                                    Hapus Total
+                                </Button>
+                            )}
                         </>
                     }
                 />
@@ -93,6 +122,21 @@ export default function Show({
                     tone={confirmation === 'delete' ? 'danger' : 'info'}
                     confirmLabel={confirmation === 'delete' ? 'Hapus Lead' : 'Lanjutkan'}
                     processing={actionProcessing}
+                />
+
+                <PromptDialog
+                    open={forceDeleteOpen}
+                    onClose={() => setForceDeleteOpen(false)}
+                    onConfirm={confirmForceDelete}
+                    title="Hapus total data ini?"
+                    description={`Lead/opportunity ini sudah ada transaksi nyata (Invoice/Project) sehingga tidak bisa dihapus lewat cara biasa. Seluruh Requirement, Meeting, Survey, Procurement Request, Quotation, Sales Order, Invoice, Project, SOW, BAST, pembayaran vendor, dokumen, dan notifikasi yang terhubung akan ikut terhapus PERMANEN. Tindakan ini tidak bisa dibatalkan. Ketik ${leadCode} untuk konfirmasi.`}
+                    label="Kode Lead/Opportunity"
+                    placeholder={leadCode}
+                    required
+                    error={forceDeleteError}
+                    processing={forceDeleting}
+                    confirmLabel="Hapus Total"
+                    confirmVariant="danger"
                 />
 
                 {lead.type === 'lead' && convertBlockReason && (

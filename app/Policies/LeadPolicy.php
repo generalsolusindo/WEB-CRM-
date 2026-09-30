@@ -73,14 +73,21 @@ class LeadPolicy
     }
 
     /**
-     * Hapus total tanpa batasan apa pun (beda dari delete() di atas) — dipakai Manajemen
-     * untuk membersihkan data dummy/coba-coba, termasuk yang sudah ada Invoice, Project,
-     * pembayaran Procurement, dst. Sengaja hanya Manajemen: aksi ini permanen dan tidak
-     * bisa dibatalkan, jadi tidak dibuka untuk Sales meski itu lead miliknya sendiri.
+     * Hapus total tanpa batasan apa pun (beda dari delete() di atas) — buat membersihkan
+     * data dummy/coba-coba, termasuk yang sudah ada Invoice, Project, pembayaran
+     * Procurement, dst. Manajemen boleh untuk lead siapa pun; Sales cuma boleh untuk
+     * lead miliknya sendiri (dan tetap wajib ketik ulang kode lead-nya di layar sebagai
+     * konfirmasi — lihat Sales\Leads\Show.jsx — karena aksi ini permanen, tidak bisa
+     * dibatalkan). $lead null berarti dicek tanpa instance spesifik (mis. Gate::authorize
+     * dengan nama kelas) — hanya Manajemen yang lolos di kondisi itu.
      */
-    public function forceDelete(User $user): bool
+    public function forceDelete(User $user, ?Lead $lead = null): bool
     {
-        return $this->isManagement($user);
+        if ($this->isManagement($user)) {
+            return true;
+        }
+
+        return $lead !== null && $this->owns($user, $lead);
     }
 
     public function convert(User $user, Lead $lead): bool

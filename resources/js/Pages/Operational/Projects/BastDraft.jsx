@@ -2,20 +2,23 @@ import { Head, useForm } from '@inertiajs/react';
 import { useEffect } from 'react';
 import { FiFileText } from 'react-icons/fi';
 import AppLayout from '../../../Layouts/AppLayout';
-import { PageHeader, Card, Field, Input, Textarea, Button } from '../../../Components/ui';
+import { PageHeader, Card, Field, Input, Button } from '../../../Components/ui';
 
 export default function BastDraft({ project, draft, hasDraft }) {
     const form = useForm({
         number: draft.number ?? '',
         event_date: draft.event_date ?? '',
         job_title: draft.job_title ?? '',
-        work_description: draft.work_description ?? '',
         pic_name: draft.pic_name ?? '',
         pic_position: draft.pic_position ?? '',
         pic_address: draft.pic_address ?? '',
         leader_name: draft.leader_name ?? '',
         leader_position: draft.leader_position ?? '',
     });
+
+    // "Bahwa, Pihak Kedua telah melaksanakan pekerjaan ..." di cetakan BAST otomatis
+    // dipanggil dari judul pekerjaan ini — tidak perlu diketik ulang terpisah.
+    form.transform((data) => ({ ...data, work_description: data.job_title }));
 
     useEffect(() => {
         if (draft.number && !form.data.number) {
@@ -49,12 +52,8 @@ export default function BastDraft({ project, draft, hasDraft }) {
                             </Field>
                         </div>
 
-                        <Field label="Pekerjaan" error={form.errors.job_title}>
+                        <Field label="Pekerjaan" error={form.errors.job_title} hint="Otomatis dipakai juga sebagai uraian pekerjaan yang diserahterimakan di cetakan BAST.">
                             <Input value={form.data.job_title} onChange={(e) => form.setData('job_title', e.target.value)} placeholder="Mis. Instalasi PLTS On-Grid 10 kWp" />
-                        </Field>
-
-                        <Field label="Deskripsi Pelaksanaan Pekerjaan" error={form.errors.work_description}>
-                            <Textarea rows={4} value={form.data.work_description} onChange={(e) => form.setData('work_description', e.target.value)} placeholder="Uraikan pekerjaan yang telah dilaksanakan..." />
                         </Field>
 
                         <div>

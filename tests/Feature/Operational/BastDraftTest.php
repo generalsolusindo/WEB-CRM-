@@ -147,6 +147,29 @@ class BastDraftTest extends TestCase
             ->assertDontSee('Purchase Order (PO)');
     }
 
+    /**
+     * Regresi produksi: poin ke-2 BAST ("Bahwa, Pihak Kedua telah melaksanakan pekerjaan ...")
+     * tampil kosong (titik-titik) kalau field "Deskripsi Pelaksanaan Pekerjaan" tidak diisi
+     * terpisah — sekarang otomatis memakai judul Pekerjaan, tidak perlu diketik dua kali.
+     */
+    public function test_bast_print_fills_the_work_clause_from_job_title_when_description_is_blank(): void
+    {
+        [$project, $ops] = $this->projectWithLead();
+        $leader = User::factory()->create(['role' => 'technician', 'is_active' => true]);
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/technicians", [
+            'technician_ids' => [$leader->id], 'leader_id' => $leader->id,
+        ]);
+
+        $this->actingAs($ops)->put("/operational/projects/{$project->id}/bast-draft", [
+            'job_title' => 'Instalasi, Migrasi Data, Konfigurasi RAID, dan Testing NAS Synology',
+        ]);
+
+        $this->actingAs($ops)->get("/operational/projects/{$project->id}/bast-draft/print")
+            ->assertOk()
+            ->assertSee('telah melaksanakan pekerjaan')
+            ->assertSee('Instalasi, Migrasi Data, Konfigurasi RAID, dan Testing NAS Synology');
+    }
+
     public function test_bast_number_is_auto_generated_when_left_blank_on_first_save(): void
     {
         [$project, $ops] = $this->projectWithLead();

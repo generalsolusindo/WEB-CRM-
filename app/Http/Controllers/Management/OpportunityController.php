@@ -92,7 +92,7 @@ class OpportunityController extends Controller
      */
     public function destroy(Lead $lead, DeleteLeadCompletely $action): RedirectResponse
     {
-        Gate::authorize('forceDelete', Lead::class);
+        Gate::authorize('forceDelete', $lead);
 
         $action->handle($lead);
 

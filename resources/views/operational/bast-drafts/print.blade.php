@@ -84,7 +84,7 @@
 
         <ol>
             <li>Bahwa, sebelumnya Pihak Pertama dan Pihak Kedua telah mengadakan suatu kerja sama kontrak kerja berdasarkan {{ $referenceLabel }} Nomor : {{ $dots($referenceNumber, 20) }} tanggal {{ $referenceDate ? $referenceDate->format('d-m-Y') : '...............' }}, tentang Pekerjaan {{ $dots($draft->job_title, 30) }}</li>
-            <li>Bahwa, Pihak Kedua telah melaksanakan {{ $dots($draft->work_description, 40) }}</li>
+            <li>Bahwa, Pihak Kedua telah melaksanakan pekerjaan {{ $dots($draft->work_description ?: $draft->job_title, 40) }}</li>
             <li>Bahwa, Perjanjian tersebut telah mewajibkan Pihak Kedua untuk menyerahkan pekerjaan kepada Pihak Kesatu, sesuai dengan {{ $referenceLabel }}.</li>
             <li>Bahwa, untuk melaksanakan serah terima Pekerjaan berdasarkan {{ $referenceLabel }} sebagaimana dimaksud angka 2 diatas, maka Pihak Kedua dengan ini menyerahkan Pekerjaan kepada Pihak Pertama sebagaimana Pihak Pertama dengan ini menerima Pekerjaan tersebut dari Pihak Kedua.</li>
             <li>Bahwa, dengan telah dilakukannya serah terima Pekerjaan berdasarkan Berita Acara ini, maka dengan demikian kewajiban Pihak Kedua untuk menyerahkan Pekerjaan kepada Pihak Pertama dan hak Pihak Pertama untuk menerima Pekerjaan tersebut dari Pihak Kedua berdasarkan Perjanjian telah dilaksanakan.</li>

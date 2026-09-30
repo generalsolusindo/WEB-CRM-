@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Sales;
 
+use App\Actions\Management\DeleteLeadCompletely;
 use App\Actions\Sales\DeleteLead;
 use App\Enums\LeadSource;
 use App\Enums\LeadStage;
@@ -216,6 +217,7 @@ class LeadController extends Controller
                 && request()->user()->can('submitAddendum', $lead),
             'hasActiveSalesOrderForAddendum' => $hasActiveSalesOrder,
             'canDelete' => request()->user()->can('delete', $lead),
+            'canForceDelete' => request()->user()->can('forceDelete', $lead),
             'canMarkLost' => request()->user()->can('markLost', $lead),
             'convertBlockReason' => $lead->type === LeadType::Lead->value
                 ? $this->convertBlocker($lead)
@@ -284,6 +286,21 @@ class LeadController extends Controller
 
         return redirect()->route('sales.leads.index')
             ->with('success', 'Lead berhasil dihapus.');
+    }
+
+    /**
+     * Hapus total (permanen, tanpa batasan) — dipakai untuk lead/opportunity milik sendiri
+     * yang sudah kepalang ada transaksi nyata (Invoice/Project), jadi tidak lagi memenuhi
+     * syarat destroy() di atas. Beda dari itu, aksi ini tidak bisa dibatalkan sama sekali.
+     */
+    public function forceDestroy(Lead $lead, DeleteLeadCompletely $action): RedirectResponse
+    {
+        Gate::authorize('forceDelete', $lead);
+
+        $action->handle($lead);
+
+        return redirect()->route('sales.leads.index')
+            ->with('success', 'Data berhasil dihapus total beserta seluruh riwayatnya.');
     }
 
     /**

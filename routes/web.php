@@ -424,6 +424,7 @@ Route::middleware('auth')->group(function () {
             ->name('sales-orders.documents');
         Route::resource('sales-orders', SalesOrderController::class)->only(['index', 'show']);
         Route::resource('leads', LeadController::class);
+        Route::delete('leads/{lead}/force', [LeadController::class, 'forceDestroy'])->name('leads.force-destroy');
     });
 
     Route::prefix('sales')->name('sales.')->middleware('role:sales,management,project_manager')->group(function () {
