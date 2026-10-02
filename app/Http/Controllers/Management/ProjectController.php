@@ -32,7 +32,7 @@ class ProjectController extends Controller
         ]));
 
         $projects = Project::query()
-            ->with(['salesOrder:id,number,contact_id,status', 'salesOrder.contact:id,name', 'salesOrder.lines:id,sales_order_id,category,qty', 'delegatedTo:id,name'])
+            ->with(['salesOrder:id,number,contact_id,status', 'salesOrder.contact:id,name,company_name', 'salesOrder.lines:id,sales_order_id,category,qty', 'delegatedTo:id,name'])
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($filters['from'] ?? null, fn ($q, $from) => $q->whereDate('created_at', '>=', $from))
             ->when($filters['to'] ?? null, fn ($q, $to) => $q->whereDate('created_at', '<=', $to))

@@ -2,11 +2,10 @@
 
 namespace Tests\Feature\Management;
 
-use App\Models\Bast;
 use App\Models\Contact;
 use App\Models\Lead;
-use App\Models\Project;
 use App\Models\ProcurementRequest;
+use App\Models\Project;
 use App\Models\Quotation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,6 +22,28 @@ class ProjectDelegationTest extends TestCase
 
         $this->actingAs($management)->get('/management/projects')->assertOk();
         $this->actingAs($management)->get("/management/projects/{$project->id}")->assertOk();
+    }
+
+    /** Laporan Manager: daftar project cuma nampilin nama PIC, nama perusahaannya tidak kelihatan. */
+    public function test_project_list_shows_company_name_alongside_contact_name(): void
+    {
+        $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
+        $project = $this->plannedProject();
+        $contact = $project->salesOrder->contact;
+        $contact->update(['company_name' => 'PT Mitra Jaya']);
+
+        $this->actingAs($management)->get('/management/projects')
+            ->assertInertia(fn ($page) => $page->where('projects.data.0.customer', "{$contact->name} · PT Mitra Jaya"));
+    }
+
+    public function test_project_list_marks_contact_without_company_as_perorangan(): void
+    {
+        $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
+        $project = $this->plannedProject();
+        $contact = $project->salesOrder->contact;
+
+        $this->actingAs($management)->get('/management/projects')
+            ->assertInertia(fn ($page) => $page->where('projects.data.0.customer', "{$contact->name} (perorangan)"));
     }
 
     public function test_project_overview_shows_stage_options_and_won_flag(): void
@@ -62,7 +83,7 @@ class ProjectDelegationTest extends TestCase
         $this->assertNotNull($project->delegated_at);
 
         // PM sekarang bisa lihat project ini
-        $this->actingAs($pm)->get("/management/projects")->assertForbidden();
+        $this->actingAs($pm)->get('/management/projects')->assertForbidden();
         $this->actingAs($pm)->get("/project-manager/projects/{$project->id}")->assertOk();
         $this->assertCount(1, Project::where('delegated_to', $pm->id)->get());
 
