@@ -95,8 +95,8 @@ class VendorServicePaymentController extends Controller
                 'notes' => $p->notes,
                 'submitted_by' => $p->submitter?->name,
                 'bast_verified' => $p->bastVerified(),
-                'sow_status' => $p->project->sow?->status?->value,
-                'sow_status_label' => $p->project->sow?->status?->label(),
+                'sow_status' => $p->project->sow?->status,
+                'sow_status_label' => $p->project->sow ? SowStatus::from($p->project->sow->status)->label() : null,
             ],
             'entries' => $p->entries->map($entryRow)->values(),
             'cancelledEntries' => $cancelled->map(fn ($e) => [

@@ -344,6 +344,12 @@ class VendorServicePaymentFlowTest extends TestCase
         $this->actingAs($this->finance)->get('/finance/vendor-service-payments')
             ->assertOk()
             ->assertInertia(fn ($page) => $page->where('payments.0.next', 'Bayar DP'));
+        // Begitu SOW sungguhan ada (bukan null lagi), halaman detail tidak boleh error
+        // 500 ("Attempt to read property 'value' on string") — status SOW disimpan
+        // sebagai string biasa di kolom, bukan di-cast ke enum.
+        $this->actingAs($this->finance)->get("/finance/vendor-service-payments/{$deal->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('canPayDp', true)->where('payment.sow_status', 'completed')->where('payment.sow_status_label', 'Selesai'));
         $this->assertSame(1, app(MenuBadges::class)->for($this->finance)['/finance/vendor-service-payments']);
 
         $this->pay($deal, 'dp');
