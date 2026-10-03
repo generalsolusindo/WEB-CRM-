@@ -68,7 +68,11 @@ export default function Show({ quotation, canReview, role, backHref }) {
                                         : null;
                                     return (
                                         <tr key={line.id}>
-                                            <td className="sticky left-0 z-[1] bg-surface w-44 min-w-44 px-4 py-3 sm:w-auto"><div className="font-medium text-text">{line.item_name}</div><CategoryBadge category={line.category} /></td>
+                                            <td className="sticky left-0 z-[1] bg-surface w-44 min-w-44 px-4 py-3 sm:w-auto">
+                                                <div className="font-medium text-text">{line.item_name}</div>
+                                                {line.description?.trim() && <div className="mt-1 whitespace-pre-line text-xs text-text-muted">Keterangan: {line.description}</div>}
+                                                <CategoryBadge category={line.category} />
+                                            </td>
                                             <td className="px-4 py-3 text-text-muted">{line.qty} {line.unit}</td>
                                             {isMgmt && <td className="px-4 py-3 text-right text-text-muted">{money(line.cost_price)}</td>}
                                             <td className="px-4 py-3 text-right text-text">{money(line.selling_price)}</td>
