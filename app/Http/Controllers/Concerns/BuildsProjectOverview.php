@@ -7,7 +7,6 @@ use App\Enums\InvoiceStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\SalesOrderStatus;
 use App\Models\Attachment;
-use App\Models\Contact;
 use App\Models\Project;
 use App\Services\Operational\MaterialDeliveryStatus;
 use Illuminate\Support\Facades\Storage;
@@ -26,7 +25,8 @@ trait BuildsProjectOverview
             'number' => 'PRJ-'.str_pad((string) $p->id, 6, '0', STR_PAD_LEFT),
             'status' => $p->status,
             'status_label' => ProjectStatus::from($p->status)->label(),
-            'customer' => $this->customerLabel($p->salesOrder?->contact),
+            'customer' => $p->salesOrder?->contact?->name,
+            'company' => $p->salesOrder?->contact?->company_name,
             'delegated_to' => $p->delegatedTo?->name,
             'material_status' => $p->salesOrder ? MaterialDeliveryStatus::of($p->salesOrder) : null,
             'is_won' => $p->salesOrder?->status === SalesOrderStatus::Won->value,
@@ -173,15 +173,5 @@ trait BuildsProjectOverview
     private function attachmentUrl(?Attachment $attachment): ?string
     {
         return $attachment ? Storage::disk('local')->temporaryUrl($attachment->file_path, now()->addDay()) : null;
-    }
-
-    /** Nama PIC + nama perusahaan — sama seperti konvensi di dashboard Finance. */
-    private function customerLabel(?Contact $contact): ?string
-    {
-        if (! $contact) {
-            return null;
-        }
-
-        return $contact->company_name ? "{$contact->name} · {$contact->company_name}" : "{$contact->name} (perorangan)";
     }
 }

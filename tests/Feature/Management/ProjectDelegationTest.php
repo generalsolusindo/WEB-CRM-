@@ -25,7 +25,7 @@ class ProjectDelegationTest extends TestCase
     }
 
     /** Laporan Manager: daftar project cuma nampilin nama PIC, nama perusahaannya tidak kelihatan. */
-    public function test_project_list_shows_company_name_alongside_contact_name(): void
+    public function test_project_list_includes_company_name_separately_from_contact_name(): void
     {
         $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
         $project = $this->plannedProject();
@@ -33,17 +33,21 @@ class ProjectDelegationTest extends TestCase
         $contact->update(['company_name' => 'PT Mitra Jaya']);
 
         $this->actingAs($management)->get('/management/projects')
-            ->assertInertia(fn ($page) => $page->where('projects.data.0.customer', "{$contact->name} · PT Mitra Jaya"));
+            ->assertInertia(fn ($page) => $page
+                ->where('projects.data.0.customer', $contact->name)
+                ->where('projects.data.0.company', 'PT Mitra Jaya'));
     }
 
-    public function test_project_list_marks_contact_without_company_as_perorangan(): void
+    public function test_project_list_company_is_null_when_contact_has_none(): void
     {
         $management = User::factory()->create(['role' => 'management', 'is_active' => true]);
         $project = $this->plannedProject();
         $contact = $project->salesOrder->contact;
 
         $this->actingAs($management)->get('/management/projects')
-            ->assertInertia(fn ($page) => $page->where('projects.data.0.customer', "{$contact->name} (perorangan)"));
+            ->assertInertia(fn ($page) => $page
+                ->where('projects.data.0.customer', $contact->name)
+                ->where('projects.data.0.company', null));
     }
 
     public function test_project_overview_shows_stage_options_and_won_flag(): void

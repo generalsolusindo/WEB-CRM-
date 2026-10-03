@@ -16,7 +16,7 @@ class ProjectOverviewIndexTest extends TestCase
     use RefreshDatabase;
 
     /** Sama seperti daftar project Management: nama perusahaan harus ikut tampil, bukan cuma nama PIC. */
-    public function test_project_list_shows_company_name_alongside_contact_name(): void
+    public function test_project_list_includes_company_name_separately_from_contact_name(): void
     {
         $pm = User::factory()->create(['role' => 'project_manager', 'is_active' => true]);
         $project = $this->delegatedProject($pm);
@@ -24,7 +24,9 @@ class ProjectOverviewIndexTest extends TestCase
         $contact->update(['company_name' => 'PT Mitra Jaya']);
 
         $this->actingAs($pm)->get('/project-manager/projects')
-            ->assertInertia(fn ($page) => $page->where('projects.data.0.customer', "{$contact->name} · PT Mitra Jaya"));
+            ->assertInertia(fn ($page) => $page
+                ->where('projects.data.0.customer', $contact->name)
+                ->where('projects.data.0.company', 'PT Mitra Jaya'));
     }
 
     private function delegatedProject(User $pm): Project

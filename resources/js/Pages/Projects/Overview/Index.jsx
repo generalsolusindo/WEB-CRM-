@@ -40,7 +40,16 @@ export default function Index({ projects, filters, statusOptions, role }) {
                 </span>
             ),
         },
-        { key: 'customer', label: 'Customer', render: (p) => p.customer || '—' },
+        {
+            key: 'customer',
+            label: 'Customer',
+            render: (p) => (
+                <span className="flex flex-col">
+                    <span>{p.customer || '—'}</span>
+                    {p.company && <span className="text-xs text-text-muted">{p.company}</span>}
+                </span>
+            ),
+        },
         { key: 'status', label: 'Status', render: (p) => <StatusBadge status={p.status} label={p.status_label} /> },
         {
             key: 'material',
